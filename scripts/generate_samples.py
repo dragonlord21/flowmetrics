@@ -195,7 +195,7 @@ def build_index_html(sets: list[SampleSet], generated_at: datetime) -> str:
             "\n        <tr>\n"
             f'          <td><strong>{html.escape(slug)}</strong><br>'
             f'<span class="archetype">{html.escape(s.repo.archetype)}</span></td>\n'
-            f"          {_cell(d, 'efficiency-week', True)}\n"
+            f"          {_cell(d, 'efficiency', True)}\n"
             f"          {_cell(d, 'forecast-when-done', True)}\n"
             f"          {_cell(d, 'forecast-how-many', True)}\n"
             f"          {_cell(d, 'cfd', s.cfd_html is not None)}\n"
@@ -303,7 +303,7 @@ def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleS
     out_dir = SAMPLES_DIR / slug_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Window for "efficiency week" — the 7 days ending at history_end (UTC-yesterday).
+    # Window for the efficiency report — the 7 days ending at history_end (UTC-yesterday).
     end_date = datetime.strptime(history_end, "%Y-%m-%d").replace(tzinfo=UTC).date()
     week_start = (end_date - timedelta(days=6)).isoformat()
     week_stop = end_date.isoformat()
@@ -316,7 +316,7 @@ def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleS
     common_cache = ["--cache-dir", str(cache_dir)]
 
     common_efficiency = [
-        "efficiency", "week",
+        "efficiency",
         *source_args,
         "--start", week_start, "--stop", week_stop,
         *common_cache,
@@ -344,7 +344,7 @@ def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleS
     ]
 
     commands: list[tuple[list[str], str]] = [
-        (common_efficiency, "efficiency-week"),
+        (common_efficiency, "efficiency"),
         (common_when_done, "forecast-when-done"),
         (common_how_many, "forecast-how-many"),
     ]
@@ -393,9 +393,9 @@ def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleS
 
     return SampleSet(
         repo=repo,
-        efficiency_html=out_dir / "efficiency-week.html",
-        efficiency_json=out_dir / "efficiency-week.json",
-        efficiency_text=out_dir / "efficiency-week.txt",
+        efficiency_html=out_dir / "efficiency.html",
+        efficiency_json=out_dir / "efficiency.json",
+        efficiency_text=out_dir / "efficiency.txt",
         when_done_html=out_dir / "forecast-when-done.html",
         when_done_json=out_dir / "forecast-when-done.json",
         when_done_text=out_dir / "forecast-when-done.txt",

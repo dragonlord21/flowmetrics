@@ -153,7 +153,8 @@ class TestEfficiencyJson:
 
     def test_cli_invocation_is_a_reproducible_command(self):
         payload = json.loads(json_renderer.render(_efficiency_report()))
-        assert payload["cli_invocation"].startswith("uv run flow efficiency week")
+        assert payload["cli_invocation"].startswith("uv run flow efficiency ")
+        assert "uv run flow efficiency week" not in payload["cli_invocation"]
         assert "--repo acme/widget" in payload["cli_invocation"]
 
     def test_answer_first_field_ordering(self):
@@ -199,7 +200,7 @@ class TestEfficiencyJson:
     def test_schema_pinned(self):
         payload = json.loads(json_renderer.render(_efficiency_report()))
         assert payload["schema"] == "flowmetrics.efficiency.v1"
-        assert payload["command"] == "efficiency week"
+        assert payload["command"] == "efficiency"
 
     def test_generated_at_is_iso8601(self):
         payload = json.loads(json_renderer.render(_efficiency_report()))

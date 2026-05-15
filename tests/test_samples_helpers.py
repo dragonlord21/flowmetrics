@@ -59,9 +59,9 @@ def _sample_set(
     d = slug.replace("/", "_")
     return SampleSet(
         repo=Repo(slug=slug, archetype="test", cli_args=["--repo", slug]),
-        efficiency_html=Path(f"samples/{d}/efficiency-week.html"),
-        efficiency_json=Path(f"samples/{d}/efficiency-week.json"),
-        efficiency_text=Path(f"samples/{d}/efficiency-week.txt"),
+        efficiency_html=Path(f"samples/{d}/efficiency.html"),
+        efficiency_json=Path(f"samples/{d}/efficiency.json"),
+        efficiency_text=Path(f"samples/{d}/efficiency.txt"),
         when_done_html=Path(f"samples/{d}/forecast-when-done.html"),
         when_done_json=Path(f"samples/{d}/forecast-when-done.json"),
         when_done_text=Path(f"samples/{d}/forecast-when-done.txt"),
@@ -94,8 +94,8 @@ class TestBuildIndexHtml:
     def test_links_to_every_format(self):
         sets = [_sample_set("astral-sh/uv")]
         out = build_index_html(sets, datetime(2026, 5, 12, 14, 30, tzinfo=UTC))
-        assert "efficiency-week.html" in out
-        assert "efficiency-week.json" in out
+        assert "efficiency.html" in out
+        assert "efficiency.json" in out
         assert "forecast-when-done.html" in out
         assert "forecast-how-many.html" in out
 

@@ -19,10 +19,10 @@ The CLI is `flow`, grouped into five subcommands.
 
 ```
 # This week (Monday to Sunday)
-uv run flow efficiency week --repo astral-sh/uv
+uv run flow efficiency --repo astral-sh/uv
 
 # A specific window
-uv run flow efficiency week --repo astral-sh/uv \
+uv run flow efficiency --repo astral-sh/uv \
     --start 2026-05-04 --stop 2026-05-10
 ```
 

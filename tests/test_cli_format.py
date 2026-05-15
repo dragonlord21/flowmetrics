@@ -39,8 +39,8 @@ class TestHelpMentionsAgentUsage:
         result = _invoke("--help")
         assert "json" in result.output.lower()
 
-    def test_efficiency_week_help_mentions_agent_or_json(self):
-        result = _invoke("efficiency", "week", "--help")
+    def test_efficiency_help_mentions_agent_or_json(self):
+        result = _invoke("efficiency", "--help")
         assert "agent" in result.output.lower() or "--format json" in result.output
 
     def test_forecast_when_done_help_mentions_agent_or_json(self):
@@ -58,10 +58,9 @@ class TestHelpMentionsAgentUsage:
 
 
 class TestDefaultIsText:
-    def test_efficiency_week_default_is_text(self):
+    def test_efficiency_default_is_text(self):
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -86,10 +85,9 @@ class TestDefaultIsText:
 
 
 class TestJsonFormat:
-    def test_efficiency_week_json_parses(self):
+    def test_efficiency_json_parses(self):
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -151,7 +149,6 @@ class TestErrorEnvelope:
         # Empty cache dir + --offline → CacheMiss
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -202,7 +199,6 @@ class TestStderrEndsUpInJsonLogs:
 
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -239,7 +235,6 @@ class TestStderrEndsUpInJsonLogs:
 
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -270,7 +265,6 @@ class TestStderrEndsUpInJsonLogs:
 
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -293,7 +287,6 @@ class TestStderrEndsUpInJsonLogs:
         logs is an empty list rather than spurious framework chatter."""
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -329,8 +322,7 @@ class TestActiveStatusesFlag:
         monkeypatch.setattr(cli_module, "flowmetrics_for_window", spy)
 
         result = _invoke(
-            "efficiency", "week",
-            "--repo", "astral-sh/uv",
+            "efficiency", "--repo", "astral-sh/uv",
             "--start", "2026-05-04", "--stop", "2026-05-10",
             "--cache-dir", FIXTURE_CACHE, "--offline",
             "--active-statuses", "In Progress,Code Review,In Development",
@@ -354,8 +346,7 @@ class TestActiveStatusesFlag:
         monkeypatch.setattr(cli_module, "flowmetrics_for_window", spy)
 
         result = _invoke(
-            "efficiency", "week",
-            "--repo", "astral-sh/uv",
+            "efficiency", "--repo", "astral-sh/uv",
             "--start", "2026-05-04", "--stop", "2026-05-10",
             "--cache-dir", FIXTURE_CACHE, "--offline",
         )
@@ -370,7 +361,6 @@ class TestHtmlFormat:
         out = tmp_path / "report.html"
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -395,7 +385,6 @@ class TestHtmlFormat:
         monkeypatch.chdir(tmp_path)
         result = _invoke(
             "efficiency",
-            "week",
             "--repo",
             "astral-sh/uv",
             "--start",
@@ -411,4 +400,5 @@ class TestHtmlFormat:
         assert result.exit_code == 0, result.output
         reports = list((tmp_path / "reports").glob("*.html"))
         assert len(reports) == 1
-        assert reports[0].name.startswith("flow-efficiency-week-")
+        assert reports[0].name.startswith("flow-efficiency-")
+        assert not reports[0].name.startswith("flow-efficiency-week-")

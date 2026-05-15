@@ -31,7 +31,7 @@ A one-line headline for terminals and pipelines (`--format text`,
 default):
 
 ```
-$ uv run flow efficiency week --repo astral-sh/uv
+$ uv run flow efficiency --repo astral-sh/uv
 Portfolio flow efficiency for astral-sh/uv May 5, 2026 → May 11, 2026:
 8.4% across 46 completed items (31 human, 15 bot).
 

@@ -164,7 +164,8 @@ class TestEfficiencyHtml:
         """Each report shows the CLI command that produced it — useful
         for humans (copy-paste to reproduce) and agents (provenance)."""
         out = html_renderer.render(_efficiency_report())
-        assert "uv run flow efficiency week" in out
+        assert "uv run flow efficiency" in out
+        assert "uv run flow efficiency week" not in out
         assert "--repo acme/widget" in out
 
     def test_actionable_content_comes_before_detail(self):
@@ -965,7 +966,11 @@ class TestDefaultOutputPath:
         eff_path = str(html_renderer.default_output_path(_efficiency_report()))
         wd_path = str(html_renderer.default_output_path(_when_done_report()))
         hm_path = str(html_renderer.default_output_path(_how_many_report()))
-        assert "efficiency-week" in eff_path
+        # Efficiency is now flat (no `week` subcommand), so the slug
+        # collapses to plain `efficiency`. Filename pattern matches
+        # `flow-aging-...` / `flow-cfd-...`.
+        assert "flow-efficiency-" in eff_path
+        assert "flow-efficiency-week-" not in eff_path
         assert "forecast-when-done" in wd_path
         assert "forecast-how-many" in hm_path
 

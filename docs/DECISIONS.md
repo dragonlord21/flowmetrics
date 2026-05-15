@@ -7,7 +7,7 @@ made, the cost we accepted, and when the decision should be revisited.
 ## 1. One shared GraphQL query for both efficiency and forecast
 
 **What we do.** A single query (`PR_SEARCH_QUERY` in
-`src/flowmetrics/github.py`) drives both `flow efficiency week` and
+`src/flowmetrics/github.py`) drives both `flow efficiency` and
 `flow forecast`. The query fetches PR metadata *and* the first 100
 timeline events per PR inline, in a single round trip per page.
 

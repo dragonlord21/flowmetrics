@@ -396,7 +396,7 @@ shape we expect. If GitHub changes the response shape, or you change
 and the fixture test fails with `CacheMiss`. Re-record with:
 
 ```
-uv run flow efficiency week \
+uv run flow efficiency \
     --repo astral-sh/uv \
     --start 2026-05-04 --stop 2026-05-10 \
     --cache-dir tests/fixtures/cache

@@ -133,7 +133,7 @@ A scheduling unit, not a flow concept. We use absolute dates.
 
 ### PR (pull request)
 
-GitHub-specific. The unit our `efficiency week` command measures and
+GitHub-specific. The unit our `efficiency` command measures and
 the unit `forecast` counts.
 
 ### Issue

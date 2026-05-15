@@ -92,7 +92,7 @@ class TestEfficiencyReport:
             interpretation=_interp(),
         )
         assert r.schema == "flowmetrics.efficiency.v1"
-        assert r.command == "efficiency week"
+        assert r.command == "efficiency"
 
     def test_generated_at_defaults_to_now(self):
         before = datetime.now().astimezone()
@@ -328,7 +328,9 @@ class TestCliInvocation:
             interpretation=_interp(),
         )
         cmd = cli_invocation(report)
-        assert cmd.startswith("uv run flow efficiency week")
+        # Flat command — no `week` subcommand any more.
+        assert cmd.startswith("uv run flow efficiency ")
+        assert "uv run flow efficiency week" not in cmd
         assert "--repo acme/widget" in cmd
         assert "--start 2026-05-04" in cmd
         assert "--stop 2026-05-10" in cmd

@@ -53,7 +53,7 @@ class EfficiencyReport:
     interpretation: Interpretation
     generated_at: datetime = field(default_factory=lambda: datetime.now().astimezone())
     schema: str = "flowmetrics.efficiency.v1"
-    command: str = "efficiency week"
+    command: str = "efficiency"
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +484,7 @@ def cli_invocation(report: Report) -> str:
     """
     if isinstance(report, EfficiencyReport):
         parts = [
-            "uv run flow efficiency week",
+            "uv run flow efficiency",
             *_source_args(report.input),
             f"--start {report.input.start.isoformat()}",
             f"--stop {report.input.stop.isoformat()}",

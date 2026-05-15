@@ -243,12 +243,7 @@ def cli() -> None:
     """
 
 
-@cli.group(short_help="Flow efficiency (active vs. wait time)")
-def efficiency() -> None:
-    """Flow efficiency: active vs. wait time on merged PRs."""
-
-
-@efficiency.command()
+@cli.command(short_help="Flow efficiency (active vs. wait time)")
 @_apply_source_options
 @click.option(
     "--start",
@@ -290,7 +285,7 @@ def efficiency() -> None:
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
-def week(
+def efficiency(
     repo: str | None,
     jira_url: str | None,
     jira_project: str | None,
@@ -305,7 +300,7 @@ def week(
     output: Path | None,
     verbose: bool,
 ) -> None:
-    """Compute flow efficiency for a date window (defaults to this week).
+    """Flow efficiency for a date window (defaults to this week).
 
     For agent use, pass --format json (schema: flowmetrics.efficiency.v1).
     """
