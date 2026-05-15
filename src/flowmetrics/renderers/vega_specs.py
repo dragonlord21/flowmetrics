@@ -205,11 +205,17 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
             ],
         },
         # Inject state_index for explicit stacking order matching
-        # workflow earliest→latest.
+        # workflow earliest→latest. Build a right-associative ternary
+        # chain `A ? 0 : B ? 1 : C ? 2 : -1`. Vega compiles the
+        # expression via `new Function()`, so the string must be valid
+        # JS — the earlier `A ? 0 || B ? 1 : -1` form was syntactically
+        # broken (`A ? B || C ? D : E` parses as a ternary missing its
+        # `:` after A) and rejected with "Unexpected end of input".
         "transform": [
-            {"calculate": " || ".join(
-                f"datum.state === '{s}' ? {i}" for i, s in enumerate(workflow)
-            ) + " : -1", "as": "state_index"},
+            {"calculate": "".join(
+                f"datum.state === '{s}' ? {i} : "
+                for i, s in enumerate(workflow)
+            ) + "-1", "as": "state_index"},
         ],
     }
 

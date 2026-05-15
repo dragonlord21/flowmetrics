@@ -13,6 +13,7 @@ unit tests of spec shape would miss.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime, timedelta
 
 from flowmetrics.aging import AgingItem
@@ -735,6 +736,49 @@ class TestCfdSpec:
         assert "items" in area_layer["encoding"]["y"]["axis"]["title"].lower() or \
                "WIP" in area_layer["encoding"]["y"]["axis"]["title"] or \
                "Count" in area_layer["encoding"]["y"]["axis"]["title"]
+
+    def test_state_index_calculate_is_valid_javascript_ternary(self):
+        """Vega evaluates `calculate` strings with `new Function()`. A
+        chain like `A ? 0 || B ? 1 : -1` is missing a colon after `A`
+        — JS throws 'Unexpected end of input' and Vega's promise
+        rejects with that message. The correct shape is a nested
+        ternary: `A ? 0 : B ? 1 : -1`. This test parses the expression
+        through node to confirm it's syntactically valid JS."""
+        import subprocess
+
+        spec = vega_specs.cfd_spec(_cfd_report(
+            [(date(2026, 5, 1), {"Open": 1, "In Progress": 0, "Done": 0})],
+            workflow=("Open", "In Progress", "Done"),
+        ))
+        area_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "area"
+        )
+        calc = next(
+            t["calculate"] for t in area_layer["transform"]
+            if t.get("as") == "state_index"
+        )
+        # Compile through node to validate JS syntax — this is what
+        # Vega does internally via new Function() when it evaluates the
+        # expression at runtime. Pass the expression via JSON.parse on
+        # a stdin-fed payload so single quotes inside the expression
+        # don't fight the shell.
+        result = subprocess.run(
+            ["node", "-e",
+             "let s=''; "
+             "process.stdin.on('data', c => s += c); "
+             "process.stdin.on('end', () => { "
+             "  const expr = JSON.parse(s); "
+             "  new Function('datum', 'return (' + expr + ')'); "
+             "});"],
+            input=json.dumps(calc),
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, (
+            f"state_index calculate expression is not valid JS: "
+            f"{calc!r}\nstderr: {result.stderr}"
+        )
 
     def test_two_state_github_degenerate_case_still_renders(self):
         """GitHub PR CFD is two-state (Open, Merged) per DECISIONS.md.
