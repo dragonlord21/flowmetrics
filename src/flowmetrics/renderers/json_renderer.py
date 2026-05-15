@@ -206,6 +206,29 @@ def _render_cfd(report: CfdReport) -> dict[str, Any]:
     workflow = list(report.input.workflow)
     arrivals = end.counts_by_state.get(workflow[0], 0) if end else 0
     departures = end.counts_by_state.get(workflow[-1], 0) if end else 0
+
+    # `bands` is the band-width view: for each (date, step) it carries
+    # `wip_in_state` (items currently in that step) alongside the
+    # cumulative line value. Computed once here so consumers — Vega
+    # specs, downstream tools, humans grep'ing the JSON — don't have
+    # to re-derive it. The invariant Σ wip_in_state_on_date = top line
+    # is enforced by tests.
+    bands: list[dict[str, Any]] = []
+    for pt in report.points:
+        for i, state in enumerate(workflow):
+            line = pt.counts_by_state.get(state, 0)
+            if i + 1 < len(workflow):
+                next_line = pt.counts_by_state.get(workflow[i + 1], 0)
+                wip = line - next_line
+            else:
+                wip = line  # bottom band = terminal-state cumulative
+            bands.append({
+                "sampled_on": pt.sampled_on.isoformat(),
+                "state": state,
+                "wip_in_state": wip,
+                "entered_at_or_later": line,
+            })
+
     return {
         "schema": report.schema,
         "command": report.command,
@@ -231,6 +254,7 @@ def _render_cfd(report: CfdReport) -> dict[str, Any]:
                 }
                 for p in report.points
             ],
+            "bands": bands,
         },
         "input": {
             "repo": report.input.repo,

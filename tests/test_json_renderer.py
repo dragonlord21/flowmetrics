@@ -26,6 +26,9 @@ from flowmetrics.renderers import json_renderer
 from flowmetrics.report import (
     AgingInput,
     AgingReport,
+    CfdInput,
+    CfdPoint,
+    CfdReport,
     EfficiencyInput,
     EfficiencyReport,
     HowManyInput,
@@ -341,6 +344,128 @@ class TestHowManyJson:
 # ---------------------------------------------------------------------------
 # Logs + errors
 # ---------------------------------------------------------------------------
+
+
+def _cfd_report() -> CfdReport:
+    """A 7-step workflow modelled on the Cassandra fixture, with a
+    known cumulative-at-state-or-later snapshot so we can verify the
+    JSON envelope carries both the line values and the per-step band
+    widths in a single self-contained test fixture.
+
+    At 2026-04-15 the counts mirror Vacanti's worked example shape:
+    line[step_0] = 29, monotonically decreasing to line[step_6] = 2,
+    so total WIP = 27 and the per-step band widths are 5, 4, 4, 11,
+    2, 1, 2 — sum = 29 = top line, exactly as property #1 + #3
+    require.
+    """
+    workflow = (
+        "Triage Needed", "Open", "In Progress", "Patch Available",
+        "Review In Progress", "Ready to Commit", "Resolved",
+    )
+    counts_d1 = {
+        "Triage Needed": 29, "Open": 24, "In Progress": 20,
+        "Patch Available": 16, "Review In Progress": 5,
+        "Ready to Commit": 3, "Resolved": 2,
+    }
+    counts_d2 = {
+        "Triage Needed": 30, "Open": 26, "In Progress": 23,
+        "Patch Available": 18, "Review In Progress": 8,
+        "Ready to Commit": 5, "Resolved": 3,
+    }
+    return CfdReport(
+        input=CfdInput(
+            repo="acme/widget",
+            start=date(2026, 4, 15),
+            stop=date(2026, 4, 16),
+            workflow=workflow,
+            interval_days=1,
+            offline=False,
+        ),
+        points=[
+            CfdPoint(date(2026, 4, 15), counts_d1),
+            CfdPoint(date(2026, 4, 16), counts_d2),
+        ],
+        interpretation=_interp(),
+        generated_at=datetime(2026, 4, 16, 12, 0, tzinfo=UTC),
+    )
+
+
+class TestCfdJson:
+    """The canonical CFD JSON envelope. `chart_data.points` carries
+    the cumulative line values (Vacanti property #2 — never decrease,
+    one value per workflow step per sample date). `chart_data.bands`
+    carries the per-step band widths — items currently in each
+    workflow step — so visualization consumers don't have to derive
+    them and so the JSON is directly readable by humans who just
+    want 'how many things are in In Progress right now'."""
+
+    def test_envelope_carries_canonical_cumulative_line_values(self):
+        """`chart_data.points` must keep the same shape it has had —
+        per-date map of workflow state → cumulative line value. This
+        is what other CFD tools / docs consume."""
+        payload = json.loads(json_renderer.render(_cfd_report()))
+        pts = payload["chart_data"]["points"]
+        assert len(pts) == 2
+        first = pts[0]
+        assert first["sampled_on"] == "2026-04-15"
+        assert first["counts_by_state"]["Triage Needed"] == 29
+        assert first["counts_by_state"]["Resolved"] == 2
+
+    def test_envelope_adds_per_step_band_widths(self):
+        """`chart_data.bands` carries WIP-per-step (the band-width
+        view) alongside the cumulative line value. Each row pins down
+        exactly one workflow step on exactly one sample date."""
+        payload = json.loads(json_renderer.render(_cfd_report()))
+        assert "bands" in payload["chart_data"]
+        bands = payload["chart_data"]["bands"]
+        # 2 sample dates × 7 workflow steps.
+        assert len(bands) == 14
+        row = next(b for b in bands
+                   if b["sampled_on"] == "2026-04-15"
+                   and b["state"] == "Open")
+        assert row["wip_in_state"] == 24 - 20  # line[Open] - line[InProgress]
+        assert row["entered_at_or_later"] == 24
+
+    def test_bottom_band_uses_terminal_state_count_directly(self):
+        """The last workflow step has no 'later state' to subtract.
+        Its band width equals its cumulative line value — Vacanti's
+        Property #3 boundary case for the terminal step."""
+        payload = json.loads(json_renderer.render(_cfd_report()))
+        bands = payload["chart_data"]["bands"]
+        row = next(b for b in bands
+                   if b["sampled_on"] == "2026-04-15"
+                   and b["state"] == "Resolved")
+        assert row["wip_in_state"] == 2  # = line[Resolved]
+        assert row["entered_at_or_later"] == 2
+
+    def test_per_date_band_widths_sum_to_top_line(self):
+        """Property #1 + #3 corollary: summing every step's band width
+        on a given date equals the top line value (= cumulative
+        arrivals). This is the invariant that makes a stacked-area
+        CFD render correctly."""
+        payload = json.loads(json_renderer.render(_cfd_report()))
+        bands = payload["chart_data"]["bands"]
+        pts = payload["chart_data"]["points"]
+        for pt in pts:
+            top_line = pt["counts_by_state"]["Triage Needed"]
+            total_band = sum(
+                b["wip_in_state"] for b in bands
+                if b["sampled_on"] == pt["sampled_on"]
+            )
+            assert total_band == top_line, (
+                f"band widths on {pt['sampled_on']} sum to {total_band}; "
+                f"top line is {top_line}"
+            )
+
+    def test_summary_wip_matches_top_minus_bottom_line(self):
+        """`summary.wip_at_end` carries the Vacanti-canonical
+        cumulative-arrivals minus cumulative-departures at the right
+        edge — preserved from before this change."""
+        payload = json.loads(json_renderer.render(_cfd_report()))
+        # End of window = 2026-04-16: top=30, bottom=3 → WIP=27.
+        assert payload["summary"]["arrivals_at_end"] == 30
+        assert payload["summary"]["departures_at_end"] == 3
+        assert payload["summary"]["wip_at_end"] == 27
 
 
 class TestAgingJson:
