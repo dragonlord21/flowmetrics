@@ -240,6 +240,10 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
     # so the spec function stays a pure transform of the report.
     rows: list[dict[str, Any]] = []
     for pt in report.points:
+        # Pre-formatted date string for the hover tooltip — sidesteps
+        # Vega-Lite's local-vs-UTC formatting maze when the pivoted
+        # data flows through the rule layer.
+        date_label = pt.sampled_on.strftime("%b %d, %Y")
         for i, state in enumerate(workflow):
             line = pt.counts_by_state.get(state, 0)
             if i + 1 < len(workflow):
@@ -249,6 +253,7 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
                 wip = line  # bottom band — no "later" state
             rows.append({
                 "sampled_on": pt.sampled_on.isoformat(),
+                "date_label": date_label,
                 "state": state,
                 "wip_in_state": wip,
                 "entered_at_or_later": line,
@@ -268,14 +273,18 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
             "x": {
                 "field": "sampled_on",
                 "type": "temporal",
+                # `scale.type: "utc"` keeps both the scale domain and
+                # the axis ticks in UTC. Data values are ISO date
+                # strings parsed as midnight UTC, so the axis tick
+                # "Apr 29" now lands on the same x pixel as the data
+                # vertex at midnight UTC Apr 29 — no LOCAL/UTC drift
+                # (was ~25% of a column off in non-UTC timezones).
+                "scale": {"type": "utc"},
                 "axis": {
                     "title": "Date",
                     "titleFontWeight": "bold",
                     "format": "%b %d",
                     "labelAngle": 0,
-                    # One tick per sample (interval = 1 day) so the
-                    # daily granularity is visually obvious. Vega will
-                    # still thin LABELS if they'd collide; ticks stay.
                     "tickCount": {"interval": "day", "step": 1},
                 },
             },
@@ -318,19 +327,35 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
     hover_layer = {
         "data": {"values": rows},
         "transform": [
-            {"pivot": "state", "value": "wip_in_state", "groupby": ["sampled_on"]},
+            # `groupby` lists fields to PRESERVE across the pivot.
+            # Carrying `date_label` along lets the tooltip read the
+            # pre-formatted UTC date string rather than trying to
+            # format the parsed `sampled_on` in browser local time.
+            {"pivot": "state", "value": "wip_in_state",
+             "groupby": ["sampled_on", "date_label"]},
             {"calculate": wip_calc, "as": "wip"},
         ],
         "mark": {"type": "rule", "color": "#222", "strokeWidth": 2},
         "encoding": {
-            "x": {"field": "sampled_on", "type": "temporal"},
+            "x": {
+                "field": "sampled_on",
+                "type": "temporal",
+                # The hover rule shares the area layer's x scale by
+                # default in a layered Vega-Lite spec, so it inherits
+                # `scale.type: "utc"` and lands on the same pixel as
+                # the corresponding axis tick.
+            },
             "opacity": {
                 "condition": {"param": "cfd_hover", "value": 0.6, "empty": False},
                 "value": 0,
             },
             "tooltip": [
-                {"field": "sampled_on", "type": "temporal", "title": "Date",
-                 "format": "%b %d, %Y"},
+                # Use the Python-formatted date string verbatim. The
+                # `sampled_on` field is in UTC but Vega's tooltip
+                # formatter renders it in local time, dropping the
+                # date by one for non-UTC viewers. Pre-formatting
+                # sidesteps the whole timezone path.
+                {"field": "date_label", "type": "nominal", "title": "Date"},
                 # Each state's band width — items currently in that step.
                 *[{"field": s, "type": "quantitative", "title": s}
                   for s in workflow],
