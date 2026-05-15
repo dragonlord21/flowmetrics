@@ -57,7 +57,19 @@ them moves the portfolio number more than improving a typical PR.
 {% endfor %}
 </div>
 
-<img alt="Per-PR flow efficiency" src="data:image/png;base64,{{ chart_per_pr_b64 }}" />
+<div id="efficiency-chart" style="width:100%;"></div>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<script>
+  vegaEmbed("#efficiency-chart", {{ vega_spec_json | safe }}, {
+    actions: {export: true, source: false, compiled: false, editor: false},
+    renderer: "svg"
+  }).catch(function(err) {
+    document.getElementById("efficiency-chart").innerText =
+      "Interactive chart failed to render: " + err;
+  });
+</script>
 
 <p style="font-size:0.9rem; color:#666; max-width:60ch">
 <strong>Why are so many PRs at 100%?</strong>

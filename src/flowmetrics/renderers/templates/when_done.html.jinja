@@ -39,7 +39,22 @@
 </tbody>
 </table>
 
-<img alt="When-done histogram" src="data:image/png;base64,{{ chart_histogram_b64 }}" />
+{% if vega_spec_json %}
+<div id="whendone-chart" style="width:100%; min-height:340px;"
+     role="img" aria-label="When-done forecast histogram with P50, P70, P85, P95 percentile lines"></div>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<script>
+  vegaEmbed("#whendone-chart", {{ vega_spec_json | safe }}, {
+    actions: {export: true, source: false, compiled: false, editor: false},
+    renderer: "svg"
+  }).catch(function(err) {
+    document.getElementById("whendone-chart").innerText =
+      "Interactive chart failed to render: " + err;
+  });
+</script>
+{% endif %}
 {% endblock %}
 
 {% block detail %}
@@ -66,7 +81,6 @@
   <tr><th>Average throughput / day</th><td class="num">{{ "%.2f"|format(training.avg_per_day) }}</td></tr>
   <tr><th>Zero-throughput days</th><td class="num">{{ training.zero_days }} of {{ training.daily_samples|length }}</td></tr>
 </table>
-<img alt="Daily throughput in training window" src="data:image/png;base64,{{ chart_training_b64 }}" />
 </details>
 
 <details>

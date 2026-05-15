@@ -13,9 +13,316 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..report import AgingReport
+from ..report import AgingReport, CfdReport, EfficiencyReport, HowManyReport, WhenDoneReport
 
 _VEGA_LITE_SCHEMA = "https://vega.github.io/schema/vega-lite/v5.json"
+
+
+def _fe_band(pct: float, is_bot: bool) -> str:
+    """FE-band classifier — matches the matplotlib chart's color logic.
+    Three risk bands plus a bot bucket. Bot PRs are excluded from the
+    'is the team slow' read."""
+    if is_bot:
+        return "bot"
+    if pct < 10:
+        return "< 10% (slow)"
+    if pct < 50:
+        return "10–50%"
+    return "≥ 50% (healthy)"
+
+
+def _forecast_histogram_spec(
+    *,
+    histogram_rows: list[dict[str, Any]],
+    percentile_rule_rows: list[dict[str, Any]],
+    x_field: str,
+    x_type: str,
+    x_title: str,
+) -> dict[str, Any]:
+    """Shared spec body for the when-done (temporal X) and how-many
+    (quantitative X) histograms. Bars colored neutral; percentile
+    rule lines yellow→red with P85 solid + heavier, matching the
+    Aging convention."""
+    bar_layer = {
+        "mark": {"type": "bar", "color": "#2b7cff", "opacity": 0.65},
+        "data": {"values": histogram_rows},
+        "encoding": {
+            "x": {
+                "field": "outcome",
+                "type": x_type,
+                "axis": {"title": x_title, "titleFontWeight": "bold"},
+            },
+            "y": {
+                "field": "frequency",
+                "type": "quantitative",
+                "axis": {"title": "Simulation frequency", "titleFontWeight": "bold"},
+            },
+            "tooltip": [
+                {"field": "outcome", "type": x_type, "title": x_title,
+                 **({"format": "%b %d, %Y"} if x_type == "temporal" else {})},
+                {"field": "frequency", "title": "Runs"},
+            ],
+        },
+    }
+
+    rule_layer = {
+        "mark": {"type": "rule"},
+        "data": {"values": percentile_rule_rows},
+        "encoding": {
+            "x": {"field": "x", "type": x_type},
+            "color": {
+                "field": "pct",
+                "type": "ordinal",
+                "sort": ["P50", "P70", "P85", "P95"],
+                "scale": {"scheme": "yelloworangered"},
+                "legend": {"title": "Confidence", "orient": "right"},
+            },
+            "strokeDash": {
+                "condition": {"test": "datum.pct === 'P85'", "value": [1, 0]},
+                "value": [6, 4],
+            },
+            "size": {
+                "condition": {"test": "datum.pct === 'P85'", "value": 4},
+                "value": 2,
+            },
+            "tooltip": [{"field": "label", "title": "Confidence"}],
+        },
+    }
+
+    return {
+        "$schema": _VEGA_LITE_SCHEMA,
+        "width": "container",
+        "height": 320,
+        "background": "transparent",
+        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "layer": [bar_layer, rule_layer],
+    }
+
+
+def when_done_spec(report: WhenDoneReport) -> dict[str, Any]:
+    """When-done forecast histogram: vertical bars over completion
+    dates, percentile rules at each confidence threshold. Read
+    FORWARD — higher confidence ⇒ later date."""
+    histogram_rows = [
+        {"outcome": d.isoformat(), "frequency": report.histogram.counts[d]}
+        for d in report.histogram.sorted_keys
+    ]
+    percentile_rule_rows = [
+        {
+            "pct": f"P{p}",
+            "x": report.percentiles[p].isoformat(),
+            "label": f"P{p} ({report.percentiles[p].isoformat()})",
+        }
+        for p in (50, 70, 85, 95)
+    ]
+    return _forecast_histogram_spec(
+        histogram_rows=histogram_rows,
+        percentile_rule_rows=percentile_rule_rows,
+        x_field="outcome",
+        x_type="temporal",
+        x_title="Completion date",
+    )
+
+
+def how_many_spec(report: HowManyReport) -> dict[str, Any]:
+    """How-many forecast histogram: vertical bars over item counts,
+    percentile rules at each confidence threshold. Read BACKWARD —
+    higher confidence ⇒ FEWER items."""
+    histogram_rows = [
+        {"outcome": int(n), "frequency": report.histogram.counts[n]}
+        for n in report.histogram.sorted_keys
+    ]
+    percentile_rule_rows = [
+        {"pct": f"P{p}", "x": int(report.percentiles[p]),
+         "label": f"P{p} ({report.percentiles[p]} items)"}
+        for p in (50, 70, 85, 95)
+    ]
+    return _forecast_histogram_spec(
+        histogram_rows=histogram_rows,
+        percentile_rule_rows=percentile_rule_rows,
+        x_field="outcome",
+        x_type="quantitative",
+        x_title="Item count",
+    )
+
+
+def cfd_spec(report: CfdReport) -> dict[str, Any]:
+    """Stacked-area Cumulative Flow Diagram per Vacanti.
+
+    Vertical thickness of any band at a sample date = WIP in that state
+    (property 3). Slope of any line = arrival rate into that state-or-
+    later (properties 5/6). Horizontal distance between two adjacent
+    lines at a given y = approximate average cycle time through the
+    bands between them (property 4).
+
+    Stacks earliest workflow state on bottom, latest on top (e.g.,
+    Open ⟶ In Progress ⟶ Done). Renders the GitHub-PR degenerate
+    two-state case (Open / Merged) without complaint.
+    """
+    workflow = list(report.input.workflow)
+    rows: list[dict[str, Any]] = []
+    for pt in report.points:
+        for state in workflow:
+            rows.append({
+                "sampled_on": pt.sampled_on.isoformat(),
+                "state": state,
+                "count": pt.counts_by_state.get(state, 0),
+            })
+
+    area_layer = {
+        "mark": {"type": "area", "interpolate": "step-after", "opacity": 0.85},
+        "data": {"values": rows},
+        "encoding": {
+            "x": {
+                "field": "sampled_on",
+                "type": "temporal",
+                "axis": {"title": "Date", "titleFontWeight": "bold",
+                         "format": "%b %d", "labelAngle": 0},
+            },
+            "y": {
+                "field": "count",
+                "type": "quantitative",
+                "aggregate": "sum",
+                "axis": {"title": "Cumulative items",
+                         "titleFontWeight": "bold"},
+                "stack": "zero",
+            },
+            "color": {
+                "field": "state",
+                "type": "nominal",
+                "sort": workflow,
+                # Sequential blue palette: dark = furthest along (Done),
+                # light = earliest (Open). Color-blind-safe.
+                "scale": {"scheme": "blues"},
+                "legend": {"title": "Workflow state", "orient": "right"},
+            },
+            "order": {"field": "state_index", "type": "ordinal"},
+            "tooltip": [
+                {"field": "sampled_on", "type": "temporal", "title": "Date",
+                 "format": "%b %d, %Y"},
+                {"field": "state", "title": "State"},
+                {"field": "count", "title": "Items"},
+            ],
+        },
+        # Inject state_index for explicit stacking order matching
+        # workflow earliest→latest.
+        "transform": [
+            {"calculate": " || ".join(
+                f"datum.state === '{s}' ? {i}" for i, s in enumerate(workflow)
+            ) + " : -1", "as": "state_index"},
+        ],
+    }
+
+    return {
+        "$schema": _VEGA_LITE_SCHEMA,
+        "width": "container",
+        "height": 360,
+        "background": "transparent",
+        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "layer": [area_layer],
+    }
+
+
+def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
+    """Per-PR FE chart, brought to Aging parity.
+
+    Vacanti's framing: long-running PRs dominate the portfolio FE.
+    Sorting by cycle time descending puts the system-bottleneck PRs at
+    the top. Color encodes FE band. The portfolio FE is a vertical
+    rule — the system-level reference number the bars are compared
+    against.
+
+    Click-through where a PR URL exists (GitHub source). Tooltip
+    shows item_id, title, cycle hours, and FE %.
+    """
+    repo = report.input.repo
+    is_github = "/" in repo and not repo.startswith("jira:")
+
+    def _url(item_id: str) -> str | None:
+        if not is_github or not item_id.startswith("#"):
+            return None
+        return f"https://github.com/{repo}/pull/{item_id.lstrip('#')}"
+
+    per_pr = report.result.per_pr
+    values = [
+        {
+            "item_id": p.item_id,
+            "title": p.title,
+            "cycle_hours": round(p.cycle_time.total_seconds() / 3600, 2),
+            "active_hours": round(p.active_time.total_seconds() / 3600, 2),
+            "efficiency_pct": round(p.efficiency * 100, 1),
+            "is_bot": p.is_bot,
+            "band": _fe_band(p.efficiency * 100, p.is_bot),
+            "pr_url": _url(p.item_id),
+        }
+        for p in per_pr
+    ]
+
+    bar_layer: dict[str, Any] = {
+        "mark": {"type": "bar", "height": {"band": 0.8}},
+        "data": {"values": values},
+        "encoding": {
+            "y": {
+                "field": "item_id",
+                "type": "nominal",
+                "axis": {"title": None, "labelLimit": 80, "labelFontSize": 10},
+                # Slowest at top — biggest cycle_hours value first.
+                "sort": {"field": "cycle_hours", "order": "descending"},
+            },
+            "x": {
+                "field": "efficiency_pct",
+                "type": "quantitative",
+                "axis": {"title": "Flow efficiency (%)", "titleFontWeight": "bold"},
+                "scale": {"domain": [0, 100]},
+            },
+            "color": {
+                "field": "band",
+                "type": "nominal",
+                "scale": {
+                    "domain": ["< 10% (slow)", "10–50%", "≥ 50% (healthy)", "bot"],
+                    "range": ["#cc3333", "#d4a72c", "#2ca02c", "#bbbbbb"],
+                },
+                "legend": {"title": "FE band", "orient": "right"},
+            },
+            "tooltip": [
+                {"field": "item_id", "title": "ID"},
+                {"field": "title", "title": "Title"},
+                {"field": "efficiency_pct", "title": "FE %"},
+                {"field": "cycle_hours", "title": "Cycle (h)"},
+                {"field": "active_hours", "title": "Active (h)"},
+            ],
+            "href": {"field": "pr_url", "type": "nominal"},
+        },
+    }
+
+    # Portfolio FE — Vacanti's system-level reference. Drawn as a
+    # vertical rule across the whole chart so any PR can be compared
+    # against the system number.
+    portfolio_pct = round(report.result.portfolio_efficiency * 100, 1)
+    rule_layer = {
+        "mark": {"type": "rule", "color": "#2b7cff", "size": 2,
+                 "strokeDash": [6, 4]},
+        "data": {"values": [
+            {"portfolio_pct": portfolio_pct, "label": f"Portfolio FE: {portfolio_pct}%"}
+        ]},
+        "encoding": {
+            "x": {"field": "portfolio_pct", "type": "quantitative"},
+            "tooltip": [{"field": "label"}],
+        },
+    }
+
+    # Dynamic chart height — ~22px per row gives a readable bar; capped
+    # via container height for very large datasets.
+    height = max(120, min(20 * len(values), 1600))
+
+    return {
+        "$schema": _VEGA_LITE_SCHEMA,
+        "width": "container",
+        "height": height,
+        "background": "transparent",
+        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "layer": [bar_layer, rule_layer],
+    }
 
 
 def aging_spec(report: AgingReport) -> dict[str, Any]:

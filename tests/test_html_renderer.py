@@ -139,9 +139,13 @@ class TestEfficiencyHtml:
         out = html_renderer.render(_efficiency_report())
         assert "Caveat one verbatim." in out
 
-    def test_embeds_base64_png_chart(self):
+    def test_chart_is_interactive_vega_not_png(self):
         out = html_renderer.render(_efficiency_report())
-        assert re.search(r'src="data:image/png;base64,[A-Za-z0-9+/=]{100,}"', out)
+        # Vega chart div + CDN scripts.
+        assert 'id="efficiency-chart"' in out
+        assert 'src="https://cdn.jsdelivr.net/npm/vega-lite@5' in out
+        # PNG embed is gone — interactive chart is canonical.
+        assert not re.search(r'src="data:image/png;base64,[A-Za-z0-9+/=]{100,}"', out)
 
     def test_no_human_notes_section(self):
         """We removed the 'Your notes' placeholder — the report stands alone."""
@@ -385,11 +389,14 @@ class TestWhenDoneHtml:
         out = html_renderer.render(_when_done_report())
         assert "2026-05-20" in out  # 85th percentile
 
-    def test_embeds_two_charts(self):
-        # Training-throughput + Results-Histogram
+    def test_embeds_vega_histogram(self):
+        # Results histogram is now a Vega-Lite spec inlined into the page
+        # (CDN-loaded runtime — no PNGs).
         out = html_renderer.render(_when_done_report())
-        matches = re.findall(r'src="data:image/png;base64,', out)
-        assert len(matches) >= 2
+        assert 'id="whendone-chart"' in out
+        assert "vega-lite" in out
+        assert "vegaEmbed" in out
+        assert 'src="data:image/png' not in out
 
     def test_shows_forecast_horizon_callout(self):
         """Surface Vacanti's 'shorter is better' principle: show how far
@@ -945,26 +952,6 @@ class TestAgingHtmlDistributionAtTop:
         i_chart = out.index('id="aging-chart"')
         i_per_state = out.index("Per-state aging")
         assert i_chart < i_per_state
-
-
-class TestHumanDateLabel:
-    """Chart axis labels: `Jan 12` (space, no dash). Year only when the
-    chart spans a year boundary."""
-
-    def test_format_with_space_not_dash(self):
-        from datetime import date as _d
-
-        from flowmetrics.renderers.html_renderer import _human_date_label
-
-        assert _human_date_label(_d(2026, 1, 12), include_year=False) == "Jan 12"
-        assert "-" not in _human_date_label(_d(2026, 1, 12), include_year=False)
-
-    def test_format_with_year_when_required(self):
-        from datetime import date as _d
-
-        from flowmetrics.renderers.html_renderer import _human_date_label
-
-        assert _human_date_label(_d(2026, 1, 12), include_year=True) == "Jan 12 2026"
 
 
 class TestDefaultOutputPath:

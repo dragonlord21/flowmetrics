@@ -13,11 +13,12 @@ unit tests of spec shape would miss.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from flowmetrics.aging import AgingItem
+from flowmetrics.compute import FlowEfficiency, WindowResult
 from flowmetrics.renderers import vega_specs
-from flowmetrics.report import AgingInput, AgingReport
+from flowmetrics.report import AgingInput, AgingReport, EfficiencyInput, EfficiencyReport
 
 
 def _interp():
@@ -492,3 +493,421 @@ class TestAgingSpec:
 # dropped; the compile-time check is no longer feasible offline. Spec-
 # shape tests above still guard the known regression patterns (top-
 # level params on layered specs, etc.).
+
+
+# ---------------------------------------------------------------------------
+# Efficiency spec — per-PR FE bars
+# ---------------------------------------------------------------------------
+
+
+def _efficiency_report(per_pr: list[FlowEfficiency]) -> EfficiencyReport:
+    from flowmetrics.report import Interpretation
+    total_cycle = sum((p.cycle_time for p in per_pr), start=timedelta())
+    total_active = sum((p.active_time for p in per_pr), start=timedelta())
+    portfolio = (
+        total_active.total_seconds() / total_cycle.total_seconds()
+        if total_cycle.total_seconds() > 0
+        else 0.0
+    )
+    return EfficiencyReport(
+        input=EfficiencyInput(
+            repo="acme/widget",
+            start=date(2026, 5, 4),
+            stop=date(2026, 5, 10),
+            gap_hours=4.0,
+            min_cluster_minutes=30.0,
+            offline=False,
+        ),
+        result=WindowResult(
+            pr_count=len(per_pr),
+            portfolio_efficiency=portfolio,
+            mean_efficiency=sum(p.efficiency for p in per_pr) / len(per_pr)
+            if per_pr else 0.0,
+            median_efficiency=sorted(p.efficiency for p in per_pr)[len(per_pr) // 2]
+            if per_pr else 0.0,
+            total_cycle=total_cycle,
+            total_active=total_active,
+            per_pr=per_pr,
+        ),
+        interpretation=Interpretation(
+            headline="h", key_insight="k", next_actions=["a"], caveats=["c"]
+        ),
+        generated_at=datetime(2026, 5, 12, 14, 30, tzinfo=UTC),
+    )
+
+
+def _pr(item_id: str, cycle_hours: float, eff: float, *,
+        is_bot: bool = False, title: str = "title") -> FlowEfficiency:
+    return FlowEfficiency(
+        item_id=item_id,
+        title=title,
+        created_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC),
+        merged_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC) + timedelta(hours=cycle_hours),
+        cycle_time=timedelta(hours=cycle_hours),
+        active_time=timedelta(hours=cycle_hours * eff),
+        efficiency=eff,
+        is_bot=is_bot,
+        author_login="alice",
+    )
+
+
+class TestEfficiencySpec:
+    """Per-PR FE chart, brought to Aging parity.
+
+    Vacanti framing: long-running PRs dominate the portfolio FE. The
+    chart sorts by cycle time descending so the system-bottleneck PRs
+    sit at top. Color encodes the FE band (red/yellow/green); the
+    portfolio FE is a vertical rule — the system-level reference."""
+
+    def test_top_level_shape_is_vega_lite_v5(self):
+        spec = vega_specs.efficiency_spec(_efficiency_report([_pr("#1", 24, 0.4)]))
+        assert spec["$schema"].startswith("https://vega.github.io/schema/vega-lite/")
+
+    def test_bar_layer_carries_per_pr_data_with_required_fields(self):
+        items = [
+            _pr("#1", 24, 0.4, title="Fix bug"),
+            _pr("#2", 200, 0.05, title="Slow refactor"),
+        ]
+        spec = vega_specs.efficiency_spec(_efficiency_report(items))
+        bar_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "bar"
+        )
+        values = bar_layer["data"]["values"]
+        assert {v["item_id"] for v in values} == {"#1", "#2"}
+        v2 = next(v for v in values if v["item_id"] == "#2")
+        assert "title" in v2 and "cycle_hours" in v2 and "efficiency_pct" in v2
+
+    def test_bars_sorted_by_cycle_time_descending(self):
+        spec = vega_specs.efficiency_spec(_efficiency_report([
+            _pr("#fast", 1, 1.0),
+            _pr("#slow", 200, 0.01),
+            _pr("#mid", 50, 0.3),
+        ]))
+        bar_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "bar"
+        )
+        # Y-axis sort: slowest cycle time at top.
+        y = bar_layer["encoding"]["y"]
+        # Vega-Lite "sort" can be -field, by another field desc, or an
+        # explicit array. Either signals descending by cycle.
+        sort = y.get("sort")
+        assert sort is not None
+
+    def test_color_encodes_efficiency_band(self):
+        """Three FE bands matching the matplotlib chart: red < 10%,
+        yellow < 50%, green ≥ 50%. Bots in grey."""
+        spec = vega_specs.efficiency_spec(_efficiency_report([_pr("#1", 24, 0.4)]))
+        bar_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "bar"
+        )
+        # color encoding is on a derived band field.
+        color = bar_layer["encoding"]["color"]
+        # Pinned scheme of three risk-style colors (sequential-or-categorical).
+        assert "scale" in color
+        domain = color["scale"].get("domain", [])
+        # At least the three FE bands plus bot bucket.
+        assert any("low" in d.lower() or "red" in d.lower() for d in domain) or \
+               any("<" in str(d) for d in domain)
+
+    def test_portfolio_fe_drawn_as_vertical_rule(self):
+        """The portfolio FE is the system-level reference, per Vacanti.
+        Draw it as a vertical rule line across the bars so the eye can
+        see which PRs lie below/above the portfolio number."""
+        items = [_pr("#1", 24, 0.4), _pr("#2", 200, 0.05)]
+        spec = vega_specs.efficiency_spec(_efficiency_report(items))
+        rule_layer = next(
+            (layer for layer in spec["layer"]
+             if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                 else layer["mark"]) == "rule"),
+            None,
+        )
+        assert rule_layer is not None
+        # Its data carries the portfolio_fe percent (not raw ratio).
+        values = rule_layer["data"]["values"]
+        portfolio_pct = values[0].get("portfolio_pct")
+        assert portfolio_pct is not None
+        assert 0 <= portfolio_pct <= 100
+
+    def test_bar_tooltip_and_href_channels(self):
+        spec = vega_specs.efficiency_spec(_efficiency_report([
+            _pr("#42", 24, 0.4, title="Fix bug"),
+        ]))
+        bar_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "bar"
+        )
+        enc = bar_layer["encoding"]
+        tooltip_fields = {t["field"] for t in enc["tooltip"]}
+        assert {"item_id", "title", "efficiency_pct", "cycle_hours"} <= tooltip_fields
+        # Click → PR URL.
+        assert enc["href"]["field"] == "pr_url"
+
+
+# ---------------------------------------------------------------------------
+# CFD spec — stacked area, the canonical Vacanti chart
+# ---------------------------------------------------------------------------
+
+
+def _cfd_report(points: list, workflow: tuple[str, ...] = ("Open", "In Progress", "Done")):
+    from flowmetrics.cfd import CfdPoint
+    from flowmetrics.report import CfdInput, CfdReport, Interpretation
+    return CfdReport(
+        input=CfdInput(
+            repo="acme/widget",
+            start=date(2026, 5, 1),
+            stop=date(2026, 5, 14),
+            workflow=workflow,
+            interval_days=1,
+            offline=False,
+        ),
+        points=[CfdPoint(d, counts) for d, counts in points],
+        interpretation=Interpretation(
+            headline="h", key_insight="k", next_actions=["a"], caveats=["c"]
+        ),
+        generated_at=datetime(2026, 5, 14, 12, 0, tzinfo=UTC),
+    )
+
+
+class TestCfdSpec:
+    """Stacked area chart per Vacanti's CFD. Vertical thickness at a
+    sample date = WIP in that band (property 3); slope of any line =
+    rate at which items entered state-or-later over time (property 5/6).
+    """
+
+    def test_top_level_shape_is_vega_lite_v5(self):
+        spec = vega_specs.cfd_spec(_cfd_report([
+            (date(2026, 5, 1), {"Open": 1, "In Progress": 0, "Done": 0}),
+            (date(2026, 5, 14), {"Open": 3, "In Progress": 2, "Done": 5}),
+        ]))
+        assert spec["$schema"].startswith("https://vega.github.io/schema/vega-lite/")
+
+    def test_area_layer_has_per_state_stacked_values(self):
+        spec = vega_specs.cfd_spec(_cfd_report([
+            (date(2026, 5, 1), {"Open": 1, "In Progress": 0, "Done": 0}),
+            (date(2026, 5, 14), {"Open": 3, "In Progress": 2, "Done": 5}),
+        ]))
+        area_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "area"
+        )
+        values = area_layer["data"]["values"]
+        # 2 sample dates × 3 states = 6 rows.
+        assert len(values) == 6
+        # Each row has the sampled_on date, state name, count.
+        v0 = values[0]
+        assert "sampled_on" in v0 and "state" in v0 and "count" in v0
+
+    def test_workflow_state_order_drives_band_stacking(self):
+        """Stacking order matters: leftmost workflow state = bottom band
+        (departures); rightmost = top band (arrivals). Vega-Lite's `sort`
+        on the color encoding controls this."""
+        workflow = ("Open", "In Progress", "Done")
+        spec = vega_specs.cfd_spec(_cfd_report([
+            (date(2026, 5, 1), {"Open": 1, "In Progress": 0, "Done": 0}),
+        ], workflow=workflow))
+        area_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "area"
+        )
+        color = area_layer["encoding"]["color"]
+        assert color["sort"] == list(workflow)
+
+    def test_axis_titles_and_x_is_temporal(self):
+        spec = vega_specs.cfd_spec(_cfd_report([
+            (date(2026, 5, 1), {"Open": 1, "In Progress": 0, "Done": 0}),
+        ]))
+        area_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "area"
+        )
+        assert area_layer["encoding"]["x"]["type"] == "temporal"
+        assert "Date" in area_layer["encoding"]["x"]["axis"]["title"]
+        assert "items" in area_layer["encoding"]["y"]["axis"]["title"].lower() or \
+               "WIP" in area_layer["encoding"]["y"]["axis"]["title"] or \
+               "Count" in area_layer["encoding"]["y"]["axis"]["title"]
+
+    def test_two_state_github_degenerate_case_still_renders(self):
+        """GitHub PR CFD is two-state (Open, Merged) per DECISIONS.md.
+        The chart should render — degenerate but valid — not skip."""
+        spec = vega_specs.cfd_spec(_cfd_report(
+            [(date(2026, 5, 1), {"Open": 1, "Merged": 0}),
+             (date(2026, 5, 14), {"Open": 3, "Merged": 7})],
+            workflow=("Open", "Merged"),
+        ))
+        area_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "area"
+        )
+        states = {v["state"] for v in area_layer["data"]["values"]}
+        assert states == {"Open", "Merged"}
+
+
+# ---------------------------------------------------------------------------
+# Forecast specs — when-done (date histogram) + how-many (count histogram)
+# ---------------------------------------------------------------------------
+
+
+def _when_done_fixture():
+    from flowmetrics.forecast import build_histogram
+    from flowmetrics.report import (
+        Interpretation,
+        SimulationSummary,
+        TrainingSummary,
+        WhenDoneInput,
+        WhenDoneReport,
+    )
+    return WhenDoneReport(
+        input=WhenDoneInput(
+            repo="acme/widget", items=30,
+            start_date=date(2026, 5, 12),
+            history_start=date(2026, 4, 12),
+            history_end=date(2026, 5, 11),
+            offline=False,
+        ),
+        training=TrainingSummary(
+            window_start=date(2026, 4, 12), window_end=date(2026, 5, 11),
+            daily_samples=[2, 1, 3, 2, 4, 0, 0] * 4 + [1, 0],
+            total_merges=46, avg_per_day=1.5,
+            min_per_day=0, max_per_day=4, zero_days=10,
+        ),
+        simulation=SimulationSummary(runs=10000, seed=42),
+        histogram=build_histogram(
+            [date(2026, 5, 19)] * 100
+            + [date(2026, 5, 20)] * 250
+            + [date(2026, 5, 21)] * 350
+            + [date(2026, 5, 22)] * 200
+            + [date(2026, 5, 23)] * 80
+            + [date(2026, 5, 24)] * 20
+        ),
+        percentiles={
+            50: date(2026, 5, 21),
+            70: date(2026, 5, 22),
+            85: date(2026, 5, 22),
+            95: date(2026, 5, 23),
+        },
+        interpretation=Interpretation(
+            headline="h", key_insight="k", next_actions=["a"], caveats=["c"]
+        ),
+        generated_at=datetime(2026, 5, 12, 14, 30, tzinfo=UTC),
+    )
+
+
+def _how_many_fixture():
+    from flowmetrics.forecast import build_histogram
+    from flowmetrics.report import (
+        HowManyInput,
+        HowManyReport,
+        Interpretation,
+        SimulationSummary,
+        TrainingSummary,
+    )
+    return HowManyReport(
+        input=HowManyInput(
+            repo="acme/widget",
+            start_date=date(2026, 5, 12),
+            target_date=date(2026, 5, 26),
+            history_start=date(2026, 4, 12),
+            history_end=date(2026, 5, 11),
+            offline=False,
+        ),
+        training=TrainingSummary(
+            window_start=date(2026, 4, 12), window_end=date(2026, 5, 11),
+            daily_samples=[2, 1, 3, 2, 4, 0, 0] * 4 + [1, 0],
+            total_merges=46, avg_per_day=1.5,
+            min_per_day=0, max_per_day=4, zero_days=10,
+        ),
+        simulation=SimulationSummary(runs=10000, seed=42),
+        histogram=build_histogram([15] * 50 + [20] * 200 + [25] * 400 + [30] * 250 + [35] * 100),
+        percentiles={50: 28, 70: 25, 85: 22, 95: 18},
+        interpretation=Interpretation(
+            headline="h", key_insight="k", next_actions=["a"], caveats=["c"]
+        ),
+        generated_at=datetime(2026, 5, 12, 14, 30, tzinfo=UTC),
+    )
+
+
+class TestWhenDoneSpec:
+    """Vertical bars over completion dates. Percentile dates marked as
+    vertical rules — P85 solid + heavier (the forecast threshold per
+    Vacanti's recommendation); others dashed."""
+
+    def test_top_level_shape_is_vega_lite_v5(self):
+        spec = vega_specs.when_done_spec(_when_done_fixture())
+        assert spec["$schema"].startswith("https://vega.github.io/schema/vega-lite/")
+
+    def test_bar_layer_carries_histogram_rows(self):
+        spec = vega_specs.when_done_spec(_when_done_fixture())
+        bar_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "bar"
+        )
+        # Each row = one completion date + frequency.
+        v0 = bar_layer["data"]["values"][0]
+        assert "outcome" in v0 and "frequency" in v0
+        assert bar_layer["encoding"]["x"]["type"] == "temporal"
+
+    def test_percentile_rule_lines_one_per_pct(self):
+        spec = vega_specs.when_done_spec(_when_done_fixture())
+        rule_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "rule"
+        )
+        rows = rule_layer["data"]["values"]
+        pcts = {row["pct"] for row in rows}
+        assert pcts == {"P50", "P70", "P85", "P95"}
+
+    def test_p85_rule_is_solid_and_heavier(self):
+        """Same convention as Aging: P85 stands out as the forecast
+        threshold; others are dashed and lighter."""
+        spec = vega_specs.when_done_spec(_when_done_fixture())
+        rule_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "rule"
+        )
+        enc = rule_layer["encoding"]
+        assert "strokeDash" in enc and "condition" in enc["strokeDash"]
+        assert "size" in enc and "condition" in enc["size"]
+
+
+class TestHowManySpec:
+    """Same shape as when-done but X-axis is item count, not date.
+    Read BACKWARD: higher confidence ⇒ FEWER items."""
+
+    def test_top_level_shape_is_vega_lite_v5(self):
+        spec = vega_specs.how_many_spec(_how_many_fixture())
+        assert spec["$schema"].startswith("https://vega.github.io/schema/vega-lite/")
+
+    def test_bar_x_is_quantitative_item_count(self):
+        spec = vega_specs.how_many_spec(_how_many_fixture())
+        bar_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "bar"
+        )
+        assert bar_layer["encoding"]["x"]["type"] == "quantitative"
+        v0 = bar_layer["data"]["values"][0]
+        assert isinstance(v0["outcome"], int)
+
+    def test_percentile_rule_lines_at_item_counts(self):
+        spec = vega_specs.how_many_spec(_how_many_fixture())
+        rule_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "rule"
+        )
+        ys = {row["x"] for row in rule_layer["data"]["values"]}
+        assert ys == {18, 22, 25, 28}

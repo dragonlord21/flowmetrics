@@ -41,7 +41,19 @@
 </div>
 {% endif %}
 
-<img alt="Cumulative Flow Diagram" src="data:image/png;base64,{{ chart_cfd_b64 }}" />
+<div id="cfd-chart" style="width:100%; min-height:380px;"></div>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<script>
+  vegaEmbed("#cfd-chart", {{ vega_spec_json | safe }}, {
+    actions: {export: true, source: false, compiled: false, editor: false},
+    renderer: "svg"
+  }).catch(function(err) {
+    document.getElementById("cfd-chart").innerText =
+      "Interactive chart failed to render: " + err;
+  });
+</script>
 
 <p style="font-size:0.85rem; color:#666">
 {{ end_counts[report.input.workflow[0]] }} arrivals,
