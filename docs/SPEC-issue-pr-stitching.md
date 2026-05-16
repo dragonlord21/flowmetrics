@@ -177,6 +177,60 @@ the basics.
 > one more row of translation in `sources/jira.py`. No changes
 > to the canonical schema, no changes to the metric layer.
 
+## Future dimension: slicing by work type (NOT in this spec)
+
+Vacanti calls these *classes of service* or *work-item types* —
+the same metric (cycle time, throughput, CFD, …) computed
+separately per category. Common splits:
+
+- **Team-typed work**: bug / feature / keep-the-lights-on /
+  refactor. Different cycle-time distributions per type — a bug
+  fix typically ships faster than a feature.
+- **Vacanti's classes of service**: Standard / Expedite /
+  Fixed-Date / Intangible. Used to drive WIP policy.
+
+**Not building this in any of phases 0–4.** But the schema must
+not block it. The clean addition is one new column on the
+`work_item` table:
+
+```
+work_item
+─────────────────
+id          text PK
+title       text
+url         text
+source      text
+types       text[]   ← future; team-defined tags, multi-valued
+```
+
+Or, if we ever normalize to a real DB, a many-to-many side
+table:
+
+```
+work_item_type
+─────────────────
+item_id     text  (FK)
+type        text  (team-defined)
+```
+
+The translation rule per source would be the team's choice:
+
+- GitHub: labels matching a configured prefix (e.g.
+  `type:bug`, `type:feature`). The adapter strips the prefix
+  and writes the rest into `work_item.types`.
+- Jira: the native Issue Type field maps directly.
+
+The metric layer would gain one optional filter argument
+(`types: set[str] | None = None`) on every metric query. None
+= include all items; non-None = restrict the population. The
+arithmetic is unchanged; only the row-filter at the top of
+each query changes.
+
+Worth keeping in mind during Phase 1 design: don't bake
+single-valued type assumptions into the `WorkItem` dataclass or
+the query helpers. A `types: tuple[str, ...] = ()` field added
+later should be a pure addition, never a breaking change.
+
 ## Phased plan
 
 ### Phase 0 — vocabulary rename (no behaviour change)
