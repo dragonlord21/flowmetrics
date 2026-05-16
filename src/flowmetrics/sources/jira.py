@@ -180,7 +180,11 @@ class JiraSource:
         while True:
             payload = self._search(jql, start_at, max_results)
             for issue in payload.get("issues", []):
-                item = _issue_to_work_item(issue, in_flight_asof=in_flight_asof)
+                item = _issue_to_work_item(
+                    issue,
+                    in_flight_asof=in_flight_asof,
+                    base_url=self.base_url,
+                )
                 if item is not None:
                     items.append(item)
             total = payload.get("total", 0)
@@ -194,6 +198,7 @@ def _issue_to_work_item(
     issue: dict[str, Any],
     *,
     in_flight_asof: date | None = None,
+    base_url: str = "",
 ) -> WorkItem | None:
     """Convert one Jira issue dict to a WorkItem.
 
@@ -260,6 +265,12 @@ def _issue_to_work_item(
     reporter = fields.get("reporter") or {}
     author_login = reporter.get("name") or reporter.get("accountId")
 
+    # Canonical Jira browse URL — same convention every Jira instance
+    # uses (`<base>/browse/PROJECT-N`). Recorded on the WorkItem so
+    # downstream code consumes `item.url` rather than reconstructing
+    # it from item_id + a separately-threaded base URL.
+    url = f"{base_url.rstrip('/')}/browse/{key}" if base_url else None
+
     return WorkItem(
         item_id=key,
         title=title,
@@ -269,6 +280,7 @@ def _issue_to_work_item(
         is_bot=False,
         author_login=author_login,
         status_intervals=intervals,
+        url=url,
     )
 
 

@@ -46,8 +46,8 @@ them moves the portfolio number more than improving a typical PR.
 {% for p in per_pr_by_cycle[:5] %}
   <div class="intervention">
     <span class="id">
-      {%- if pr_urls.get(p.item_id) -%}
-        <a href="{{ pr_urls[p.item_id] }}">{{ p.item_id }}</a>
+      {%- if p.url -%}
+        <a href="{{ p.url }}">{{ p.item_id }}</a>
       {%- else -%}
         {{ p.item_id }}
       {%- endif -%}
@@ -95,8 +95,8 @@ up the way they drag this bar's count up.
 {% for p in per_pr_sorted %}
   <tr>
     <td>
-      {%- if pr_urls.get(p.item_id) -%}
-        <a href="{{ pr_urls[p.item_id] }}">{{ p.item_id }}</a>
+      {%- if p.url -%}
+        <a href="{{ p.url }}">{{ p.item_id }}</a>
       {%- else -%}
         {{ p.item_id }}
       {%- endif -%}

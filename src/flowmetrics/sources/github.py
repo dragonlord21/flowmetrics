@@ -11,8 +11,8 @@ from typing import Any
 import httpx
 from dateutil.parser import isoparse
 
-from .cache import CacheMiss, FileCache
-from .compute import StatusInterval, WorkItem
+from ..cache import CacheMiss, FileCache
+from ..compute import StatusInterval, WorkItem
 
 GITHUB_GRAPHQL_URL = "https://api.github.com/graphql"
 
@@ -224,7 +224,14 @@ def _is_bot(author: dict[str, Any] | None) -> bool:
     return login.endswith("[bot]")
 
 
-def _pr_node_to_events(node: dict[str, Any]) -> WorkItem | None:
+def _pr_url(repo: str, number: int) -> str:
+    """Canonical GitHub PR URL. Set on every WorkItem the source
+    emits so downstream code can navigate to the issue without
+    pattern-matching the item_id."""
+    return f"https://github.com/{repo}/pull/{number}"
+
+
+def _pr_node_to_events(repo: str, node: dict[str, Any]) -> WorkItem | None:
     if not node.get("mergedAt"):
         return None
     author = node.get("author")
@@ -236,6 +243,7 @@ def _pr_node_to_events(node: dict[str, Any]) -> WorkItem | None:
         activity=extract_activity(node),
         is_bot=_is_bot(author),
         author_login=(author or {}).get("login"),
+        url=_pr_url(repo, node["number"]),
     )
 
 
@@ -342,6 +350,7 @@ def fetch_open_prs(
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
                     status_intervals=[StatusInterval(created, end, phase)],
+                    url=_pr_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -422,6 +431,7 @@ def fetch_prs_for_cycle_times(
                     activity=[],
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
+                    url=_pr_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -517,6 +527,7 @@ def fetch_open_prs_with_label_snapshot(
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
                     status_intervals=[StatusInterval(created, end, status)],
+                    url=_pr_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -662,6 +673,7 @@ def fetch_open_prs_with_labels(
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
                     status_intervals=status_intervals,
+                    url=_pr_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -692,7 +704,7 @@ def fetch_prs_merged_in_window(
         for node in search["nodes"]:
             if not node:  # nodes can include non-PR items in odd cases
                 continue
-            events = _pr_node_to_events(node)
+            events = _pr_node_to_events(repo, node)
             if events is not None:
                 prs.append(events)
         page_info = search["pageInfo"]

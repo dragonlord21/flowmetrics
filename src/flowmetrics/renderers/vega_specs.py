@@ -172,6 +172,12 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
     point_rows = [
         {
             "completed_at": pt.completed_at.isoformat(),
+            # Pre-formatted UTC date string for the tooltip. Same fix
+            # the CFD needed (a205d5e): `formatType: "utc"` on a
+            # temporal field parsed from an ISO string round-trips
+            # badly inside Vega's formatter and renders as NaN. Carry
+            # a ready-to-display label and use it as a nominal field.
+            "completed_label": pt.completed_at.strftime("%b %d, %Y"),
             "cycle_time_days": pt.cycle_time_days,
             "item_id": pt.item_id,
             "title": pt.title,
@@ -221,9 +227,8 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
                 {"field": "title", "title": "Title"},
                 {"field": "cycle_time_days", "title": "Cycle (d)",
                  "format": ".1f"},
-                {"field": "completed_at", "title": "Completed",
-                 "type": "temporal", "format": "%b %d, %Y",
-                 "formatType": "utc"},
+                {"field": "completed_label", "type": "nominal",
+                 "title": "Completed"},
             ],
             "href": {"field": "pr_url", "type": "nominal"},
         },

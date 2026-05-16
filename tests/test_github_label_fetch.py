@@ -14,14 +14,14 @@ from datetime import UTC, date, datetime
 import httpx
 
 from flowmetrics.cache import FileCache
-from flowmetrics.github import (
+from flowmetrics.sources.github import (
     OPEN_PR_LABEL_QUERY,
     OPEN_PR_LABEL_SNAPSHOT_QUERY,
     GitHubClient,
     fetch_open_prs_with_label_snapshot,
     fetch_open_prs_with_labels,
 )
-from flowmetrics.github_labels import (
+from flowmetrics.sources.github_labels import (
     PRE_WIP_STATUS,
     WipLabels,
 )

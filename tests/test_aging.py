@@ -37,6 +37,7 @@ def _in_flight(
     *,
     created: datetime,
     intervals: list[tuple[str, datetime, datetime]],
+    url: str | None = None,
 ) -> WorkItem:
     return WorkItem(
         item_id=item_id,
@@ -44,6 +45,7 @@ def _in_flight(
         created_at=created,
         merged_at=None,  # in flight
         status_intervals=[StatusInterval(s, e, name) for name, s, e in intervals],
+        url=url,
     )
 
 
@@ -176,11 +178,13 @@ class TestAgingItemFields:
 
 
 class TestPrUrl:
-    """Aging items optionally carry a per-item URL so the interactive
-    chart can make each circle clickable. The CLI builds the URL
-    function based on the source backend (GitHub vs Jira)."""
+    """Aging items carry a per-item URL so the interactive chart can
+    make each circle clickable. The URL comes directly from the
+    upstream `WorkItem.url`, which the source populated at fetch time
+    (GitHub PR URL or Jira browse URL). `compute_aging` doesn't need
+    any source-specific knowledge."""
 
-    def test_pr_url_is_none_by_default(self):
+    def test_pr_url_is_none_when_workitem_carries_no_url(self):
         items = [
             _in_flight(
                 "#42",
@@ -191,40 +195,25 @@ class TestPrUrl:
         out = compute_aging(items, asof=date(2026, 5, 12))
         assert out[0].pr_url is None
 
-    def test_pr_url_populated_when_url_for_callable_provided(self):
+    def test_pr_url_inherits_from_workitem_url(self):
         items = [
             _in_flight(
                 "#42",
                 created=ts(2026, 5, 1),
                 intervals=[("Awaiting Review", ts(2026, 5, 1), ts(2026, 5, 12))],
+                url="https://github.com/acme/widget/pull/42",
             ),
-            _in_flight(
-                "#7",
-                created=ts(2026, 5, 5),
-                intervals=[("Approved", ts(2026, 5, 5), ts(2026, 5, 12))],
-            ),
-        ]
-        out = compute_aging(
-            items,
-            asof=date(2026, 5, 12),
-            url_for=lambda item_id: f"https://github.com/acme/widget/pull/{item_id.lstrip('#')}",
-        )
-        by_id = {it.item_id: it for it in out}
-        assert by_id["#42"].pr_url == "https://github.com/acme/widget/pull/42"
-        assert by_id["#7"].pr_url == "https://github.com/acme/widget/pull/7"
-
-    def test_url_for_returning_none_keeps_pr_url_none(self):
-        """A url_for callable that returns None for unknown ids leaves
-        the AgingItem's pr_url untouched (still None)."""
-        items = [
             _in_flight(
                 "BIGTOP-42",
-                created=ts(2026, 5, 1),
-                intervals=[("In Progress", ts(2026, 5, 1), ts(2026, 5, 12))],
-            )
+                created=ts(2026, 5, 5),
+                intervals=[("In Progress", ts(2026, 5, 5), ts(2026, 5, 12))],
+                url="https://issues.apache.org/jira/browse/BIGTOP-42",
+            ),
         ]
-        out = compute_aging(items, asof=date(2026, 5, 12), url_for=lambda _id: None)
-        assert out[0].pr_url is None
+        out = compute_aging(items, asof=date(2026, 5, 12))
+        by_id = {it.item_id: it for it in out}
+        assert by_id["#42"].pr_url == "https://github.com/acme/widget/pull/42"
+        assert by_id["BIGTOP-42"].pr_url == "https://issues.apache.org/jira/browse/BIGTOP-42"
 
 
 class TestMaxAgeFilter:

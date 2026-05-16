@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from flowmetrics.github_labels import (
+from flowmetrics.sources.github_labels import (
     ABANDONED_STATUS,
     DEPARTED_STATUS,
     PRE_WIP_STATUS,

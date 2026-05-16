@@ -10,7 +10,7 @@ This module computes only the data. The chart is built by the renderer.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -34,7 +34,6 @@ def compute_aging(
     items: Sequence[WorkItem],
     *,
     asof: date,
-    url_for: Callable[[str], str | None] | None = None,
     max_age_days: int | None = None,
 ) -> list[AgingItem]:
     """Build aging data points for in-flight items.
@@ -43,9 +42,9 @@ def compute_aging(
     they have a Cycle Time, not an Age. Current state is read from the
     last status_interval; if there are none, falls back to ``"Unknown"``.
 
-    `url_for(item_id) -> str | None` lets the caller plug in a backend-
-    specific URL builder (GitHub vs Jira) without `compute_aging`
-    knowing about the source.
+    Per-item drill-down URLs are read directly from `WorkItem.url`,
+    which the source populated at fetch time (GitHub PR URL or Jira
+    browse URL).
 
     `max_age_days` is opt-in: when set, items with `age_days >
     max_age_days` are dropped from the result. Default (None) keeps
@@ -65,7 +64,7 @@ def compute_aging(
                 title=item.title,
                 current_state=current,
                 age_days=age_days,
-                pr_url=url_for(item.item_id) if url_for is not None else None,
+                pr_url=item.url,
             )
         )
     return out

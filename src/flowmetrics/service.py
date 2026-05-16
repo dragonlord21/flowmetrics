@@ -5,15 +5,15 @@ from pathlib import Path
 
 from .cache import FileCache
 from .compute import WindowResult, WorkItem, aggregate, compute_pr_flow
-from .github import (
+from .sources import Source
+from .sources.github import (
     GitHubClient,
     fetch_open_prs,
     fetch_open_prs_with_label_snapshot,
     fetch_prs_for_cycle_times,
     fetch_prs_merged_in_window,
 )
-from .github_labels import WipLabels, is_aging_wip
-from .sources import Source
+from .sources.github_labels import WipLabels, is_aging_wip
 from .sources.jira import JiraSource
 from .throughput import daily_throughput
 

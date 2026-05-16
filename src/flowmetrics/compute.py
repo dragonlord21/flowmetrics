@@ -41,6 +41,11 @@ class WorkItem:
     # configured, compute_pr_flow uses status-duration math instead of
     # event clustering. See docs/METRICS.md.
     status_intervals: list[StatusInterval] = field(default_factory=list)
+    # Canonical drill-down URL for this item, set by the source that
+    # fetched it (since the source is the only thing that knows its
+    # own URL convention). Renderers should consume `url` directly
+    # rather than pattern-matching `item_id` to guess the source type.
+    url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +64,10 @@ class FlowEfficiency:
     # `WorkItem.status_intervals` so renderers can surface a workflow
     # map without re-reading the upstream source.
     statuses_visited: tuple[str, ...] = ()
+    # Canonical drill-down URL inherited from the source's WorkItem
+    # (see `WorkItem.url`). Renderers use this directly instead of
+    # pattern-matching `item_id` to construct one.
+    url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +144,7 @@ def compute_pr_flow(
         efficiency=efficiency,
         is_bot=pr.is_bot,
         author_login=pr.author_login,
+        url=pr.url,
         statuses_visited=tuple(sorted({iv.status for iv in pr.status_intervals})),
     )
 

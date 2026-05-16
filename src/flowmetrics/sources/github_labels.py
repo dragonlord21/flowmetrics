@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from .compute import StatusInterval, WorkItem
+from ..compute import StatusInterval, WorkItem
 
 # State machine for the PR's lifecycle, distinct from labels.
 _OPEN = "OPEN"

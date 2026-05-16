@@ -14,7 +14,7 @@ import pytest
 
 from flowmetrics import flowmetrics_for_window, make_github_source, this_week_window
 from flowmetrics.cache import CacheMiss, FileCache
-from flowmetrics.github import PR_SEARCH_QUERY
+from flowmetrics.sources.github import PR_SEARCH_QUERY
 
 REPO = "pallets/flask"
 START = date(2026, 5, 4)

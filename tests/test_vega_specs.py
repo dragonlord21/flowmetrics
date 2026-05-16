@@ -1342,3 +1342,90 @@ class TestHowManySpec:
             f"Forecast bars need an explicit minimum width to be "
             f"readable; got mark={mark}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Scatterplot spec
+# ---------------------------------------------------------------------------
+
+
+def _scatterplot_fixture():
+    from flowmetrics.report import (
+        Interpretation,
+        ScatterplotInput,
+        ScatterplotPoint,
+        ScatterplotReport,
+    )
+    return ScatterplotReport(
+        input=ScatterplotInput(
+            repo="acme/widget",
+            start=date(2026, 4, 15),
+            stop=date(2026, 5, 14),
+            offline=False,
+        ),
+        points=[
+            ScatterplotPoint(
+                item_id="#1", title="alpha",
+                completed_at=date(2026, 4, 20),
+                cycle_time_days=3.5, pr_url="https://x/1",
+            ),
+            ScatterplotPoint(
+                item_id="#2", title="beta",
+                completed_at=date(2026, 5, 1),
+                cycle_time_days=10.0, pr_url=None,
+            ),
+        ],
+        cycle_time_percentiles={50: 5.0, 70: 7.0, 85: 9.0, 95: 12.0},
+        interpretation=Interpretation(
+            headline="h", key_insight="k", next_actions=["a"], caveats=["c"],
+        ),
+    )
+
+
+class TestScatterplotSpec:
+    """Vacanti's Cycle-Time Scatterplot: x = completion date,
+    y = cycle time, dots = completed items, horizontal percentile
+    lines (P50/P70/P85/P95)."""
+
+    def test_tooltip_date_field_does_not_rely_on_formatType_utc(self):
+        """Regression guard for the NaN-on-hover bug: when the tooltip
+        configures a temporal field with `formatType: "utc"` AND the
+        data row's date is an ISO string parsed back through Vega's
+        date formatter, the browser renders "NaN". Same root cause as
+        the CFD tooltip bug (a205d5e). Fix: pre-format the date in
+        Python as a nominal string field.
+
+        Concretely: the tooltip's completion-date entry must be a
+        nominal field reading a pre-formatted string (e.g.
+        `completed_label`), NOT a `temporal`+`formatType:"utc"` combo
+        on the raw ISO `completed_at`."""
+        spec = vega_specs.scatterplot_spec(_scatterplot_fixture())
+        circle_layer = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "circle"
+        )
+        date_tooltip = next(
+            (t for t in circle_layer["encoding"]["tooltip"]
+             if t.get("title", "").lower() in {"completed", "completion date"}),
+            None,
+        )
+        assert date_tooltip is not None, "Tooltip must include the completion date"
+        # The fragile combo we don't want:
+        assert date_tooltip.get("formatType") != "utc", (
+            f"Tooltip date field must not use formatType:'utc' on a "
+            f"temporal field — it renders as NaN in the browser. "
+            f"Use a pre-formatted nominal string field. Got "
+            f"{date_tooltip}"
+        )
+        # And the date field a row carries SHOULD have a pre-formatted
+        # label available for nominal display.
+        row = circle_layer["data"]["values"][0]
+        assert any(
+            isinstance(v, str) and "2026" in v
+            for k, v in row.items()
+            if k.endswith("_label") or k.endswith("_display")
+        ), (
+            f"Each data row must carry a pre-formatted, human-readable "
+            f"date string for the tooltip; got row keys {list(row.keys())}"
+        )

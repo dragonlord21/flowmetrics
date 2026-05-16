@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from flowmetrics.cache import CacheMiss, FileCache
-from flowmetrics.github import (
+from flowmetrics.sources.github import (
     PR_CYCLE_TIME_QUERY,
     PR_SEARCH_QUERY,
     GitHubClient,
@@ -342,6 +342,10 @@ class TestFetchPrsMergedInWindow:
         assert dt(2026, 5, 5, 10, 0) in pr.activity
         assert dt(2026, 5, 5, 12, 0) in pr.activity
         assert dt(2026, 5, 5, 17, 0) in pr.activity
+        # The fetcher records the canonical PR URL on the WorkItem
+        # itself — downstream code consumes `item.url` directly
+        # instead of pattern-matching `item_id` to guess the source.
+        assert pr.url == "https://github.com/pallets/flask/pull/5500"
 
     def test_skips_unmerged_nodes(self, tmp_path):
         cache = FileCache(tmp_path)
@@ -383,7 +387,7 @@ class TestFetchPrsMergedInWindow:
 # ---------------------------------------------------------------------------
 
 
-from flowmetrics.github import (  # noqa: E402
+from flowmetrics.sources.github import (  # noqa: E402
     OPEN_PR_QUERY,
     _pr_open_phase,
     fetch_open_prs,

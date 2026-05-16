@@ -19,7 +19,7 @@ import httpx
 import pytest
 
 from flowmetrics.cache import FileCache
-from flowmetrics.github import GitHubClient
+from flowmetrics.sources.github import GitHubClient
 
 
 def _build_client(tmp_path, transport: httpx.MockTransport, token: str = "test-token"):

@@ -17,7 +17,7 @@ from datetime import date
 import pytest
 
 from flowmetrics.cache import FileCache
-from flowmetrics.github import GitHubClient, fetch_prs_merged_in_window
+from flowmetrics.sources.github import GitHubClient, fetch_prs_merged_in_window
 
 pytestmark = pytest.mark.integration
 

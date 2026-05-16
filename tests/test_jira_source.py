@@ -129,6 +129,46 @@ class TestFetchCompletedInWindow:
         assert datetime(2026, 5, 1, 10, 0, 0, tzinfo=UTC) in item.activity
         assert datetime(2026, 5, 8, 8, 36, 9, tzinfo=UTC) in item.activity
 
+    def test_jira_data_observation_includes_canonical_url(self, tmp_path):
+        """Every WorkItem returned from a Jira source must carry its
+        own canonical Jira browse URL — the click-through to the
+        real issue page. URL construction is the source's job
+        because the source is the only thing that knows its own URL
+        convention; downstream code (CLI / renderer / chart spec)
+        should consume `item.url` directly instead of pattern-
+        matching `item_id` to guess the source type. Today's
+        substring-match URL builder in cli.py is a code smell that
+        falls apart when GitHub and Jira items have different ID
+        shapes — make the source the authority."""
+        cache = FileCache(tmp_path)
+        base_url = "https://issues.apache.org/jira"
+        start, stop = date(2026, 5, 4), date(2026, 5, 10)
+        jql = (
+            'project = "BIGTOP" AND resolutiondate >= "2026-05-04" '
+            'AND resolutiondate <= "2026-05-10" AND statusCategory = Done '
+            "ORDER BY resolutiondate ASC"
+        )
+        response = {
+            "startAt": 0, "maxResults": 100, "total": 1,
+            "issues": [
+                _issue(
+                    key="BIGTOP-4525", summary="Upgrade",
+                    created="2026-04-30T07:43:47.000+0000",
+                    resolved="2026-05-08T08:36:09.000+0000",
+                    histories=[],
+                ),
+            ],
+        }
+        _seed_jira(cache, base_url=base_url, jql=jql, response=response)
+        source = JiraSource(
+            base_url=base_url, project="BIGTOP",
+            cache=cache, read_only=True,
+            http_client=_no_network_client(),
+        )
+        items = source.fetch_completed_in_window(start, stop)
+
+        assert items[0].url == "https://issues.apache.org/jira/browse/BIGTOP-4525"
+
     def test_skips_unresolved_issues(self, tmp_path):
         cache = FileCache(tmp_path)
         base_url = "https://issues.apache.org/jira"

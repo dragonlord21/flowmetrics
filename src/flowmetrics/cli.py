@@ -34,7 +34,6 @@ from .forecast import (
     monte_carlo_how_many,
     monte_carlo_when_done,
 )
-from .github_labels import WipLabels
 from .interpretation import (
     interpret_aging,
     interpret_cfd,
@@ -75,6 +74,7 @@ from .service import (
     this_week_window,
 )
 from .sources import Source
+from .sources.github_labels import WipLabels
 
 
 def _parse_date(value: str) -> date:
@@ -514,19 +514,21 @@ def scatterplot(
     def build() -> ScatterplotReport:
         from .percentiles import chart_percentiles
         items = src.fetch_for_percentile_training(start_d, stop_d)
-        pr_url_for = _github_pr_url_builder(src.label)
         points: list[ScatterplotPoint] = []
         cycle_days: list[float] = []
         for it in items:
             if it.merged_at is None:
                 continue
             cycle = (it.merged_at - it.created_at).total_seconds() / 86400
+            # `it.url` is set by the source — GitHub PR URL or Jira
+            # browse URL. Renderer consumes it directly; no
+            # pattern-matching of item_id here any more.
             points.append(ScatterplotPoint(
                 item_id=it.item_id,
                 title=it.title,
                 completed_at=it.merged_at.date(),
                 cycle_time_days=cycle,
-                pr_url=pr_url_for(it.item_id),
+                pr_url=it.url,
             ))
             cycle_days.append(cycle)
 
@@ -550,18 +552,6 @@ def scatterplot(
     _dispatch(fmt, output, build, verbose=verbose)
 
 
-def _github_pr_url_builder(repo_label: str):
-    """Returns a callable item_id -> PR URL for GitHub repos,
-    item_id -> None for everything else (Jira gets its URL from
-    the source-level metadata, not constructed here)."""
-    if not repo_label or "/" not in repo_label or repo_label.startswith("jira:"):
-        return lambda _id: None
-
-    def f(item_id: str) -> str | None:
-        if item_id.startswith("#"):
-            return f"https://github.com/{repo_label}/pull/{item_id.lstrip('#')}"
-        return None
-    return f
 
 
 @cli.command(short_help="Aging Work In Progress (Vacanti WWIBD)")
@@ -712,21 +702,11 @@ def aging(
         ]
         pct = cycle_time_percentiles(completed_flows)
 
-        # GitHub source → build a clickable PR URL per item.
-        # Jira → leave as None (different URL scheme; out of scope here).
-        url_for: Callable[[str], str | None] | None = None
-        if repo:
-            owner_name = repo
-            url_for = lambda item_id: (  # noqa: E731
-                f"https://github.com/{owner_name}/pull/{item_id.lstrip('#')}"
-                if item_id.startswith("#")
-                else None
-            )
-
+        # Per-item drill-down URLs come from `WorkItem.url` set by
+        # the source at fetch time — no per-source URL stitching here.
         aging_items = compute_aging(
             in_flight,
             asof=asof_d,
-            url_for=url_for,
             max_age_days=max_age_days,
         )
         excluded = len(in_flight) - len(aging_items)

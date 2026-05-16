@@ -138,24 +138,11 @@ def _render_efficiency(report: EfficiencyReport) -> str:
         report=report,
         per_pr_sorted=sorted(report.result.per_pr, key=lambda p: p.efficiency),
         per_pr_by_cycle=per_pr_by_cycle,
-        pr_urls=_github_pr_urls(report.input.repo, [p.item_id for p in report.result.per_pr]),
         vega_spec_json=(
             _safe_json_for_script_tag(vega_specs.efficiency_spec(report))
             if report.result.pr_count else ""
         ),
     )
-
-
-def _github_pr_urls(repo: str, item_ids: list[str]) -> dict[str, str]:
-    """Best-effort URL builder. Returns {} for non-GitHub sources;
-    template falls through to plain text in that case."""
-    if not repo or "/" not in repo:
-        return {}
-    out: dict[str, str] = {}
-    for item_id in item_ids:
-        if item_id.startswith("#"):
-            out[item_id] = f"https://github.com/{repo}/pull/{item_id.lstrip('#')}"
-    return out
 
 
 def _render_when_done(report: WhenDoneReport) -> str:
