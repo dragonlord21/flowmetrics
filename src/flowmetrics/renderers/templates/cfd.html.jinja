@@ -103,6 +103,13 @@ snapshot only when the next sample arrives.
       band. Anything not yet in the workflow (e.g., a Jira ticket
       that hasn't been filed; a PR not yet opened) is not on this
       chart.</li>
+  <li>The team picks which states count as "in flight": that's the
+      <code>--workflow</code> list above. A state like
+      <em>Triage Needed</em> reads differently depending on whether
+      the team treats triage as work (then it belongs on the chart)
+      or as a queue waiting for someone to start (then it doesn't).
+      The tool renders whatever you've told it; choose the states
+      that match your team's agreed definition of WIP.</li>
   <li>The <em>bottom band</em> is items that have reached the final
       step ({{ report.input.workflow[-1] }}) — finished, accumulating
       forever.</li>

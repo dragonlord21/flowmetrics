@@ -112,12 +112,14 @@ REPOS: list[Repo] = [
             "--jira-project", "CASSANDRA",
         ],
         cache_subdir="jira",
-        # Main workflow path observed in the changelog data; we drop the
-        # off-path side states (Awaiting Feedback, Changes Suggested,
-        # Needs Committer, Testing) to keep the chart readable. Items in
-        # those states get dropped from the chart but the headline still
-        # counts them — see DECISIONS.md #9.
-        cfd_workflow="Triage Needed,Open,In Progress,Patch Available,Review In Progress,Ready to Commit,Resolved",
+        # Which states count as WIP is a team-level call about what
+        # the team has actually committed to working on. For this
+        # sample we treat `Triage Needed` and `Open` as wait-for-
+        # pickup (so the CFD starts at `In Progress`); a team where
+        # triage is itself a tracked, person-assigned activity could
+        # legitimately include them. Aging keeps the early states
+        # because aging-in-intake is a useful signal regardless.
+        cfd_workflow="In Progress,Patch Available,Review In Progress,Ready to Commit,Resolved",
         aging_workflow="Triage Needed,Open,In Progress,Patch Available,Review In Progress,Ready to Commit",
     ),
     Repo(
@@ -128,7 +130,11 @@ REPOS: list[Repo] = [
             "--jira-project", "BIGTOP",
         ],
         cache_subdir="jira",
-        cfd_workflow="Open,In Progress,Patch Available,Resolved",
+        # Same convention as the Cassandra sample: `Open` here is
+        # treated as wait-for-pickup, so the CFD starts at
+        # `In Progress`. Adjust to match whatever the team agrees
+        # counts as WIP.
+        cfd_workflow="In Progress,Patch Available,Resolved",
         aging_workflow="Open,In Progress,Patch Available",
     ),
 ]
@@ -233,8 +239,8 @@ def build_samples_md(sets: list[SampleSet], generated_at: datetime) -> str:
         lines.append("| Report | Formats |")
         lines.append("| --- | --- |")
         lines.append(f"| Efficiency | {_link(d, 'efficiency', True)} |")
-        lines.append(f"| Forecast — when done | {_link(d, 'forecast-when-done', True)} |")
-        lines.append(f"| Forecast — how many | {_link(d, 'forecast-how-many', True)} |")
+        lines.append(f"| WWIBD: Date | {_link(d, 'forecast-when-done', True)} |")
+        lines.append(f"| WWIBD: How Many | {_link(d, 'forecast-how-many', True)} |")
         lines.append(f"| Cycle-time scatterplot | {_link(d, 'scatterplot', True)} |")
         lines.append(f"| CFD | {_link(d, 'cfd', s.cfd_html is not None)} |")
         lines.append(f"| Aging WIP | {_link(d, 'aging', s.aging_html is not None)} |")
@@ -321,8 +327,8 @@ samples here use the simple review-decision lifecycle
 <thead>
 <tr><th>Repository</th>
 <th>Efficiency (week)</th>
-<th>Forecast: when-done</th>
-<th>Forecast: how-many</th>
+<th>WWIBD: Date</th>
+<th>WWIBD: How Many</th>
 <th>Scatterplot</th>
 <th>CFD</th>
 <th>Aging WIP</th></tr>

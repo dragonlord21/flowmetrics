@@ -1,12 +1,11 @@
 {
   "schema": "flowmetrics.cfd.v1",
   "command": "cfd",
-  "generated_at": "2026-05-16T09:48:40.614786-06:00",
+  "generated_at": "2026-05-16T09:56:13.378985-06:00",
   "headline": "CFD for jira:BIGTOP Apr 16, 2026 \u2192 May 15, 2026: 736 items arrived, 17 completed, 719 still in flight at end.",
   "definition": "Stacked-area chart of items by workflow step over time. The top line counts every item that has ever entered the system; the bottom line counts items finished. The vertical gap at any sample date is items still in flight (WIP). Includes carry-over items that were already open at window start AND items still open at window end \u2014 so the chart shows real WIP, not just items that both arrived and finished inside the window.",
   "summary": {
     "workflow": [
-      "Open",
       "In Progress",
       "Patch Available",
       "Resolved"
@@ -18,16 +17,16 @@
     "wip_at_end": 719,
     "peak_wip": 723
   },
-  "key_insight": "The largest WIP band at May 15, 2026 is 'Open' with 646 items in flight. The thicker that band is on the chart, the more work is queued or in-progress at that stage; the steeper the line bordering it, the faster items are arriving into the stage.",
+  "key_insight": "The largest WIP band at May 15, 2026 is 'In Progress' with 669 items in flight. The thicker that band is on the chart, the more work is queued or in-progress at that stage; the steeper the line bordering it, the faster items are arriving into the stage.",
   "next_actions": [
-    "Investigate why items accumulate in 'Open'. Either items are arriving faster than this stage can process, or they're waiting on a downstream resource (reviewers, environments, decisions).",
+    "Investigate why items accumulate in 'In Progress'. Either items are arriving faster than this stage can process, or they're waiting on a downstream resource (reviewers, environments, decisions).",
     "Look for places where one line flattens \u2014 that's a stall in that band.",
     "Compare band widths to the previous window to spot accumulation trends."
   ],
   "caveats": [
     "Past data only \u2014 the chart does not project forward.",
     "Items still in flight may be under-represented when the source only fetches completed work. Wider bands today may grow tomorrow.",
-    "Workflow used: Open \u2192 In Progress \u2192 Patch Available \u2192 Resolved. Items that visit statuses outside this list are silently skipped at those points."
+    "Workflow used: In Progress \u2192 Patch Available \u2192 Resolved. Items that visit statuses outside this list are silently skipped at those points."
   ],
   "vocabulary": {
     "Cumulative Flow Diagram": "Stacked area chart of cumulative counts per workflow state over time. Each state's line counts items that have entered that state or any later one \u2014 so the lines never cross and never decrease.",
@@ -41,8 +40,7 @@
       {
         "sampled_on": "2026-04-16",
         "counts_by_state": {
-          "Open": 728,
-          "In Progress": 83,
+          "In Progress": 728,
           "Patch Available": 60,
           "Resolved": 7
         }
@@ -50,8 +48,7 @@
       {
         "sampled_on": "2026-04-17",
         "counts_by_state": {
-          "Open": 729,
-          "In Progress": 84,
+          "In Progress": 729,
           "Patch Available": 61,
           "Resolved": 7
         }
@@ -59,8 +56,7 @@
       {
         "sampled_on": "2026-04-18",
         "counts_by_state": {
-          "Open": 729,
-          "In Progress": 84,
+          "In Progress": 729,
           "Patch Available": 61,
           "Resolved": 7
         }
@@ -68,8 +64,7 @@
       {
         "sampled_on": "2026-04-19",
         "counts_by_state": {
-          "Open": 729,
-          "In Progress": 84,
+          "In Progress": 729,
           "Patch Available": 61,
           "Resolved": 7
         }
@@ -77,8 +72,7 @@
       {
         "sampled_on": "2026-04-20",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -86,8 +80,7 @@
       {
         "sampled_on": "2026-04-21",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -95,8 +88,7 @@
       {
         "sampled_on": "2026-04-22",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -104,8 +96,7 @@
       {
         "sampled_on": "2026-04-23",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -113,8 +104,7 @@
       {
         "sampled_on": "2026-04-24",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -122,8 +112,7 @@
       {
         "sampled_on": "2026-04-25",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -131,8 +120,7 @@
       {
         "sampled_on": "2026-04-26",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -140,8 +128,7 @@
       {
         "sampled_on": "2026-04-27",
         "counts_by_state": {
-          "Open": 730,
-          "In Progress": 85,
+          "In Progress": 730,
           "Patch Available": 62,
           "Resolved": 7
         }
@@ -149,8 +136,7 @@
       {
         "sampled_on": "2026-04-28",
         "counts_by_state": {
-          "Open": 731,
-          "In Progress": 86,
+          "In Progress": 731,
           "Patch Available": 63,
           "Resolved": 11
         }
@@ -158,8 +144,7 @@
       {
         "sampled_on": "2026-04-29",
         "counts_by_state": {
-          "Open": 731,
-          "In Progress": 86,
+          "In Progress": 731,
           "Patch Available": 63,
           "Resolved": 11
         }
@@ -167,8 +152,7 @@
       {
         "sampled_on": "2026-04-30",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -176,8 +160,7 @@
       {
         "sampled_on": "2026-05-01",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -185,8 +168,7 @@
       {
         "sampled_on": "2026-05-02",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -194,8 +176,7 @@
       {
         "sampled_on": "2026-05-03",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -203,8 +184,7 @@
       {
         "sampled_on": "2026-05-04",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -212,8 +192,7 @@
       {
         "sampled_on": "2026-05-05",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -221,8 +200,7 @@
       {
         "sampled_on": "2026-05-06",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -230,8 +208,7 @@
       {
         "sampled_on": "2026-05-07",
         "counts_by_state": {
-          "Open": 732,
-          "In Progress": 87,
+          "In Progress": 732,
           "Patch Available": 64,
           "Resolved": 11
         }
@@ -239,8 +216,7 @@
       {
         "sampled_on": "2026-05-08",
         "counts_by_state": {
-          "Open": 735,
-          "In Progress": 88,
+          "In Progress": 735,
           "Patch Available": 65,
           "Resolved": 15
         }
@@ -248,8 +224,7 @@
       {
         "sampled_on": "2026-05-09",
         "counts_by_state": {
-          "Open": 735,
-          "In Progress": 88,
+          "In Progress": 735,
           "Patch Available": 65,
           "Resolved": 15
         }
@@ -257,8 +232,7 @@
       {
         "sampled_on": "2026-05-10",
         "counts_by_state": {
-          "Open": 736,
-          "In Progress": 89,
+          "In Progress": 736,
           "Patch Available": 66,
           "Resolved": 15
         }
@@ -266,8 +240,7 @@
       {
         "sampled_on": "2026-05-11",
         "counts_by_state": {
-          "Open": 736,
-          "In Progress": 89,
+          "In Progress": 736,
           "Patch Available": 66,
           "Resolved": 15
         }
@@ -275,8 +248,7 @@
       {
         "sampled_on": "2026-05-12",
         "counts_by_state": {
-          "Open": 736,
-          "In Progress": 89,
+          "In Progress": 736,
           "Patch Available": 66,
           "Resolved": 15
         }
@@ -284,8 +256,7 @@
       {
         "sampled_on": "2026-05-13",
         "counts_by_state": {
-          "Open": 736,
-          "In Progress": 89,
+          "In Progress": 736,
           "Patch Available": 66,
           "Resolved": 15
         }
@@ -293,8 +264,7 @@
       {
         "sampled_on": "2026-05-14",
         "counts_by_state": {
-          "Open": 736,
-          "In Progress": 90,
+          "In Progress": 736,
           "Patch Available": 67,
           "Resolved": 17
         }
@@ -302,8 +272,7 @@
       {
         "sampled_on": "2026-05-15",
         "counts_by_state": {
-          "Open": 736,
-          "In Progress": 90,
+          "In Progress": 736,
           "Patch Available": 67,
           "Resolved": 17
         }
@@ -312,15 +281,9 @@
     "bands": [
       {
         "sampled_on": "2026-04-16",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 728
-      },
-      {
-        "sampled_on": "2026-04-16",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 83
+        "wip_in_state": 668,
+        "entered_at_or_later": 728
       },
       {
         "sampled_on": "2026-04-16",
@@ -336,15 +299,9 @@
       },
       {
         "sampled_on": "2026-04-17",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 729
-      },
-      {
-        "sampled_on": "2026-04-17",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 84
+        "wip_in_state": 668,
+        "entered_at_or_later": 729
       },
       {
         "sampled_on": "2026-04-17",
@@ -360,15 +317,9 @@
       },
       {
         "sampled_on": "2026-04-18",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 729
-      },
-      {
-        "sampled_on": "2026-04-18",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 84
+        "wip_in_state": 668,
+        "entered_at_or_later": 729
       },
       {
         "sampled_on": "2026-04-18",
@@ -384,15 +335,9 @@
       },
       {
         "sampled_on": "2026-04-19",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 729
-      },
-      {
-        "sampled_on": "2026-04-19",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 84
+        "wip_in_state": 668,
+        "entered_at_or_later": 729
       },
       {
         "sampled_on": "2026-04-19",
@@ -408,15 +353,9 @@
       },
       {
         "sampled_on": "2026-04-20",
-        "state": "Open",
-        "wip_in_state": 645,
+        "state": "In Progress",
+        "wip_in_state": 668,
         "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-20",
-        "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
       },
       {
         "sampled_on": "2026-04-20",
@@ -432,15 +371,9 @@
       },
       {
         "sampled_on": "2026-04-21",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-21",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-21",
@@ -456,15 +389,9 @@
       },
       {
         "sampled_on": "2026-04-22",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-22",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-22",
@@ -480,15 +407,9 @@
       },
       {
         "sampled_on": "2026-04-23",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-23",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-23",
@@ -504,15 +425,9 @@
       },
       {
         "sampled_on": "2026-04-24",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-24",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-24",
@@ -528,15 +443,9 @@
       },
       {
         "sampled_on": "2026-04-25",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-25",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-25",
@@ -552,15 +461,9 @@
       },
       {
         "sampled_on": "2026-04-26",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-26",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-26",
@@ -576,15 +479,9 @@
       },
       {
         "sampled_on": "2026-04-27",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 730
-      },
-      {
-        "sampled_on": "2026-04-27",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 85
+        "wip_in_state": 668,
+        "entered_at_or_later": 730
       },
       {
         "sampled_on": "2026-04-27",
@@ -600,15 +497,9 @@
       },
       {
         "sampled_on": "2026-04-28",
-        "state": "Open",
-        "wip_in_state": 645,
+        "state": "In Progress",
+        "wip_in_state": 668,
         "entered_at_or_later": 731
-      },
-      {
-        "sampled_on": "2026-04-28",
-        "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 86
       },
       {
         "sampled_on": "2026-04-28",
@@ -624,15 +515,9 @@
       },
       {
         "sampled_on": "2026-04-29",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 731
-      },
-      {
-        "sampled_on": "2026-04-29",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 86
+        "wip_in_state": 668,
+        "entered_at_or_later": 731
       },
       {
         "sampled_on": "2026-04-29",
@@ -648,15 +533,9 @@
       },
       {
         "sampled_on": "2026-04-30",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-04-30",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-04-30",
@@ -672,15 +551,9 @@
       },
       {
         "sampled_on": "2026-05-01",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-01",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-01",
@@ -696,15 +569,9 @@
       },
       {
         "sampled_on": "2026-05-02",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-02",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-02",
@@ -720,15 +587,9 @@
       },
       {
         "sampled_on": "2026-05-03",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-03",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-03",
@@ -744,15 +605,9 @@
       },
       {
         "sampled_on": "2026-05-04",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-04",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-04",
@@ -768,15 +623,9 @@
       },
       {
         "sampled_on": "2026-05-05",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-05",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-05",
@@ -792,15 +641,9 @@
       },
       {
         "sampled_on": "2026-05-06",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-06",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-06",
@@ -816,15 +659,9 @@
       },
       {
         "sampled_on": "2026-05-07",
-        "state": "Open",
-        "wip_in_state": 645,
-        "entered_at_or_later": 732
-      },
-      {
-        "sampled_on": "2026-05-07",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 87
+        "wip_in_state": 668,
+        "entered_at_or_later": 732
       },
       {
         "sampled_on": "2026-05-07",
@@ -840,15 +677,9 @@
       },
       {
         "sampled_on": "2026-05-08",
-        "state": "Open",
-        "wip_in_state": 647,
+        "state": "In Progress",
+        "wip_in_state": 670,
         "entered_at_or_later": 735
-      },
-      {
-        "sampled_on": "2026-05-08",
-        "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 88
       },
       {
         "sampled_on": "2026-05-08",
@@ -864,15 +695,9 @@
       },
       {
         "sampled_on": "2026-05-09",
-        "state": "Open",
-        "wip_in_state": 647,
-        "entered_at_or_later": 735
-      },
-      {
-        "sampled_on": "2026-05-09",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 88
+        "wip_in_state": 670,
+        "entered_at_or_later": 735
       },
       {
         "sampled_on": "2026-05-09",
@@ -888,15 +713,9 @@
       },
       {
         "sampled_on": "2026-05-10",
-        "state": "Open",
-        "wip_in_state": 647,
-        "entered_at_or_later": 736
-      },
-      {
-        "sampled_on": "2026-05-10",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 89
+        "wip_in_state": 670,
+        "entered_at_or_later": 736
       },
       {
         "sampled_on": "2026-05-10",
@@ -912,15 +731,9 @@
       },
       {
         "sampled_on": "2026-05-11",
-        "state": "Open",
-        "wip_in_state": 647,
-        "entered_at_or_later": 736
-      },
-      {
-        "sampled_on": "2026-05-11",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 89
+        "wip_in_state": 670,
+        "entered_at_or_later": 736
       },
       {
         "sampled_on": "2026-05-11",
@@ -936,15 +749,9 @@
       },
       {
         "sampled_on": "2026-05-12",
-        "state": "Open",
-        "wip_in_state": 647,
-        "entered_at_or_later": 736
-      },
-      {
-        "sampled_on": "2026-05-12",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 89
+        "wip_in_state": 670,
+        "entered_at_or_later": 736
       },
       {
         "sampled_on": "2026-05-12",
@@ -960,15 +767,9 @@
       },
       {
         "sampled_on": "2026-05-13",
-        "state": "Open",
-        "wip_in_state": 647,
-        "entered_at_or_later": 736
-      },
-      {
-        "sampled_on": "2026-05-13",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 89
+        "wip_in_state": 670,
+        "entered_at_or_later": 736
       },
       {
         "sampled_on": "2026-05-13",
@@ -984,15 +785,9 @@
       },
       {
         "sampled_on": "2026-05-14",
-        "state": "Open",
-        "wip_in_state": 646,
-        "entered_at_or_later": 736
-      },
-      {
-        "sampled_on": "2026-05-14",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 90
+        "wip_in_state": 669,
+        "entered_at_or_later": 736
       },
       {
         "sampled_on": "2026-05-14",
@@ -1008,15 +803,9 @@
       },
       {
         "sampled_on": "2026-05-15",
-        "state": "Open",
-        "wip_in_state": 646,
-        "entered_at_or_later": 736
-      },
-      {
-        "sampled_on": "2026-05-15",
         "state": "In Progress",
-        "wip_in_state": 23,
-        "entered_at_or_later": 90
+        "wip_in_state": 669,
+        "entered_at_or_later": 736
       },
       {
         "sampled_on": "2026-05-15",
@@ -1037,7 +826,6 @@
     "start": "2026-04-16",
     "stop": "2026-05-15",
     "workflow": [
-      "Open",
       "In Progress",
       "Patch Available",
       "Resolved"
@@ -1050,6 +838,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow cfd --jira-url https://issues.apache.org/jira --jira-project BIGTOP --start 2026-04-16 --stop 2026-05-15 --workflow 'Open,In Progress,Patch Available,Resolved' --interval-days 1",
+  "cli_invocation": "uv run flow cfd --jira-url https://issues.apache.org/jira --jira-project BIGTOP --start 2026-04-16 --stop 2026-05-15 --workflow 'In Progress,Patch Available,Resolved' --interval-days 1",
   "logs": []
 }
