@@ -45,9 +45,10 @@ root = ["./src"]
 # Default run excludes the `integration` marker. Use `uv run pytest -m integration`
 # to opt into live-API tests (which require `gh auth login` or $GITHUB_TOKEN).
 # Unit tests must NEVER hit the network — conftest.py asserts that.
-addopts = "-m 'not integration'"
+addopts = "-m 'not integration and not browser'"
 markers = [
     "integration: live GitHub API calls; opt-in only, default pytest run skips these.",
+    "browser: chromium-driven UI tests; opt-in only, default pytest run skips these. Requires `uv run playwright install chromium`.",
 ]
 
 [project.scripts]

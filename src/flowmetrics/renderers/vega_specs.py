@@ -118,7 +118,7 @@ def _forecast_histogram_spec(
         "width": "container",
         "height": 320,
         "background": "transparent",
-        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}},
         "layer": [bar_layer, rule_layer],
     }
 
@@ -313,7 +313,7 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
         "width": "container",
         "height": 380,
         "background": "transparent",
-        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}},
         "layer": [circle_layer, rule_layer, text_layer],
     }
 
@@ -390,7 +390,7 @@ def aging_distribution_spec(report: AgingReport) -> dict[str, Any]:
         "width": "container",
         "height": {"step": 32},
         "background": "transparent",
-        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}},
         "layer": [bar_layer],
     }
 
@@ -579,7 +579,7 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
         "width": "container",
         "height": 360,
         "background": "transparent",
-        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}},
         "layer": layers,
     }
 
@@ -629,7 +629,10 @@ def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
         "params": [
             {
                 "name": "efficiency_zoom",
-                "select": {"type": "interval", "encodings": ["x", "y"]},
+                # X only - Y is nominal (item_id), which can't be interval-
+                # zoomed. Including y in encodings made the whole zoom param
+                # a no-op (caught by test_zoom_browser.py).
+                "select": {"type": "interval", "encodings": ["x"]},
                 "bind": "scales",
             }
         ],
@@ -649,7 +652,10 @@ def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
                 "field": "efficiency_pct",
                 "type": "quantitative",
                 "axis": {"title": "Flow efficiency (%)", "titleFontWeight": "bold"},
-                "scale": {"domain": [0, 100]},
+                # No explicit scale - Vega-Lite auto-fits to data range.
+                # `domain: [0, 100]` (or domainMin/Max combo) locks the
+                # scale and makes bind:scales zoom a no-op
+                # (caught by test_zoom_browser.py).
             },
             "color": {
                 "field": "band",
@@ -696,7 +702,7 @@ def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
         "width": "container",
         "height": height,
         "background": "transparent",
-        "config": {"view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1}},
+        "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}},
         "layer": [bar_layer, rule_layer],
     }
 
@@ -942,7 +948,7 @@ def aging_spec(report: AgingReport) -> dict[str, Any]:
         # the view background — clean Tufte chart needs neither.
         "background": "transparent",
         "config": {
-            "view": {"fill": None, "stroke": "#e5e5e5", "strokeWidth": 1},
+            "view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1},
         },
         # Layer order: column shade → percentile rules → circles →
         # per-state header labels. Shade paints first (behind

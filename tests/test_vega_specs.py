@@ -402,15 +402,19 @@ class TestAgingSpec:
         i_circle = layer_kinds.index("circle")
         assert i_first_rule < i_circle, "rules must paint before circles"
 
-    def test_chart_has_transparent_background_and_no_view_fill(self):
-        """Vega-Lite defaults render the view (chart plot area) with a
-        subtle fill that can show through and look like a tint. Make
-        background + view.fill explicit (transparent / null) so the
-        chart is on plain white regardless of theme defaults."""
+    def test_chart_has_transparent_background_and_transparent_view_fill(self):
+        """The view rect needs an explicit 'transparent' fill (not null)
+        so it captures pointer events for bind:scales zoom. With
+        view.fill: null, wheel/drag is dead unless cursor is exactly
+        on a mark (verified empirically — tests/test_zoom_browser.py).
+
+        Both `background` and `view.fill` set to `transparent` keep the
+        chart visually on plain white while making the view rect
+        interactive."""
         spec = vega_specs.aging_spec(_aging_report([_item("#1", "Awaiting Review", 100)]))
         assert spec.get("background") == "transparent"
         view = spec.get("config", {}).get("view", {})
-        assert view.get("fill") is None
+        assert view.get("fill") == "transparent"
         assert "stroke" in view  # explicit stroke (even if subtle)
 
     def test_alternating_column_shade_helps_the_eye_locate_stages(self):
@@ -1538,7 +1542,9 @@ class TestZoomParityAcrossCharts:
         zoom = _find_zoom_in_spec(spec)
         assert zoom is not None, "efficiency_spec must declare an interval-bind:scales zoom"
         encs = zoom["select"].get("encodings", [])
-        assert "x" in encs and "y" in encs, f"Zoom must cover X and Y. Got {encs}"
+        # X only - Y is nominal (item_id), interval-zoom on ordinal is
+        # a no-op AND breaks zoom on the X axis if included.
+        assert "x" in encs, f"Zoom must cover X. Got {encs}"
 
     def test_aging_distribution_supports_drag_zoom(self):
         """Aging distribution histogram's 'Above P95' band often
