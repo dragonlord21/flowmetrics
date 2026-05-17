@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-16T10:24:43.194907-06:00",
+  "generated_at": "2026-05-16T22:38:27.800487-06:00",
   "headline": "0.0% flow efficiency across 6 completed items over 7 days, May 9, 2026 \u2192 May 15, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
@@ -42,7 +42,7 @@
     "Active time uses gap=4.0h and min_cluster=30.0min \u2014 raising the gap credits longer idle stretches as active, which raises FE; lowering it does the opposite."
   ],
   "vocabulary": {
-    "Cycle time": "Wall-clock time from when a PR was opened until it was merged. The clock starts at `created_at` and stops at `merged_at`.",
+    "Cycle time": "Wall-clock time from when a PR was opened until it was merged. The clock starts at `created_at` and stops at `completed_at`.",
     "Active time": "The share of cycle time covered by clusters of activity events (commits, reviews, comments). Events more than `gap-hours` apart form separate clusters; each cluster credits at least `min-cluster-minutes` of active time.",
     "Wait time": "cycle_time \u2212 active_time. Time the PR spent waiting in queues (awaiting review, blocked, etc.). This is where time leaks out of the system \u2014 long wait time on a few PRs drives the portfolio FE down more than slow individual work does.",
     "Flow efficiency": "active_time / cycle_time. Reported per-PR and as a portfolio.",
@@ -83,7 +83,7 @@
     "stop": "2026-05-15",
     "gap_hours": 4.0,
     "min_cluster_minutes": 30.0,
-    "offline": false,
+    "offline": true,
     "active_statuses": [
       "In Development",
       "In Progress"
@@ -96,7 +96,7 @@
         "item_id": "CASSANDRA-21355",
         "title": "Accord: Clean Shutdown/Restart, Rebootstrap, et al",
         "created_at": "2026-05-08T20:52:50+00:00",
-        "merged_at": "2026-05-09T20:10:51+00:00",
+        "completed_at": "2026-05-09T20:10:51+00:00",
         "cycle_time": {
           "seconds": 83881.0,
           "hours": 23.30027777777778,
@@ -115,7 +115,7 @@
         "item_id": "CASSANDRA-21364",
         "title": "Add ability to skip post-checkout submodule init with BUILD_OFFLINE env var",
         "created_at": "2026-05-11T17:51:18+00:00",
-        "merged_at": "2026-05-11T21:01:00+00:00",
+        "completed_at": "2026-05-11T21:01:00+00:00",
         "cycle_time": {
           "seconds": 11382.0,
           "hours": 3.1616666666666666,
@@ -134,7 +134,7 @@
         "item_id": "CASSANDRA-21367",
         "title": "Cassandra CIs fail on artifacts resolution",
         "created_at": "2026-05-12T14:09:24+00:00",
-        "merged_at": "2026-05-12T21:13:11+00:00",
+        "completed_at": "2026-05-12T21:13:11+00:00",
         "cycle_time": {
           "seconds": 25427.0,
           "hours": 7.063055555555556,
@@ -153,7 +153,7 @@
         "item_id": "CASSANDRA-21366",
         "title": "Fix MutationId class hierarchy and related maps lookup issues",
         "created_at": "2026-05-12T12:57:57+00:00",
-        "merged_at": "2026-05-13T09:35:47+00:00",
+        "completed_at": "2026-05-13T09:35:47+00:00",
         "cycle_time": {
           "seconds": 74270.0,
           "hours": 20.630555555555556,
@@ -172,7 +172,7 @@
         "item_id": "CASSANDRA-21245",
         "title": "Uncompressed size is being used for compressed tables in maintenance operations",
         "created_at": "2026-03-22T19:51:25+00:00",
-        "merged_at": "2026-05-13T20:01:06+00:00",
+        "completed_at": "2026-05-13T20:01:06+00:00",
         "cycle_time": {
           "seconds": 4493381.0,
           "hours": 1248.161388888889,
@@ -191,7 +191,7 @@
         "item_id": "CASSANDRA-21301",
         "title": "add AGENTS.md and CLAUDE.md",
         "created_at": "2026-04-12T12:59:30+00:00",
-        "merged_at": "2026-05-14T11:25:51+00:00",
+        "completed_at": "2026-05-14T11:25:51+00:00",
         "cycle_time": {
           "seconds": 2759181.0,
           "hours": 766.4391666666667,
@@ -213,6 +213,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow efficiency --jira-url https://issues.apache.org/jira --jira-project CASSANDRA --start 2026-05-09 --stop 2026-05-15 --gap-hours 4.0 --min-cluster-minutes 30.0",
+  "cli_invocation": "uv run flow efficiency --jira-url https://issues.apache.org/jira --jira-project CASSANDRA --start 2026-05-09 --stop 2026-05-15 --gap-hours 4.0 --min-cluster-minutes 30.0 --offline",
   "logs": []
 }

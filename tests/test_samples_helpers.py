@@ -166,3 +166,119 @@ class TestReferenceSection:
             datetime(2026, 5, 12, 14, 30, tzinfo=UTC),
         )
         assert "Reference" in out
+
+
+# ---------------------------------------------------------------------------
+# Orchestration: --offline plumbing
+# ---------------------------------------------------------------------------
+
+
+class TestOfflineFlag:
+    """When the samples script is invoked with --offline, every
+    underlying `flow` invocation should carry --offline so cache
+    misses surface as errors instead of silent live fetches.
+    Lets you safely refresh samples after a spec/template change
+    without burning API quota — and proves the cache covers the
+    set."""
+
+    def _captured_calls(self, monkeypatch, *, offline: bool) -> list[tuple[str, ...]]:
+        import generate_samples
+        calls: list[tuple[str, ...]] = []
+
+        def fake_run(*args: str) -> str:
+            calls.append(tuple(args))
+            return ""
+
+        monkeypatch.setattr(generate_samples, "_run_cli", fake_run)
+
+        repo = generate_samples.Repo(
+            slug="acme/widget",
+            archetype="test",
+            cli_args=["--repo", "acme/widget"],
+            cache_subdir="github",
+            cfd_workflow="Open,Merged",
+            aging_workflow="Open,Review,Approved",
+        )
+        generate_samples._produce_one_repo(
+            repo,
+            history_end="2026-05-15",
+            target_date="2026-05-30",
+            offline=offline,
+        )
+        return calls
+
+    def test_offline_true_plumbs_dashes_offline_into_every_flow_invocation(self, monkeypatch):
+        calls = self._captured_calls(monkeypatch, offline=True)
+        assert calls, "expected at least one flow invocation"
+        missing = [c for c in calls if "--offline" not in c]
+        assert not missing, (
+            f"--offline should propagate to every flow invocation. "
+            f"Missing in {len(missing)} of {len(calls)} calls."
+        )
+
+    def test_offline_false_omits_dashes_offline(self, monkeypatch):
+        calls = self._captured_calls(monkeypatch, offline=False)
+        assert calls
+        leaked = [c for c in calls if "--offline" in c]
+        assert not leaked, (
+            f"--offline must NOT be added when offline=False. "
+            f"Leaked into {len(leaked)} calls."
+        )
+
+
+class TestOfflineReusesWindowFromExistingSample:
+    """When --offline is set and a previous sample exists for a repo,
+    the script should reuse the previous window so cache hits.
+    Otherwise day-to-day clock drift (today vs yesterday) causes
+    100% cache misses after a single calendar day."""
+
+    def test_offline_reuses_window_when_existing_efficiency_json_present(
+        self, monkeypatch, tmp_path
+    ):
+        import json
+
+        import generate_samples
+        # Stand up a fake samples dir with an existing efficiency.json
+        samples_dir = tmp_path / "samples"
+        repo_dir = samples_dir / "acme_widget"
+        repo_dir.mkdir(parents=True)
+        previous_window = {
+            "input": {
+                "repo": "acme/widget",
+                "start": "2026-05-01",
+                "stop": "2026-05-07",
+            }
+        }
+        (repo_dir / "efficiency.json").write_text(json.dumps(previous_window))
+        monkeypatch.setattr(generate_samples, "SAMPLES_DIR", samples_dir)
+
+        calls: list[tuple[str, ...]] = []
+        def fake_run(*args: str) -> str:
+            calls.append(tuple(args))
+            return ""
+        monkeypatch.setattr(generate_samples, "_run_cli", fake_run)
+
+        repo = generate_samples.Repo(
+            slug="acme/widget",
+            archetype="test",
+            cli_args=["--repo", "acme/widget"],
+        )
+        # Pass TODAY-derived window — script should ignore it and
+        # use the recovered window for the efficiency call.
+        generate_samples._produce_one_repo(
+            repo,
+            history_end="2026-05-15",
+            target_date="2026-05-30",
+            offline=True,
+        )
+        # The first efficiency call's --start should be the
+        # recovered date, not 2026-05-09 (which today's history_end
+        # would imply).
+        efficiency_calls = [c for c in calls if c[0] == "efficiency"]
+        assert efficiency_calls
+        first = efficiency_calls[0]
+        assert "--start" in first
+        start_idx = first.index("--start")
+        assert first[start_idx + 1] == "2026-05-01", (
+            f"--offline should recover prior window, got start={first[start_idx + 1]}"
+        )

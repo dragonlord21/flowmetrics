@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-16T10:24:33.532938-06:00",
+  "generated_at": "2026-05-16T22:38:17.900240-06:00",
   "headline": "0.7% flow efficiency across 12 completed items (7 human, 5 bot) over 7 days, May 9, 2026 \u2192 May 15, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
@@ -34,7 +34,7 @@
     "Active time uses gap=4.0h and min_cluster=30.0min \u2014 raising the gap credits longer idle stretches as active, which raises FE; lowering it does the opposite."
   ],
   "vocabulary": {
-    "Cycle time": "Wall-clock time from when a PR was opened until it was merged. The clock starts at `created_at` and stops at `merged_at`.",
+    "Cycle time": "Wall-clock time from when a PR was opened until it was merged. The clock starts at `created_at` and stops at `completed_at`.",
     "Active time": "The share of cycle time covered by clusters of activity events (commits, reviews, comments). Events more than `gap-hours` apart form separate clusters; each cluster credits at least `min-cluster-minutes` of active time.",
     "Wait time": "cycle_time \u2212 active_time. Time the PR spent waiting in queues (awaiting review, blocked, etc.). This is where time leaks out of the system \u2014 long wait time on a few PRs drives the portfolio FE down more than slow individual work does.",
     "Flow efficiency": "active_time / cycle_time. Reported per-PR and as a portfolio.",
@@ -99,7 +99,7 @@
     "stop": "2026-05-15",
     "gap_hours": 4.0,
     "min_cluster_minutes": 30.0,
-    "offline": false,
+    "offline": true,
     "active_statuses": [
       "In Development",
       "In Progress"
@@ -112,7 +112,7 @@
         "item_id": "#14479",
         "title": "docs: fix pytest-xdist plugin wording",
         "created_at": "2026-05-13T15:50:42+00:00",
-        "merged_at": "2026-05-14T09:20:33+00:00",
+        "completed_at": "2026-05-14T09:20:33+00:00",
         "cycle_time": {
           "seconds": 62991.0,
           "hours": 17.4975,
@@ -131,7 +131,7 @@
         "item_id": "#14478",
         "title": "[PR #14475/984cabfa backport][9.0.x] fix mark expression scanner: search for backslash in string value, not entire input",
         "created_at": "2026-05-13T15:42:55+00:00",
-        "merged_at": "2026-05-14T09:25:38+00:00",
+        "completed_at": "2026-05-14T09:25:38+00:00",
         "cycle_time": {
           "seconds": 63763.0,
           "hours": 17.711944444444445,
@@ -150,7 +150,7 @@
         "item_id": "#14475",
         "title": "fix mark expression scanner: search for backslash in string value, not entire input",
         "created_at": "2026-05-13T07:08:00+00:00",
-        "merged_at": "2026-05-13T15:42:39+00:00",
+        "completed_at": "2026-05-13T15:42:39+00:00",
         "cycle_time": {
           "seconds": 30879.0,
           "hours": 8.5775,
@@ -169,7 +169,7 @@
         "item_id": "#14472",
         "title": "Fix _as_numpy_array: use variable obj instead of string literal \"obj\"",
         "created_at": "2026-05-13T00:59:41+00:00",
-        "merged_at": "2026-05-14T09:40:34+00:00",
+        "completed_at": "2026-05-14T09:40:34+00:00",
         "cycle_time": {
           "seconds": 117653.0,
           "hours": 32.68138888888889,
@@ -188,7 +188,7 @@
         "item_id": "#14467",
         "title": "docs: clarify subtests progress output",
         "created_at": "2026-05-12T07:54:49+00:00",
-        "merged_at": "2026-05-12T14:02:31+00:00",
+        "completed_at": "2026-05-12T14:02:31+00:00",
         "cycle_time": {
           "seconds": 22062.0,
           "hours": 6.128333333333333,
@@ -207,7 +207,7 @@
         "item_id": "#14466",
         "title": "fix approx rel for timedelta: accept float, compute rel * expected",
         "created_at": "2026-05-12T00:43:44+00:00",
-        "merged_at": "2026-05-12T09:24:13+00:00",
+        "completed_at": "2026-05-12T09:24:13+00:00",
         "cycle_time": {
           "seconds": 31229.0,
           "hours": 8.674722222222222,
@@ -226,7 +226,7 @@
         "item_id": "#14464",
         "title": "[pre-commit.ci] pre-commit autoupdate",
         "created_at": "2026-05-11T20:49:27+00:00",
-        "merged_at": "2026-05-11T21:44:42+00:00",
+        "completed_at": "2026-05-11T21:44:42+00:00",
         "cycle_time": {
           "seconds": 3315.0,
           "hours": 0.9208333333333333,
@@ -245,7 +245,7 @@
         "item_id": "#14460",
         "title": "pastebin: deprecate `--pastebin`",
         "created_at": "2026-05-10T20:44:07+00:00",
-        "merged_at": "2026-05-11T11:44:32+00:00",
+        "completed_at": "2026-05-11T11:44:32+00:00",
         "cycle_time": {
           "seconds": 54025.0,
           "hours": 15.006944444444445,
@@ -264,7 +264,7 @@
         "item_id": "#14455",
         "title": "[automated] Update plugin list",
         "created_at": "2026-05-10T00:57:38+00:00",
-        "merged_at": "2026-05-10T06:39:15+00:00",
+        "completed_at": "2026-05-10T06:39:15+00:00",
         "cycle_time": {
           "seconds": 20497.0,
           "hours": 5.693611111111111,
@@ -283,7 +283,7 @@
         "item_id": "#14450",
         "title": "build(deps): Bump django from 6.0.4 to 6.0.5 in /testing/plugins_integration",
         "created_at": "2026-05-08T22:22:44+00:00",
-        "merged_at": "2026-05-09T10:49:30+00:00",
+        "completed_at": "2026-05-09T10:49:30+00:00",
         "cycle_time": {
           "seconds": 44806.0,
           "hours": 12.446111111111112,
@@ -302,7 +302,7 @@
         "item_id": "#14449",
         "title": "[PR #14443/a481f264 backport][9.0.x] Fix strict options from addopts",
         "created_at": "2026-05-08T20:40:45+00:00",
-        "merged_at": "2026-05-09T17:02:31+00:00",
+        "completed_at": "2026-05-09T17:02:31+00:00",
         "cycle_time": {
           "seconds": 73306.0,
           "hours": 20.36277777777778,
@@ -321,7 +321,7 @@
         "item_id": "#14071",
         "title": "Deprecate `self` in class-scoped fixtures on base classes (#10819) (#14011)",
         "created_at": "2025-12-28T15:27:52+00:00",
-        "merged_at": "2026-05-14T13:47:53+00:00",
+        "completed_at": "2026-05-14T13:47:53+00:00",
         "cycle_time": {
           "seconds": 11830801.0,
           "hours": 3286.333611111111,
@@ -343,6 +343,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow efficiency --repo pytest-dev/pytest --start 2026-05-09 --stop 2026-05-15 --gap-hours 4.0 --min-cluster-minutes 30.0",
+  "cli_invocation": "uv run flow efficiency --repo pytest-dev/pytest --start 2026-05-09 --stop 2026-05-15 --gap-hours 4.0 --min-cluster-minutes 30.0 --offline",
   "logs": []
 }

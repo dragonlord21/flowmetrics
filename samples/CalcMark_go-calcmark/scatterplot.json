@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.scatterplot.v1",
   "command": "scatterplot",
-  "generated_at": "2026-05-16T10:24:42.076292-06:00",
+  "generated_at": "2026-05-16T22:38:26.663422-06:00",
   "headline": "18 items completed in 30 days; 85% finished within 0.9 days (Apr 16, 2026 -> May 15, 2026).",
   "definition": "Each dot is one completed item: x = completion date, y = cycle time (days from creation to completion). Horizontal percentile lines mark probability thresholds \u2014 a new item entering the system has an 85% chance of finishing in P85 days or less, by definition of the percentile.",
   "summary": {
@@ -40,126 +40,126 @@
         "title": "test: lock in variable +/- percentage widening (cmw#83)",
         "completed_at": "2026-05-11",
         "cycle_time_days": 0.0010763888888888889,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/161"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/161"
       },
       {
         "item_id": "#159",
         "title": "fix(lsp): admit bare-IDENT-prefix-of-known-function as calc-shape for completion",
         "completed_at": "2026-05-08",
         "cycle_time_days": 0.07197916666666666,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/159"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/159"
       },
       {
         "item_id": "#158",
         "title": "fix(detector): admit `5% of` and other unambiguous calc-shape partials",
         "completed_at": "2026-05-07",
         "cycle_time_days": 0.00010416666666666667,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/158"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/158"
       },
       {
         "item_id": "#157",
         "title": "feat(period): explicit-year quarter syntax (CY2026 Q3, Q3 2026, FY2027 FQ1, \u2026)",
         "completed_at": "2026-05-07",
         "cycle_time_days": 0.00010416666666666667,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/157"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/157"
       },
       {
         "item_id": "#156",
         "title": "chore(release): task release:dogfood gate before tagging",
         "completed_at": "2026-05-07",
         "cycle_time_days": 0.023541666666666666,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/156"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/156"
       },
       {
         "item_id": "#155",
         "title": "fix(lsp): consult detector when lexer rejects in-flight input",
         "completed_at": "2026-05-07",
         "cycle_time_days": 0.0001273148148148148,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/155"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/155"
       },
       {
         "item_id": "#154",
         "title": "fix(detector): admit in-flight @directive / assignment lines as calc-shape",
         "completed_at": "2026-05-07",
         "cycle_time_days": 0.00010416666666666667,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/154"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/154"
       },
       {
         "item_id": "#153",
         "title": "fix(lsp): suppress completions on prose lines; variables only inside {{ ... }}",
         "completed_at": "2026-05-07",
         "cycle_time_days": 0.008611111111111111,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/153"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/153"
       },
       {
         "item_id": "#152",
         "title": "fix(detector): classify prose-with-emphasis as text, not calculation",
         "completed_at": "2026-05-06",
         "cycle_time_days": 0.002013888888888889,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/152"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/152"
       },
       {
         "item_id": "#151",
         "title": "feat: structured Document API for Embedded-mode sources (NewDocumentEmbedded)",
         "completed_at": "2026-05-03",
         "cycle_time_days": 0.005798611111111111,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/151"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/151"
       },
       {
         "item_id": "#150",
         "title": "feat(rate): same-dimension cancellation across all units (v2.1.0)",
         "completed_at": "2026-04-30",
         "cycle_time_days": 0.04972222222222222,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/150"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/150"
       },
       {
         "item_id": "#149",
         "title": "docs(brainstorm): rate arithmetic \u2014 the \"least surprise\" principle",
         "completed_at": "2026-04-30",
         "cycle_time_days": 8.101851851851852e-05,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/149"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/149"
       },
       {
         "item_id": "#147",
         "title": "fix(modules): bump module path to /v2",
         "completed_at": "2026-04-30",
         "cycle_time_days": 9.259259259259259e-05,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/147"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/147"
       },
       {
         "item_id": "#145",
         "title": "v2.0 Period type system \u2014 release candidate",
         "completed_at": "2026-04-30",
         "cycle_time_days": 0.8535648148148148,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/145"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/145"
       },
       {
         "item_id": "#142",
         "title": "v2.0 Period type system \u2014 release candidate",
         "completed_at": "2026-04-30",
         "cycle_time_days": 1.0188310185185185,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/142"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/142"
       },
       {
         "item_id": "#141",
         "title": "feat(lsp): period literals + end-of/start-of completion (#140 PR-1a)",
         "completed_at": "2026-04-30",
         "cycle_time_days": 1.0318287037037037,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/141"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/141"
       },
       {
         "item_id": "#139",
         "title": "fix: this-prefix completions + lenient frontmatter parsing for editors",
         "completed_at": "2026-04-18",
         "cycle_time_days": 8.101851851851852e-05,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/139"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/139"
       },
       {
         "item_id": "#138",
         "title": "fix: PI/E semantic constants, CY/FY/CQ/FQ abbreviations, template alias filter",
         "completed_at": "2026-04-18",
         "cycle_time_days": 0.0004398148148148148,
-        "pr_url": "https://github.com/CalcMark/go-calcmark/pull/138"
+        "url": "https://github.com/CalcMark/go-calcmark/pull/138"
       }
     ]
   },
@@ -167,7 +167,7 @@
     "repo": "CalcMark/go-calcmark",
     "start": "2026-04-16",
     "stop": "2026-05-15",
-    "offline": false,
+    "offline": true,
     "jira_url": null
   },
   "docs": {
@@ -175,6 +175,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow scatterplot --repo CalcMark/go-calcmark --start 2026-04-16 --stop 2026-05-15",
+  "cli_invocation": "uv run flow scatterplot --repo CalcMark/go-calcmark --start 2026-04-16 --stop 2026-05-15 --offline",
   "logs": []
 }

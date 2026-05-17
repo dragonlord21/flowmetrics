@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.scatterplot.v1",
   "command": "scatterplot",
-  "generated_at": "2026-05-16T10:24:39.726367-06:00",
+  "generated_at": "2026-05-16T22:38:24.270434-06:00",
   "headline": "5 items completed in 30 days; 85% finished within 1.1 days (Apr 16, 2026 -> May 15, 2026).",
   "definition": "Each dot is one completed item: x = completion date, y = cycle time (days from creation to completion). Horizontal percentile lines mark probability thresholds \u2014 a new item entering the system has an 85% chance of finishing in P85 days or less, by definition of the percentile.",
   "summary": {
@@ -40,35 +40,35 @@
         "title": "bash on windows-latest now reports cygwin",
         "completed_at": "2026-05-12",
         "cycle_time_days": 0.006053240740740741,
-        "pr_url": "https://github.com/pre-commit/pre-commit/pull/3683"
+        "url": "https://github.com/pre-commit/pre-commit/pull/3683"
       },
       {
         "item_id": "#3681",
         "title": "[pre-commit.ci] pre-commit autoupdate",
         "completed_at": "2026-05-12",
         "cycle_time_days": 0.7757986111111111,
-        "pr_url": "https://github.com/pre-commit/pre-commit/pull/3681"
+        "url": "https://github.com/pre-commit/pre-commit/pull/3681"
       },
       {
         "item_id": "#3673",
         "title": "[pre-commit.ci] pre-commit autoupdate",
         "completed_at": "2026-04-28",
         "cycle_time_days": 1.0534837962962964,
-        "pr_url": "https://github.com/pre-commit/pre-commit/pull/3673"
+        "url": "https://github.com/pre-commit/pre-commit/pull/3673"
       },
       {
         "item_id": "#3662",
         "title": "make --hook-dir optional for hook-impl",
         "completed_at": "2026-04-21",
         "cycle_time_days": 0.00542824074074074,
-        "pr_url": "https://github.com/pre-commit/pre-commit/pull/3662"
+        "url": "https://github.com/pre-commit/pre-commit/pull/3662"
       },
       {
         "item_id": "#3661",
         "title": "--hook-type is required for hook-impl",
         "completed_at": "2026-04-21",
         "cycle_time_days": 0.006099537037037037,
-        "pr_url": "https://github.com/pre-commit/pre-commit/pull/3661"
+        "url": "https://github.com/pre-commit/pre-commit/pull/3661"
       }
     ]
   },
@@ -76,7 +76,7 @@
     "repo": "pre-commit/pre-commit",
     "start": "2026-04-16",
     "stop": "2026-05-15",
-    "offline": false,
+    "offline": true,
     "jira_url": null
   },
   "docs": {
@@ -84,6 +84,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow scatterplot --repo pre-commit/pre-commit --start 2026-04-16 --stop 2026-05-15",
+  "cli_invocation": "uv run flow scatterplot --repo pre-commit/pre-commit --start 2026-04-16 --stop 2026-05-15 --offline",
   "logs": []
 }

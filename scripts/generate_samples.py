@@ -372,16 +372,64 @@ def _run_cli(*args: str) -> str:
     return result.stdout
 
 
-def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleSet:
-    """Run all three commands x three formats for one repo."""
+def _recover_efficiency_window(out_dir: Path) -> tuple[str, str] | None:
+    """When refreshing samples offline, reuse the previous run's
+    date window so the cache hits. Day-to-day clock drift (today
+    vs yesterday) otherwise produces 100% cache misses after a
+    single calendar day.
+
+    Reads the existing `efficiency.json` and returns its
+    `(start, stop)` window if available; None otherwise.
+    """
+    import json as _json
+    eff = out_dir / "efficiency.json"
+    if not eff.exists():
+        return None
+    try:
+        data = _json.loads(eff.read_text())
+        inp = data.get("input") or {}
+        start = inp.get("start")
+        stop = inp.get("stop")
+        if isinstance(start, str) and isinstance(stop, str):
+            return start, stop
+    except (ValueError, KeyError):
+        pass
+    return None
+
+
+def _produce_one_repo(
+    repo: Repo,
+    history_end: str,
+    target_date: str,
+    *,
+    offline: bool = False,
+) -> SampleSet:
+    """Run all three commands x three formats for one repo.
+
+    `offline=True` adds `--offline` to every underlying `flow`
+    invocation, so cache misses raise instead of fetching live.
+    Lets you refresh samples after a spec change without burning
+    API quota — and proves the cache covers the configured set.
+
+    When offline AND the repo has a previously-written
+    `efficiency.json`, the date window is recovered from there so
+    the cache hits. (Without recovery, today's auto-computed window
+    drifts one day per calendar day → 100% miss after one night.)
+    """
     slug_dir = repo.slug.replace("/", "_")
     out_dir = SAMPLES_DIR / slug_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Window for the efficiency report — the 7 days ending at history_end (UTC-yesterday).
-    end_date = datetime.strptime(history_end, "%Y-%m-%d").replace(tzinfo=UTC).date()
-    week_start = (end_date - timedelta(days=6)).isoformat()
-    week_stop = end_date.isoformat()
+    recovered = _recover_efficiency_window(out_dir) if offline else None
+    if recovered is not None:
+        week_start, week_stop = recovered
+        end_date = datetime.strptime(week_stop, "%Y-%m-%d").replace(tzinfo=UTC).date()
+        history_end = week_stop
+    else:
+        # Window for the efficiency report — the 7 days ending at history_end (UTC-yesterday).
+        end_date = datetime.strptime(history_end, "%Y-%m-%d").replace(tzinfo=UTC).date()
+        week_start = (end_date - timedelta(days=6)).isoformat()
+        week_stop = end_date.isoformat()
 
     # Forecast start = today (work begins now); target_date passed in.
     today = datetime.now(UTC).date().isoformat()
@@ -389,6 +437,8 @@ def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleS
     cache_dir = PROJECT_ROOT / ".cache" / repo.cache_subdir
     source_args = list(repo.cli_args)
     common_cache = ["--cache-dir", str(cache_dir)]
+    if offline:
+        common_cache.append("--offline")
 
     common_efficiency = [
         "efficiency",
@@ -497,11 +547,16 @@ def _produce_one_repo(repo: Repo, history_end: str, target_date: str) -> SampleS
 
 
 def main() -> None:
+    # Lightweight CLI: just `--offline`. argparse would pull in more
+    # surface than this single flag warrants.
+    offline = "--offline" in sys.argv[1:]
+
     generated_at = datetime.now(UTC)
     history_end = (generated_at.date() - timedelta(days=1)).isoformat()
     target_date = (generated_at.date() + timedelta(days=14)).isoformat()
 
     print(f"flowmetrics samples — generating at {generated_at.isoformat()}")
+    print(f"  mode:                 {'offline (cache only)' if offline else 'online (cache + live fetch on miss)'}")
     print(f"  training window ends: {history_end}")
     print(f"  forecast target:      {target_date}")
 
@@ -511,7 +566,7 @@ def main() -> None:
     for repo in REPOS:
         print(f"\nRepo: {repo.slug} ({repo.archetype})")
         try:
-            sets.append(_produce_one_repo(repo, history_end, target_date))
+            sets.append(_produce_one_repo(repo, history_end, target_date, offline=offline))
         except Exception as exc:
             print(f"  SKIP: {exc}")
 

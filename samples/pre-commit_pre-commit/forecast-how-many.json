@@ -1,8 +1,8 @@
 {
   "schema": "flowmetrics.forecast.how_many.v1",
   "command": "forecast how-many",
-  "generated_at": "2026-05-16T10:24:39.352026-06:00",
-  "headline": "85% confident at least 0 items finish in the next 15 days (by May 30, 2026).",
+  "generated_at": "2026-05-16T22:38:23.889393-06:00",
+  "headline": "85% confident at least 0 items finish in the next 15 days (by May 31, 2026).",
   "definition": "Monte Carlo forecast of how many items finish by a target date. The histogram is the distribution of simulated item counts; percentile lines mark confidence thresholds. Read BACKWARD: higher confidence = FEWER items, a more conservative commitment.",
   "summary": {
     "percentiles": {
@@ -100,11 +100,11 @@
   },
   "input": {
     "repo": "pre-commit/pre-commit",
-    "start_date": "2026-05-16",
-    "target_date": "2026-05-30",
+    "start_date": "2026-05-17",
+    "target_date": "2026-05-31",
     "history_start": "2026-04-16",
     "history_end": "2026-05-15",
-    "offline": false,
+    "offline": true,
     "jira_url": null
   },
   "training": {
@@ -157,6 +157,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow forecast how-many --repo pre-commit/pre-commit --target-date 2026-05-30 --start-date 2026-05-16 --history-start 2026-04-16 --history-end 2026-05-15 --runs 10000 --seed 42",
+  "cli_invocation": "uv run flow forecast how-many --repo pre-commit/pre-commit --target-date 2026-05-31 --start-date 2026-05-17 --history-start 2026-04-16 --history-end 2026-05-15 --runs 10000 --seed 42 --offline",
   "logs": []
 }
