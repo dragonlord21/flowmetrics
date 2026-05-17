@@ -41,7 +41,7 @@ def _eff(item_id="#1", eff=0.5):
         item_id=item_id,
         title=f"PR {item_id}",
         created_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC),
-        merged_at=datetime(2026, 5, 5, 17, 0, tzinfo=UTC),
+        completed_at=datetime(2026, 5, 5, 17, 0, tzinfo=UTC),
         cycle_time=timedelta(hours=8),
         active_time=timedelta(hours=4),
         efficiency=eff,

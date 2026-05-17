@@ -123,8 +123,8 @@ class TestFetchPrsForCycleTimes:
         assert {p.item_id for p in prs} == {"#1", "#2"}
         by_id = {p.item_id: p for p in prs}
         # Cycle time is computable from created/merged.
-        assert by_id["#1"].merged_at - by_id["#1"].created_at == timedelta(days=1)
-        assert by_id["#2"].merged_at - by_id["#2"].created_at == timedelta(minutes=30)
+        assert by_id["#1"].completed_at - by_id["#1"].created_at == timedelta(days=1)
+        assert by_id["#2"].completed_at - by_id["#2"].created_at == timedelta(minutes=30)
         # No timeline → activity must be empty (the whole point of the fetcher).
         assert by_id["#1"].activity == []
         assert by_id["#2"].activity == []
@@ -338,7 +338,7 @@ class TestFetchPrsMergedInWindow:
         assert pr.item_id == "#5500"
         assert pr.title == "Fix something"
         assert pr.created_at == dt(2026, 5, 5, 9, 0)
-        assert pr.merged_at == dt(2026, 5, 5, 17, 0)
+        assert pr.completed_at == dt(2026, 5, 5, 17, 0)
         assert dt(2026, 5, 5, 10, 0) in pr.activity
         assert dt(2026, 5, 5, 12, 0) in pr.activity
         assert dt(2026, 5, 5, 17, 0) in pr.activity
@@ -477,8 +477,8 @@ class TestFetchOpenPrs:
         items = fetch_open_prs(client, "x/y", asof=asof)
 
         assert [i.item_id for i in items] == ["#1", "#2", "#3", "#4"]
-        # All in-flight (merged_at None)
-        assert all(i.merged_at is None for i in items)
+        # All in-flight (completed_at None)
+        assert all(i.completed_at is None for i in items)
         # Each carries a single synthetic interval naming the current phase
         phases = [i.status_intervals[-1].status for i in items]
         assert phases == ["Draft", "Awaiting Review", "Changes Requested", "Approved"]

@@ -6,12 +6,12 @@ from flowmetrics.compute import WorkItem
 from flowmetrics.throughput import daily_throughput
 
 
-def pr(number: int, merged_at: datetime) -> WorkItem:
+def pr(number: int, completed_at: datetime) -> WorkItem:
     return WorkItem(
         item_id=f"#{number}",
         title=f"PR {number}",
-        created_at=merged_at,  # not used by daily_throughput
-        merged_at=merged_at,
+        created_at=completed_at,  # not used by daily_throughput
+        completed_at=completed_at,
         activity=[],
     )
 
@@ -55,7 +55,7 @@ class TestDailyThroughput:
             item_id="#99",
             title="open",
             created_at=dt(2026, 5, 4, 9, 0),
-            merged_at=None,
+            completed_at=None,
             activity=[],
         )
         samples = daily_throughput(

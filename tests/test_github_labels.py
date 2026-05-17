@@ -478,7 +478,7 @@ def test_is_aging_wip_true_for_wip_status() -> None:
         item_id="#1",
         title="t",
         created_at=dt(2026, 5, 1, 9, 0),
-        merged_at=None,
+        completed_at=None,
         status_intervals=[
             StatusInterval(dt(2026, 5, 1, 9, 0), dt(2026, 5, 10, 0, 0), "in-progress")
         ],
@@ -496,7 +496,7 @@ def test_is_aging_wip_false_for_non_wip_statuses(status: str) -> None:
         item_id="#1",
         title="t",
         created_at=dt(2026, 5, 1, 9, 0),
-        merged_at=None,
+        completed_at=None,
         status_intervals=[
             StatusInterval(dt(2026, 5, 1, 9, 0), dt(2026, 5, 10, 0, 0), status)
         ],
@@ -511,6 +511,6 @@ def test_is_aging_wip_false_for_empty_intervals() -> None:
         item_id="#1",
         title="t",
         created_at=dt(2026, 5, 1, 9, 0),
-        merged_at=None,
+        completed_at=None,
     )
     assert is_aging_wip(item) is False

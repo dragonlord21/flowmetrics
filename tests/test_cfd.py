@@ -33,7 +33,7 @@ def _item(
         item_id=item_id,
         title=f"t-{item_id}",
         created_at=created,
-        merged_at=merged,
+        completed_at=merged,
         status_intervals=[StatusInterval(s, e, name) for name, s, e in intervals],
     )
 
@@ -210,8 +210,8 @@ class TestVacantiProperty6SlopeIsArrivalRate:
 class TestGithubLikeItems:
     """Items without status_intervals (typical GitHub PRs) must still
     produce a valid two-state CFD: top line tracks `created_at`, bottom
-    line tracks `merged_at`. Earlier bug: both lines collapsed to
-    merged_at because merged_at was used as evidence for every
+    line tracks `completed_at`. Earlier bug: both lines collapsed to
+    completed_at because completed_at was used as evidence for every
     state-or-later, including the first state."""
 
     def test_open_line_tracks_created_at_not_merged_at(self):
@@ -221,7 +221,7 @@ class TestGithubLikeItems:
                 item_id=f"#{i}",
                 title=f"PR {i}",
                 created_at=ts(2026, 5, 1),
-                merged_at=ts(2026, 5, 3),
+                completed_at=ts(2026, 5, 3),
                 status_intervals=[],  # GitHub: no workflow history
             )
             for i in range(3)
@@ -239,7 +239,7 @@ class TestGithubLikeItems:
         items = [
             WorkItem(
                 item_id="#1", title="P", created_at=ts(2026, 5, 1),
-                merged_at=ts(2026, 5, 3), status_intervals=[],
+                completed_at=ts(2026, 5, 3), status_intervals=[],
             )
         ]
         points = build_cfd(
@@ -263,7 +263,7 @@ class TestGithubOpenPrWithReviewDecisionIntervals:
     any of its intervals say so.
 
     Regression scenario: an open PR with intervals=[Awaiting Review]
-    and merged_at=None used to render zero across the CFD because
+    and completed_at=None used to render zero across the CFD because
     `_entry_date` only fell back to created_at when intervals were
     empty.
     """
@@ -277,7 +277,7 @@ class TestGithubOpenPrWithReviewDecisionIntervals:
                 item_id="#42",
                 title="open PR",
                 created_at=ts(2026, 4, 15),
-                merged_at=None,
+                completed_at=None,
                 status_intervals=[StatusInterval(
                     ts(2026, 4, 15), None, "Awaiting Review"
                 )],
@@ -295,13 +295,13 @@ class TestGithubOpenPrWithReviewDecisionIntervals:
     def test_merged_pr_with_review_decision_intervals_open_at_created_not_merged(self):
         """Symmetric case: a merged PR that carried review-decision
         intervals. The Open line should still rise on created_at, NOT
-        on merged_at."""
+        on completed_at."""
         items = [
             WorkItem(
                 item_id="#42",
                 title="merged PR",
                 created_at=ts(2026, 4, 15),
-                merged_at=ts(2026, 4, 20),
+                completed_at=ts(2026, 4, 20),
                 status_intervals=[
                     StatusInterval(ts(2026, 4, 15), ts(2026, 4, 18), "Awaiting Review"),
                     StatusInterval(ts(2026, 4, 18), ts(2026, 4, 20), "Approved"),

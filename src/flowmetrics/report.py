@@ -225,7 +225,7 @@ class AgingReport:
 class ScatterplotPoint:
     """One completed item plotted on the scatterplot.
 
-    `completed_at` is when the item finished (= merged_at for GitHub
+    `completed_at` is when the item finished (= completed_at for GitHub
     PRs, resolved at for Jira issues). `cycle_time_days` is the
     elapsed time from creation to completion. `item_id` / `title` /
     `pr_url` carry display + drill-down context."""
@@ -309,7 +309,7 @@ def forecast_horizon(report: WhenDoneReport | HowManyReport) -> ForecastHorizon:
 _EFFICIENCY_VOCABULARY = {
     "Cycle time": (
         "Wall-clock time from when a PR was opened until it was merged. "
-        "The clock starts at `created_at` and stops at `merged_at`."
+        "The clock starts at `created_at` and stops at `completed_at`."
     ),
     "Active time": (
         "The share of cycle time covered by clusters of activity events "

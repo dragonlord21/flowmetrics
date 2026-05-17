@@ -27,9 +27,41 @@ def make_pr(
         item_id=f"#{number}",
         title=f"PR #{number}",
         created_at=created,
-        merged_at=merged,
+        completed_at=merged,
         activity=activity or [],
     )
+
+
+class TestVacantiVocabulary:
+    """The canonical type uses Vacanti's vocabulary: a work item has
+    a `completed_at` timestamp (the moment it exited the workflow),
+    not a source-specific `merged_at`. The previous name leaked
+    GitHub-PR semantics into the source-agnostic type.
+
+    Per SPEC-issue-pr-stitching.md Phase 0: this rename is the
+    precondition for everything else."""
+
+    def test_workitem_carries_completed_at_not_merged_at(self):
+        item = WorkItem(
+            item_id="x",
+            title="x",
+            created_at=ts(2026, 5, 5, 9, 0),
+            completed_at=ts(2026, 5, 5, 17, 0),
+        )
+        assert item.completed_at == ts(2026, 5, 5, 17, 0)
+        # And the old name is gone — accessing it must AttributeError.
+        with pytest.raises(AttributeError):
+            _ = item.merged_at  # type: ignore[attr-defined]
+
+    def test_workitem_completed_at_is_optional(self):
+        """In-flight items have no completion timestamp yet."""
+        item = WorkItem(
+            item_id="x",
+            title="x",
+            created_at=ts(2026, 5, 5, 9, 0),
+            completed_at=None,
+        )
+        assert item.completed_at is None
 
 
 class TestComputePrFlow:
@@ -38,7 +70,7 @@ class TestComputePrFlow:
             item_id="#1",
             title="open",
             created_at=ts(2026, 5, 5, 9, 0),
-            merged_at=None,
+            completed_at=None,
             activity=[],
         )
         with pytest.raises(ValueError):
@@ -107,7 +139,7 @@ class TestObservedStatuses:
             WorkItem(
                 item_id="X-1", title="t1",
                 created_at=ts(2026, 5, 4, 9, 0),
-                merged_at=ts(2026, 5, 5, 9, 0),
+                completed_at=ts(2026, 5, 5, 9, 0),
                 status_intervals=[
                     StatusInterval(ts(2026, 5, 4, 9, 0), ts(2026, 5, 4, 12, 0), "Open"),
                     StatusInterval(ts(2026, 5, 4, 12, 0), ts(2026, 5, 5, 9, 0), "In Progress"),
@@ -116,7 +148,7 @@ class TestObservedStatuses:
             WorkItem(
                 item_id="X-2", title="t2",
                 created_at=ts(2026, 5, 4, 9, 0),
-                merged_at=ts(2026, 5, 5, 9, 0),
+                completed_at=ts(2026, 5, 5, 9, 0),
                 status_intervals=[
                     StatusInterval(ts(2026, 5, 4, 9, 0), ts(2026, 5, 4, 12, 0), "Open"),
                     StatusInterval(ts(2026, 5, 4, 12, 0), ts(2026, 5, 5, 9, 0), "Patch Available"),
@@ -154,7 +186,7 @@ class TestStatusDurationActiveTime:
             item_id="BIGTOP-1",
             title="example",
             created_at=ts(2026, 5, 4, 9, 0),
-            merged_at=ts(2026, 5, 8, 9, 0),
+            completed_at=ts(2026, 5, 8, 9, 0),
             status_intervals=[
                 StatusInterval(ts(2026, 5, 4, 9, 0), ts(2026, 5, 5, 9, 0), "Open"),
                 StatusInterval(ts(2026, 5, 5, 9, 0), ts(2026, 5, 8, 9, 0), "In Progress"),
@@ -174,7 +206,7 @@ class TestStatusDurationActiveTime:
             item_id="BIGTOP-2",
             title="never active",
             created_at=ts(2026, 5, 4, 9, 0),
-            merged_at=ts(2026, 5, 8, 9, 0),
+            completed_at=ts(2026, 5, 8, 9, 0),
             status_intervals=[
                 StatusInterval(ts(2026, 5, 4, 9, 0), ts(2026, 5, 6, 9, 0), "Open"),
                 StatusInterval(ts(2026, 5, 6, 9, 0), ts(2026, 5, 8, 9, 0), "In Review"),
@@ -192,7 +224,7 @@ class TestStatusDurationActiveTime:
         item = WorkItem(
             item_id="X-3", title="multi active",
             created_at=ts(2026, 5, 4, 9, 0),
-            merged_at=ts(2026, 5, 8, 9, 0),
+            completed_at=ts(2026, 5, 8, 9, 0),
             status_intervals=[
                 StatusInterval(ts(2026, 5, 4, 9, 0), ts(2026, 5, 5, 9, 0), "In Progress"),
                 StatusInterval(ts(2026, 5, 5, 9, 0), ts(2026, 5, 6, 9, 0), "Code Review"),
@@ -241,7 +273,7 @@ class TestServiceLayerPassesActiveStatuses:
                     WorkItem(
                         item_id="X-1", title="t",
                         created_at=ts(2026, 5, 4, 9, 0),
-                        merged_at=ts(2026, 5, 8, 9, 0),
+                        completed_at=ts(2026, 5, 8, 9, 0),
                         status_intervals=[
                             StatusInterval(
                                 ts(2026, 5, 4, 9, 0),
@@ -283,7 +315,7 @@ class TestAggregate:
                 item_id="#1",
                 title="human",
                 created_at=ts(2026, 5, 5, 9, 0),
-                merged_at=ts(2026, 5, 5, 17, 0),
+                completed_at=ts(2026, 5, 5, 17, 0),
                 activity=[],
                 is_bot=False,
             ),
@@ -291,7 +323,7 @@ class TestAggregate:
                 item_id="#2",
                 title="bump",
                 created_at=ts(2026, 5, 5, 9, 0),
-                merged_at=ts(2026, 5, 5, 9, 5),
+                completed_at=ts(2026, 5, 5, 9, 5),
                 activity=[],
                 is_bot=True,
             ),
@@ -299,7 +331,7 @@ class TestAggregate:
                 item_id="#3",
                 title="bump 2",
                 created_at=ts(2026, 5, 5, 9, 0),
-                merged_at=ts(2026, 5, 5, 9, 5),
+                completed_at=ts(2026, 5, 5, 9, 5),
                 activity=[],
                 is_bot=True,
             ),

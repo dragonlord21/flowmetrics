@@ -23,9 +23,9 @@ def daily_throughput(
     span = (stop - start).days + 1
     counts = [0] * span
     for pr in prs:
-        if pr.merged_at is None:
+        if pr.completed_at is None:
             continue
-        day = pr.merged_at.date()
+        day = pr.completed_at.date()
         if start <= day <= stop:
             counts[(day - start).days] += 1
     return counts

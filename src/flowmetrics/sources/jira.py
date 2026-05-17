@@ -275,7 +275,7 @@ def _issue_to_work_item(
         item_id=key,
         title=title,
         created_at=created,
-        merged_at=resolved,
+        completed_at=resolved,
         activity=activity,
         is_bot=False,
         author_login=author_login,

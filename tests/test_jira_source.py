@@ -4,7 +4,7 @@ Contract:
 - `JiraSource.fetch_completed_in_window(start, stop)` returns a list of
   WorkItem.
 - Each issue's `item_id` is the Jira key (e.g. "BIGTOP-4525").
-- `created_at` and `merged_at` come from `fields.created` and
+- `created_at` and `completed_at` come from `fields.created` and
   `fields.resolutiondate` respectively.
 - Activity events derive from the changelog: status-transition timestamps
   and (TODO) comment timestamps.
@@ -124,7 +124,7 @@ class TestFetchCompletedInWindow:
         assert item.item_id == "BIGTOP-4525"
         assert item.title == "Upgrade Ranger to 2.8.0"
         assert item.created_at == datetime(2026, 4, 30, 7, 43, 47, tzinfo=UTC)
-        assert item.merged_at == datetime(2026, 5, 8, 8, 36, 9, tzinfo=UTC)
+        assert item.completed_at == datetime(2026, 5, 8, 8, 36, 9, tzinfo=UTC)
         # Activity timestamps come from status-change history entries
         assert datetime(2026, 5, 1, 10, 0, 0, tzinfo=UTC) in item.activity
         assert datetime(2026, 5, 8, 8, 36, 9, tzinfo=UTC) in item.activity

@@ -239,7 +239,7 @@ def _pr_node_to_events(repo: str, node: dict[str, Any]) -> WorkItem | None:
         item_id=f"#{node['number']}",
         title=node.get("title", ""),
         created_at=_parse_dt(node["createdAt"]),
-        merged_at=_parse_dt(node["mergedAt"]),
+        completed_at=_parse_dt(node["mergedAt"]),
         activity=extract_activity(node),
         is_bot=_is_bot(author),
         author_login=(author or {}).get("login"),
@@ -345,7 +345,7 @@ def fetch_open_prs(
                     item_id=f"#{node['number']}",
                     title=node.get("title", ""),
                     created_at=created,
-                    merged_at=None,
+                    completed_at=None,
                     activity=[],
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
@@ -427,7 +427,7 @@ def fetch_prs_for_cycle_times(
                     item_id=f"#{node['number']}",
                     title=node.get("title", ""),
                     created_at=_parse_dt(node["createdAt"]),
-                    merged_at=_parse_dt(node["mergedAt"]),
+                    completed_at=_parse_dt(node["mergedAt"]),
                     activity=[],
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
@@ -522,7 +522,7 @@ def fetch_open_prs_with_label_snapshot(
                     item_id=f"#{node['number']}",
                     title=node.get("title", ""),
                     created_at=created,
-                    merged_at=None,
+                    completed_at=None,
                     activity=[],
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
@@ -635,7 +635,7 @@ def fetch_open_prs_with_labels(
     by walking LabeledEvent/UnlabeledEvent + lifecycle events through the
     label-mode resolution rule.
 
-    The returned WorkItems have ``merged_at=None`` (only OPEN PRs are
+    The returned WorkItems have ``completed_at=None`` (only OPEN PRs are
     queried — see SPEC §1 "Out of scope" on merged-but-not-shipped).
     """
     from .github_labels import materialize_status_intervals
@@ -668,7 +668,7 @@ def fetch_open_prs_with_labels(
                     item_id=f"#{node['number']}",
                     title=node.get("title", ""),
                     created_at=created,
-                    merged_at=None,
+                    completed_at=None,
                     activity=[],
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),

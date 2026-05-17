@@ -59,7 +59,7 @@ def _pr(n: int, cycle_hours: float, eff: float) -> FlowEfficiency:
         item_id=f"#{n}",
         title=f"PR {n}",
         created_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC),
-        merged_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC) + timedelta(hours=cycle_hours),
+        completed_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC) + timedelta(hours=cycle_hours),
         cycle_time=timedelta(hours=cycle_hours),
         active_time=timedelta(hours=cycle_hours * eff),
         efficiency=eff,

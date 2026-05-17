@@ -45,7 +45,7 @@ def _efficiency_report() -> EfficiencyReport:
         item_id="#99",
         title="Slow PR",
         created_at=datetime(2026, 5, 4, 9, 0, tzinfo=UTC),
-        merged_at=datetime(2026, 5, 10, 9, 0, tzinfo=UTC),
+        completed_at=datetime(2026, 5, 10, 9, 0, tzinfo=UTC),
         cycle_time=timedelta(days=6),
         active_time=timedelta(hours=12),
         efficiency=0.083,

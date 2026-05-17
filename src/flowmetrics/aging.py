@@ -38,7 +38,7 @@ def compute_aging(
 ) -> list[AgingItem]:
     """Build aging data points for in-flight items.
 
-    Completed items (those with `merged_at`) are excluded — by definition
+    Completed items (those with `completed_at`) are excluded — by definition
     they have a Cycle Time, not an Age. Current state is read from the
     last status_interval; if there are none, falls back to ``"Unknown"``.
 
@@ -52,7 +52,7 @@ def compute_aging(
     """
     out: list[AgingItem] = []
     for item in items:
-        if item.merged_at is not None:
+        if item.completed_at is not None:
             continue
         age_days = (asof - item.created_at.date()).days
         if max_age_days is not None and age_days > max_age_days:

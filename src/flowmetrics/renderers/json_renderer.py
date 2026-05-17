@@ -135,7 +135,7 @@ def _render_efficiency(report: EfficiencyReport) -> dict[str, Any]:
                     "item_id": p.item_id,
                     "title": p.title,
                     "created_at": p.created_at.isoformat(),
-                    "merged_at": p.merged_at.isoformat(),
+                    "completed_at": p.completed_at.isoformat(),
                     "cycle_time": _encode(p.cycle_time),
                     "active_time": _encode(p.active_time),
                     "efficiency": p.efficiency,

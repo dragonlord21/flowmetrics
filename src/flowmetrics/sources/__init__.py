@@ -34,7 +34,7 @@ class Source(Protocol):
     def fetch_in_flight(self, asof: date) -> list[WorkItem]:
         """Items that have entered but not yet exited the workflow as of `asof`.
 
-        Returned WorkItems have ``merged_at=None``. Their final
+        Returned WorkItems have ``completed_at=None``. Their final
         ``status_intervals`` entry runs through `asof` so the renderer can
         read the current workflow state directly from
         ``status_intervals[-1].status``.

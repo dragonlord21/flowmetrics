@@ -41,8 +41,8 @@ def test_one_day_live_fetch_against_astral_sh_uv(tmp_path):
     if prs:
         first = prs[0]
         assert first.item_id > 0
-        assert first.merged_at is not None
-        assert first.created_at <= first.merged_at
+        assert first.completed_at is not None
+        assert first.created_at <= first.completed_at
 
     # Cache directory should now have at least one file — the recorded
     # response. Re-running the same query (read_only=True) must hit cache.

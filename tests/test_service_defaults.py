@@ -19,12 +19,12 @@ from flowmetrics.service import (
 )
 
 
-def _wi(item_id: str, *, created_at: datetime, merged_at: datetime | None = None) -> WorkItem:
+def _wi(item_id: str, *, created_at: datetime, completed_at: datetime | None = None) -> WorkItem:
     return WorkItem(
         item_id=item_id,
         title=item_id,
         created_at=created_at,
-        merged_at=merged_at,
+        completed_at=completed_at,
     )
 
 
@@ -61,10 +61,10 @@ class TestFetchItemsActiveInWindow:
 
     def test_returns_union_of_completed_and_in_flight(self):
         completed = [_wi("#1", created_at=datetime(2026, 4, 10, tzinfo=UTC),
-                         merged_at=datetime(2026, 4, 20, tzinfo=UTC))]
+                         completed_at=datetime(2026, 4, 20, tzinfo=UTC))]
         in_flight = [
-            _wi("#2", created_at=datetime(2026, 4, 12, tzinfo=UTC), merged_at=None),
-            _wi("#3", created_at=datetime(2026, 4, 25, tzinfo=UTC), merged_at=None),
+            _wi("#2", created_at=datetime(2026, 4, 12, tzinfo=UTC), completed_at=None),
+            _wi("#3", created_at=datetime(2026, 4, 25, tzinfo=UTC), completed_at=None),
         ]
         src = _FakeSource(completed, in_flight)
         items = fetch_items_active_in_window(src, date(2026, 4, 15), date(2026, 5, 14))
@@ -84,7 +84,7 @@ class TestFetchItemsActiveInWindow:
         assert src.in_flight_calls == [date(2026, 5, 14)]
 
     def test_dedupes_when_item_appears_in_both_lists(self):
-        same = _wi("#1", created_at=datetime(2026, 4, 10, tzinfo=UTC), merged_at=None)
+        same = _wi("#1", created_at=datetime(2026, 4, 10, tzinfo=UTC), completed_at=None)
         src = _FakeSource([same], [same])
         items = fetch_items_active_in_window(src, date(2026, 4, 15), date(2026, 5, 14))
         # Despite appearing in both lists, the unioned set has one row.

@@ -33,7 +33,7 @@ class WorkItem:
     item_id: str
     title: str
     created_at: datetime
-    merged_at: datetime | None
+    completed_at: datetime | None
     activity: list[datetime] = field(default_factory=list)
     is_bot: bool = False
     author_login: str | None = None
@@ -53,7 +53,7 @@ class FlowEfficiency:
     item_id: str
     title: str
     created_at: datetime
-    merged_at: datetime
+    completed_at: datetime
     cycle_time: timedelta
     active_time: timedelta
     efficiency: float
@@ -97,10 +97,10 @@ def compute_pr_flow(
     min_cluster: timedelta,
     active_statuses: frozenset[str] | None = None,
 ) -> FlowEfficiency:
-    if pr.merged_at is None:
+    if pr.completed_at is None:
         raise ValueError(f"Item {pr.item_id} is not merged; cannot compute flow")
 
-    cycle = pr.merged_at - pr.created_at
+    cycle = pr.completed_at - pr.created_at
 
     # Status-duration path: used when the source provides explicit
     # named-status intervals (Jira) AND the caller has mapped some statuses
@@ -119,9 +119,9 @@ def compute_pr_flow(
     else:
         # Event-clustering path (GitHub: no explicit status, infer from
         # event timestamps).
-        events = {pr.created_at, pr.merged_at}
+        events = {pr.created_at, pr.completed_at}
         for t in pr.activity:
-            if pr.created_at <= t <= pr.merged_at:
+            if pr.created_at <= t <= pr.completed_at:
                 events.add(t)
         clusters = cluster_activity(events, gap=gap)
         raw_active = sum(
@@ -138,7 +138,7 @@ def compute_pr_flow(
         item_id=pr.item_id,
         title=pr.title,
         created_at=pr.created_at,
-        merged_at=pr.merged_at,
+        completed_at=pr.completed_at,
         cycle_time=cycle,
         active_time=active,
         efficiency=efficiency,

@@ -80,7 +80,7 @@ def _entry_date(item: WorkItem, workflow: Sequence[str], idx: int) -> date | Non
 
       1. **status_intervals** whose status is in `workflow[idx:]` —
          direct evidence.
-      2. **merged_at** when `workflow[-1]` is in `workflow[idx:]` —
+      2. **completed_at** when `workflow[-1]` is in `workflow[idx:]` —
          the item reached the terminal state at merge time, even
          without an explicit Done interval.
       3. **created_at** when `idx == 0` — the item exists in the
@@ -91,7 +91,7 @@ def _entry_date(item: WorkItem, workflow: Sequence[str], idx: int) -> date | Non
          Review, Approved, …) that DON'T match a simple
          `--workflow Open,Merged` chart, but the item is still in
          "Open" from creation. Without this rule, source #2 would
-         propagate merged_at backward to idx=0 and the Open and
+         propagate completed_at backward to idx=0 and the Open and
          Merged lines would collapse onto each other.
 
     The entry date is the *earliest* of all available evidence.
@@ -100,8 +100,8 @@ def _entry_date(item: WorkItem, workflow: Sequence[str], idx: int) -> date | Non
     candidates: list[datetime] = [
         iv.start for iv in item.status_intervals if iv.status in later
     ]
-    if workflow[-1] in later and item.merged_at is not None:
-        candidates.append(item.merged_at)
+    if workflow[-1] in later and item.completed_at is not None:
+        candidates.append(item.completed_at)
     if idx == 0:
         candidates.append(item.created_at)
     if not candidates:

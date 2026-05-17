@@ -328,7 +328,7 @@ def test_fetcher_materializes_intervals_from_recorded_payload(tmp_path):
     rich, bot = items
     assert rich.item_id == "#101"
     assert rich.is_bot is False
-    assert rich.merged_at is None
+    assert rich.completed_at is None
     # Pre-WIP → shaping → in-progress → in-review (current), extending to asof.
     statuses = [iv.status for iv in rich.status_intervals]
     assert statuses == [PRE_WIP_STATUS, "shaping", "in-progress", "in-review"]

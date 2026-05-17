@@ -43,7 +43,7 @@ def _in_flight(
         item_id=item_id,
         title=f"t-{item_id}",
         created_at=created,
-        merged_at=None,  # in flight
+        completed_at=None,  # in flight
         status_intervals=[StatusInterval(s, e, name) for name, s, e in intervals],
         url=url,
     )
@@ -60,7 +60,7 @@ def _completed(
         item_id=item_id,
         title=f"t-{item_id}",
         created_at=created,
-        merged_at=merged,
+        completed_at=merged,
         status_intervals=[
             StatusInterval(s, e, name) for name, s, e in (intervals or [])
         ],
@@ -142,7 +142,7 @@ class TestCycleTimePercentiles:
                 item_id=f"#{i}",
                 title=f"PR {i}",
                 created_at=ts(2026, 4, 1),
-                merged_at=ts(2026, 4, 1) + timedelta(days=i),
+                completed_at=ts(2026, 4, 1) + timedelta(days=i),
                 cycle_time=timedelta(days=i),
                 active_time=timedelta(days=i),
                 efficiency=1.0,

@@ -517,16 +517,16 @@ def scatterplot(
         points: list[ScatterplotPoint] = []
         cycle_days: list[float] = []
         for it in items:
-            if it.merged_at is None:
+            if it.completed_at is None:
                 continue
-            cycle = (it.merged_at - it.created_at).total_seconds() / 86400
+            cycle = (it.completed_at - it.created_at).total_seconds() / 86400
             # `it.url` is set by the source — GitHub PR URL or Jira
             # browse URL. Renderer consumes it directly; no
             # pattern-matching of item_id here any more.
             points.append(ScatterplotPoint(
                 item_id=it.item_id,
                 title=it.title,
-                completed_at=it.merged_at.date(),
+                completed_at=it.completed_at.date(),
                 cycle_time_days=cycle,
                 pr_url=it.url,
             ))
@@ -698,7 +698,7 @@ def aging(
         completed_flows = [
             compute_pr_flow(item, gap=DEFAULT_GAP, min_cluster=DEFAULT_MIN_CLUSTER)
             for item in completed_items
-            if item.merged_at is not None
+            if item.completed_at is not None
         ]
         pct = cycle_time_percentiles(completed_flows)
 
