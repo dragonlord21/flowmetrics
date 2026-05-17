@@ -7,7 +7,7 @@
 </head>
 <body>
 <h1>flowmetrics — sample output</h1>
-<p class="stamp">Generated 2026-05-17 18:15:04 UTC</p>
+<p class="stamp">Generated 2026-05-17 19:04:24 UTC</p>
 <p>Live data from public GitHub and Apache Jira sources. Each row gives
 three output formats per report (HTML, text, JSON).</p>
 <p class="note"><strong>About the GitHub samples:</strong> the
@@ -32,7 +32,7 @@ samples here use the simple review-decision lifecycle
 </thead>
 <tbody>
         <tr>
-          <td><strong>astral-sh/uv</strong><br><span class="archetype">Fast-moving Rust/Python tooling (GitHub)</span></td>
+          <td><strong>astral-sh/uv</strong><br><span class="archetype">Async OSS PR workflow — review cycles span days, not hours. Uses `--gap-hours=24` because the inter-event gap distribution (P85=10h, P90=19h) shows cross-day pickup as a single session. Demonstrates per-repo clustering tuning.</span></td>
           <td><a href="astral-sh_uv/efficiency.html">html</a> · <a href="astral-sh_uv/efficiency.txt">text</a> · <a href="astral-sh_uv/efficiency.json">json</a></td>
           <td><a href="astral-sh_uv/forecast-when-done.html">html</a> · <a href="astral-sh_uv/forecast-when-done.txt">text</a> · <a href="astral-sh_uv/forecast-when-done.json">json</a></td>
           <td><a href="astral-sh_uv/forecast-how-many.html">html</a> · <a href="astral-sh_uv/forecast-how-many.txt">text</a> · <a href="astral-sh_uv/forecast-how-many.json">json</a></td>
@@ -41,7 +41,7 @@ samples here use the simple review-decision lifecycle
           <td><a href="astral-sh_uv/aging.html">html</a> · <a href="astral-sh_uv/aging.txt">text</a> · <a href="astral-sh_uv/aging.json">json</a></td>
         </tr>
         <tr>
-          <td><strong>pytest-dev/pytest</strong><br><span class="archetype">Mature Python framework with active maintenance (GitHub)</span></td>
+          <td><strong>pytest-dev/pytest</strong><br><span class="archetype">Established OSS team with conventional review cadence. Default `--gap-hours=4` (Vacanti&#x27;s corporate-synchronous setting) is appropriate here — contrast with uv&#x27;s async rhythm above.</span></td>
           <td><a href="pytest-dev_pytest/efficiency.html">html</a> · <a href="pytest-dev_pytest/efficiency.txt">text</a> · <a href="pytest-dev_pytest/efficiency.json">json</a></td>
           <td><a href="pytest-dev_pytest/forecast-when-done.html">html</a> · <a href="pytest-dev_pytest/forecast-when-done.txt">text</a> · <a href="pytest-dev_pytest/forecast-when-done.json">json</a></td>
           <td><a href="pytest-dev_pytest/forecast-how-many.html">html</a> · <a href="pytest-dev_pytest/forecast-how-many.txt">text</a> · <a href="pytest-dev_pytest/forecast-how-many.json">json</a></td>
@@ -50,7 +50,7 @@ samples here use the simple review-decision lifecycle
           <td><a href="pytest-dev_pytest/aging.html">html</a> · <a href="pytest-dev_pytest/aging.txt">text</a> · <a href="pytest-dev_pytest/aging.json">json</a></td>
         </tr>
         <tr>
-          <td><strong>huggingface/transformers</strong><br><span class="archetype">ML library, mixed community + maintainer flow (GitHub)</span></td>
+          <td><strong>huggingface/transformers</strong><br><span class="archetype">Massive scale with large external-contribution backlog. Uses `--exclude-stale-days=14` so headline metrics reflect engaged work, not zombie PRs sitting in queue indefinitely. Demonstrates signal-vs-noise filtering at OSS scale.</span></td>
           <td><a href="huggingface_transformers/efficiency.html">html</a> · <a href="huggingface_transformers/efficiency.txt">text</a> · <a href="huggingface_transformers/efficiency.json">json</a></td>
           <td><a href="huggingface_transformers/forecast-when-done.html">html</a> · <a href="huggingface_transformers/forecast-when-done.txt">text</a> · <a href="huggingface_transformers/forecast-when-done.json">json</a></td>
           <td><a href="huggingface_transformers/forecast-how-many.html">html</a> · <a href="huggingface_transformers/forecast-how-many.txt">text</a> · <a href="huggingface_transformers/forecast-how-many.json">json</a></td>
@@ -59,7 +59,7 @@ samples here use the simple review-decision lifecycle
           <td><a href="huggingface_transformers/aging.html">html</a> · <a href="huggingface_transformers/aging.txt">text</a> · <a href="huggingface_transformers/aging.json">json</a></td>
         </tr>
         <tr>
-          <td><strong>pre-commit/pre-commit</strong><br><span class="archetype">Developer-tooling Python project (GitHub)</span></td>
+          <td><strong>pre-commit/pre-commit</strong><br><span class="archetype">Small-team OSS baseline — minimal label vocabulary, default settings work. The &#x27;no tuning required&#x27; anchor for the demo set.</span></td>
           <td><a href="pre-commit_pre-commit/efficiency.html">html</a> · <a href="pre-commit_pre-commit/efficiency.txt">text</a> · <a href="pre-commit_pre-commit/efficiency.json">json</a></td>
           <td><a href="pre-commit_pre-commit/forecast-when-done.html">html</a> · <a href="pre-commit_pre-commit/forecast-when-done.txt">text</a> · <a href="pre-commit_pre-commit/forecast-when-done.json">json</a></td>
           <td><a href="pre-commit_pre-commit/forecast-how-many.html">html</a> · <a href="pre-commit_pre-commit/forecast-how-many.txt">text</a> · <a href="pre-commit_pre-commit/forecast-how-many.json">json</a></td>
@@ -68,7 +68,7 @@ samples here use the simple review-decision lifecycle
           <td><a href="pre-commit_pre-commit/aging.html">html</a> · <a href="pre-commit_pre-commit/aging.txt">text</a> · <a href="pre-commit_pre-commit/aging.json">json</a></td>
         </tr>
         <tr>
-          <td><strong>CalcMark/go-calcmark</strong><br><span class="archetype">Custom request: Go computational-document tool (GitHub)</span></td>
+          <td><strong>CalcMark/go-calcmark</strong><br><span class="archetype">Solo developer using Issue+PR linking. Issues capture the work request, PRs the implementation; `--include-issues` folds both into the same canonical pipeline and stitched cycle times use the closing PR&#x27;s mergedAt. Demonstrates Issue+PR stitching.</span></td>
           <td><a href="CalcMark_go-calcmark/efficiency.html">html</a> · <a href="CalcMark_go-calcmark/efficiency.txt">text</a> · <a href="CalcMark_go-calcmark/efficiency.json">json</a></td>
           <td><a href="CalcMark_go-calcmark/forecast-when-done.html">html</a> · <a href="CalcMark_go-calcmark/forecast-when-done.txt">text</a> · <a href="CalcMark_go-calcmark/forecast-when-done.json">json</a></td>
           <td><a href="CalcMark_go-calcmark/forecast-how-many.html">html</a> · <a href="CalcMark_go-calcmark/forecast-how-many.txt">text</a> · <a href="CalcMark_go-calcmark/forecast-how-many.json">json</a></td>
@@ -77,7 +77,7 @@ samples here use the simple review-decision lifecycle
           <td><a href="CalcMark_go-calcmark/aging.html">html</a> · <a href="CalcMark_go-calcmark/aging.txt">text</a> · <a href="CalcMark_go-calcmark/aging.json">json</a></td>
         </tr>
         <tr>
-          <td><strong>ASF/CASSANDRA</strong><br><span class="archetype">Apache Cassandra — active distributed-database project (Jira)</span></td>
+          <td><strong>ASF/CASSANDRA</strong><br><span class="archetype">Apache Cassandra — rich Jira workflow with 5+ explicit statuses. `status_intervals` come directly from the changelog so efficiency is computed via status-duration (no event clustering). Demonstrates Jira-direct workflow versus GitHub-cluster heuristic.</span></td>
           <td><a href="ASF_CASSANDRA/efficiency.html">html</a> · <a href="ASF_CASSANDRA/efficiency.txt">text</a> · <a href="ASF_CASSANDRA/efficiency.json">json</a></td>
           <td><a href="ASF_CASSANDRA/forecast-when-done.html">html</a> · <a href="ASF_CASSANDRA/forecast-when-done.txt">text</a> · <a href="ASF_CASSANDRA/forecast-when-done.json">json</a></td>
           <td><a href="ASF_CASSANDRA/forecast-how-many.html">html</a> · <a href="ASF_CASSANDRA/forecast-how-many.txt">text</a> · <a href="ASF_CASSANDRA/forecast-how-many.json">json</a></td>
@@ -86,7 +86,7 @@ samples here use the simple review-decision lifecycle
           <td><a href="ASF_CASSANDRA/aging.html">html</a> · <a href="ASF_CASSANDRA/aging.txt">text</a> · <a href="ASF_CASSANDRA/aging.json">json</a></td>
         </tr>
         <tr>
-          <td><strong>ASF/BIGTOP</strong><br><span class="archetype">Apache Bigtop — smaller-team build/packaging project (Jira)</span></td>
+          <td><strong>ASF/BIGTOP</strong><br><span class="archetype">Apache Bigtop — smaller-team Jira project. Same canonical pipeline as Cassandra; scale variation shows how the same workflow definitions handle very different team sizes.</span></td>
           <td><a href="ASF_BIGTOP/efficiency.html">html</a> · <a href="ASF_BIGTOP/efficiency.txt">text</a> · <a href="ASF_BIGTOP/efficiency.json">json</a></td>
           <td><a href="ASF_BIGTOP/forecast-when-done.html">html</a> · <a href="ASF_BIGTOP/forecast-when-done.txt">text</a> · <a href="ASF_BIGTOP/forecast-when-done.json">json</a></td>
           <td><a href="ASF_BIGTOP/forecast-how-many.html">html</a> · <a href="ASF_BIGTOP/forecast-how-many.txt">text</a> · <a href="ASF_BIGTOP/forecast-how-many.json">json</a></td>
@@ -108,6 +108,8 @@ there):</p>
   <dd>What flowmetrics is and how to run it.</dd>
   <dt><a href="https://github.com/dvhthomas/flowmetrics/blob/main/docs/METRICS.md">Metrics</a> <span style="color:#888;font-size:0.85rem;">— docs/METRICS.md</span></dt>
   <dd>How cycle / active / wait / flow efficiency are computed.</dd>
+  <dt><a href="https://github.com/dvhthomas/flowmetrics/blob/main/docs/TUNING.md">Tuning</a> <span style="color:#888;font-size:0.85rem;">— docs/TUNING.md</span></dt>
+  <dd>Per-repo --gap-hours / --exclude-stale-days / --include-issues.</dd>
   <dt><a href="https://github.com/dvhthomas/flowmetrics/blob/main/docs/FORECAST.md">Forecasting</a> <span style="color:#888;font-size:0.85rem;">— docs/FORECAST.md</span></dt>
   <dd>Monte Carlo when-done and how-many.</dd>
   <dt><a href="https://github.com/dvhthomas/flowmetrics/blob/main/docs/DECISIONS.md">Decisions</a> <span style="color:#888;font-size:0.85rem;">— docs/DECISIONS.md</span></dt>

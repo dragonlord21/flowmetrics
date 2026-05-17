@@ -1,6 +1,6 @@
 # Sample reports
 
-_Generated 2026-05-17 18:15:04 UTC_
+_Generated 2026-05-17 19:04:24 UTC_
 
 Open the `.html` files directly in a browser — no server needed; Vega-Lite loads from CDN via plain `<script>` tags.
 
@@ -8,7 +8,7 @@ Each report comes in three formats: **html** (interactive chart), **txt** (termi
 
 ## astral-sh/uv
 
-_Fast-moving Rust/Python tooling (GitHub)_
+_Async OSS PR workflow — review cycles span days, not hours. Uses `--gap-hours=24` because the inter-event gap distribution (P85=10h, P90=19h) shows cross-day pickup as a single session. Demonstrates per-repo clustering tuning._
 
 | Report | Formats |
 | --- | --- |
@@ -21,7 +21,7 @@ _Fast-moving Rust/Python tooling (GitHub)_
 
 ## pytest-dev/pytest
 
-_Mature Python framework with active maintenance (GitHub)_
+_Established OSS team with conventional review cadence. Default `--gap-hours=4` (Vacanti's corporate-synchronous setting) is appropriate here — contrast with uv's async rhythm above._
 
 | Report | Formats |
 | --- | --- |
@@ -34,7 +34,7 @@ _Mature Python framework with active maintenance (GitHub)_
 
 ## huggingface/transformers
 
-_ML library, mixed community + maintainer flow (GitHub)_
+_Massive scale with large external-contribution backlog. Uses `--exclude-stale-days=14` so headline metrics reflect engaged work, not zombie PRs sitting in queue indefinitely. Demonstrates signal-vs-noise filtering at OSS scale._
 
 | Report | Formats |
 | --- | --- |
@@ -47,7 +47,7 @@ _ML library, mixed community + maintainer flow (GitHub)_
 
 ## pre-commit/pre-commit
 
-_Developer-tooling Python project (GitHub)_
+_Small-team OSS baseline — minimal label vocabulary, default settings work. The 'no tuning required' anchor for the demo set._
 
 | Report | Formats |
 | --- | --- |
@@ -60,7 +60,7 @@ _Developer-tooling Python project (GitHub)_
 
 ## CalcMark/go-calcmark
 
-_Custom request: Go computational-document tool (GitHub)_
+_Solo developer using Issue+PR linking. Issues capture the work request, PRs the implementation; `--include-issues` folds both into the same canonical pipeline and stitched cycle times use the closing PR's mergedAt. Demonstrates Issue+PR stitching._
 
 | Report | Formats |
 | --- | --- |
@@ -73,7 +73,7 @@ _Custom request: Go computational-document tool (GitHub)_
 
 ## ASF/CASSANDRA
 
-_Apache Cassandra — active distributed-database project (Jira)_
+_Apache Cassandra — rich Jira workflow with 5+ explicit statuses. `status_intervals` come directly from the changelog so efficiency is computed via status-duration (no event clustering). Demonstrates Jira-direct workflow versus GitHub-cluster heuristic._
 
 | Report | Formats |
 | --- | --- |
@@ -86,7 +86,7 @@ _Apache Cassandra — active distributed-database project (Jira)_
 
 ## ASF/BIGTOP
 
-_Apache Bigtop — smaller-team build/packaging project (Jira)_
+_Apache Bigtop — smaller-team Jira project. Same canonical pipeline as Cassandra; scale variation shows how the same workflow definitions handle very different team sizes._
 
 | Report | Formats |
 | --- | --- |
@@ -103,6 +103,7 @@ _Apache Bigtop — smaller-team build/packaging project (Jira)_
 
 - **[README](https://github.com/dvhthomas/flowmetrics/blob/main/README.md)** — What flowmetrics is and how to run it.
 - **[Metrics](https://github.com/dvhthomas/flowmetrics/blob/main/docs/METRICS.md)** — How cycle / active / wait / flow efficiency are computed.
+- **[Tuning](https://github.com/dvhthomas/flowmetrics/blob/main/docs/TUNING.md)** — Per-repo --gap-hours / --exclude-stale-days / --include-issues.
 - **[Forecasting](https://github.com/dvhthomas/flowmetrics/blob/main/docs/FORECAST.md)** — Monte Carlo when-done and how-many.
 - **[Decisions](https://github.com/dvhthomas/flowmetrics/blob/main/docs/DECISIONS.md)** — Architectural trade-offs and known constraints.
 - **[Glossary](https://github.com/dvhthomas/flowmetrics/blob/main/docs/GLOSSARY.md)** — Vacanti terms and our usage.

@@ -1,8 +1,8 @@
 {
   "schema": "flowmetrics.cfd.v1",
   "command": "cfd",
-  "generated_at": "2026-05-17T12:15:11.102998-06:00",
-  "headline": "CFD for huggingface/transformers Apr 17, 2026 \u2192 May 16, 2026: 1233 items arrived, 237 completed, 996 still in flight at end.",
+  "generated_at": "2026-05-17T13:04:30.960035-06:00",
+  "headline": "CFD for huggingface/transformers Apr 17, 2026 \u2192 May 16, 2026: 155 items arrived, 103 completed, 52 still in flight at end.",
   "definition": "Stacked-area chart of items by workflow step over time. The top line counts every item that has ever entered the system; the bottom line counts items finished. The vertical gap at any sample date is items still in flight (WIP). Includes carry-over items that were already open at window start AND items still open at window end \u2014 so the chart shows real WIP, not just items that both arrived and finished inside the window.",
   "summary": {
     "workflow": [
@@ -13,13 +13,13 @@
       "Merged"
     ],
     "samples": 30,
-    "arrivals_at_end": 1233,
-    "departures_at_end": 237,
-    "wip_at_start": 945,
-    "wip_at_end": 996,
-    "peak_wip": 998
+    "arrivals_at_end": 155,
+    "departures_at_end": 103,
+    "wip_at_start": 15,
+    "wip_at_end": 52,
+    "peak_wip": 54
   },
-  "key_insight": "The largest WIP band at May 16, 2026 is 'Awaiting Review' with 714 items in flight. The thicker that band is on the chart, the more work is queued or in-progress at that stage; the steeper the line bordering it, the faster items are arriving into the stage.",
+  "key_insight": "The largest WIP band at May 16, 2026 is 'Awaiting Review' with 41 items in flight. The thicker that band is on the chart, the more work is queued or in-progress at that stage; the steeper the line bordering it, the faster items are arriving into the stage.",
   "next_actions": [
     "Investigate why items accumulate in 'Awaiting Review'. Either items are arriving faster than this stage can process, or they're waiting on a downstream resource (reviewers, environments, decisions).",
     "Look for places where one line flattens \u2014 that's a stall in that band.",
@@ -42,301 +42,301 @@
       {
         "sampled_on": "2026-04-17",
         "counts_by_state": {
-          "Draft": 953,
-          "Awaiting Review": 798,
-          "Changes Requested": 113,
-          "Approved": 107,
-          "Merged": 8
+          "Draft": 15,
+          "Awaiting Review": 14,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-18",
         "counts_by_state": {
-          "Draft": 955,
-          "Awaiting Review": 800,
-          "Changes Requested": 113,
-          "Approved": 107,
-          "Merged": 8
+          "Draft": 15,
+          "Awaiting Review": 14,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-19",
         "counts_by_state": {
-          "Draft": 959,
-          "Awaiting Review": 804,
-          "Changes Requested": 113,
-          "Approved": 107,
-          "Merged": 8
+          "Draft": 15,
+          "Awaiting Review": 14,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-20",
         "counts_by_state": {
-          "Draft": 972,
-          "Awaiting Review": 816,
-          "Changes Requested": 130,
-          "Approved": 124,
-          "Merged": 25
+          "Draft": 15,
+          "Awaiting Review": 14,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-21",
         "counts_by_state": {
-          "Draft": 988,
-          "Awaiting Review": 833,
-          "Changes Requested": 142,
-          "Approved": 136,
-          "Merged": 35
+          "Draft": 15,
+          "Awaiting Review": 14,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-22",
         "counts_by_state": {
-          "Draft": 1006,
-          "Awaiting Review": 850,
-          "Changes Requested": 168,
-          "Approved": 162,
-          "Merged": 61
+          "Draft": 16,
+          "Awaiting Review": 15,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-23",
         "counts_by_state": {
-          "Draft": 1025,
-          "Awaiting Review": 866,
-          "Changes Requested": 181,
-          "Approved": 175,
-          "Merged": 74
+          "Draft": 18,
+          "Awaiting Review": 17,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-24",
         "counts_by_state": {
-          "Draft": 1046,
-          "Awaiting Review": 887,
-          "Changes Requested": 191,
-          "Approved": 185,
-          "Merged": 82
+          "Draft": 20,
+          "Awaiting Review": 19,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-25",
         "counts_by_state": {
-          "Draft": 1049,
-          "Awaiting Review": 889,
-          "Changes Requested": 192,
-          "Approved": 186,
-          "Merged": 82
+          "Draft": 21,
+          "Awaiting Review": 19,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-26",
         "counts_by_state": {
-          "Draft": 1050,
-          "Awaiting Review": 890,
-          "Changes Requested": 192,
-          "Approved": 186,
-          "Merged": 82
+          "Draft": 21,
+          "Awaiting Review": 19,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-27",
         "counts_by_state": {
-          "Draft": 1063,
-          "Awaiting Review": 902,
-          "Changes Requested": 207,
-          "Approved": 201,
-          "Merged": 97
+          "Draft": 23,
+          "Awaiting Review": 20,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-28",
         "counts_by_state": {
-          "Draft": 1080,
-          "Awaiting Review": 919,
-          "Changes Requested": 224,
-          "Approved": 218,
-          "Merged": 113
+          "Draft": 25,
+          "Awaiting Review": 22,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-29",
         "counts_by_state": {
-          "Draft": 1086,
-          "Awaiting Review": 924,
-          "Changes Requested": 233,
-          "Approved": 227,
-          "Merged": 122
+          "Draft": 26,
+          "Awaiting Review": 23,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-04-30",
         "counts_by_state": {
-          "Draft": 1101,
-          "Awaiting Review": 938,
-          "Changes Requested": 241,
-          "Approved": 235,
-          "Merged": 130
+          "Draft": 28,
+          "Awaiting Review": 25,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-05-01",
         "counts_by_state": {
-          "Draft": 1105,
-          "Awaiting Review": 943,
-          "Changes Requested": 245,
-          "Approved": 239,
-          "Merged": 134
+          "Draft": 29,
+          "Awaiting Review": 27,
+          "Changes Requested": 0,
+          "Approved": 0,
+          "Merged": 0
         }
       },
       {
         "sampled_on": "2026-05-02",
         "counts_by_state": {
-          "Draft": 1110,
-          "Awaiting Review": 948,
-          "Changes Requested": 246,
-          "Approved": 240,
-          "Merged": 135
+          "Draft": 32,
+          "Awaiting Review": 30,
+          "Changes Requested": 1,
+          "Approved": 1,
+          "Merged": 1
         }
       },
       {
         "sampled_on": "2026-05-03",
         "counts_by_state": {
-          "Draft": 1114,
-          "Awaiting Review": 952,
-          "Changes Requested": 247,
-          "Approved": 241,
-          "Merged": 136
+          "Draft": 36,
+          "Awaiting Review": 34,
+          "Changes Requested": 2,
+          "Approved": 2,
+          "Merged": 2
         }
       },
       {
         "sampled_on": "2026-05-04",
         "counts_by_state": {
-          "Draft": 1120,
-          "Awaiting Review": 958,
-          "Changes Requested": 255,
-          "Approved": 249,
-          "Merged": 143
+          "Draft": 42,
+          "Awaiting Review": 40,
+          "Changes Requested": 10,
+          "Approved": 10,
+          "Merged": 9
         }
       },
       {
         "sampled_on": "2026-05-05",
         "counts_by_state": {
-          "Draft": 1130,
-          "Awaiting Review": 968,
-          "Changes Requested": 267,
-          "Approved": 261,
-          "Merged": 155
+          "Draft": 52,
+          "Awaiting Review": 50,
+          "Changes Requested": 22,
+          "Approved": 22,
+          "Merged": 21
         }
       },
       {
         "sampled_on": "2026-05-06",
         "counts_by_state": {
-          "Draft": 1141,
-          "Awaiting Review": 979,
-          "Changes Requested": 275,
-          "Approved": 269,
-          "Merged": 162
+          "Draft": 63,
+          "Awaiting Review": 61,
+          "Changes Requested": 30,
+          "Approved": 30,
+          "Merged": 28
         }
       },
       {
         "sampled_on": "2026-05-07",
         "counts_by_state": {
-          "Draft": 1154,
-          "Awaiting Review": 991,
-          "Changes Requested": 285,
-          "Approved": 279,
-          "Merged": 171
+          "Draft": 76,
+          "Awaiting Review": 73,
+          "Changes Requested": 40,
+          "Approved": 40,
+          "Merged": 37
         }
       },
       {
         "sampled_on": "2026-05-08",
         "counts_by_state": {
-          "Draft": 1166,
-          "Awaiting Review": 1004,
-          "Changes Requested": 297,
-          "Approved": 291,
-          "Merged": 181
+          "Draft": 88,
+          "Awaiting Review": 86,
+          "Changes Requested": 52,
+          "Approved": 52,
+          "Merged": 47
         }
       },
       {
         "sampled_on": "2026-05-09",
         "counts_by_state": {
-          "Draft": 1172,
-          "Awaiting Review": 1010,
-          "Changes Requested": 297,
-          "Approved": 291,
-          "Merged": 181
+          "Draft": 94,
+          "Awaiting Review": 92,
+          "Changes Requested": 52,
+          "Approved": 52,
+          "Merged": 47
         }
       },
       {
         "sampled_on": "2026-05-10",
         "counts_by_state": {
-          "Draft": 1173,
-          "Awaiting Review": 1011,
-          "Changes Requested": 297,
-          "Approved": 291,
-          "Merged": 181
+          "Draft": 95,
+          "Awaiting Review": 93,
+          "Changes Requested": 52,
+          "Approved": 52,
+          "Merged": 47
         }
       },
       {
         "sampled_on": "2026-05-11",
         "counts_by_state": {
-          "Draft": 1188,
-          "Awaiting Review": 1025,
-          "Changes Requested": 306,
-          "Approved": 300,
-          "Merged": 190
+          "Draft": 110,
+          "Awaiting Review": 107,
+          "Changes Requested": 61,
+          "Approved": 61,
+          "Merged": 56
         }
       },
       {
         "sampled_on": "2026-05-12",
         "counts_by_state": {
-          "Draft": 1201,
-          "Awaiting Review": 1038,
-          "Changes Requested": 320,
-          "Approved": 314,
-          "Merged": 204
+          "Draft": 123,
+          "Awaiting Review": 120,
+          "Changes Requested": 75,
+          "Approved": 75,
+          "Merged": 70
         }
       },
       {
         "sampled_on": "2026-05-13",
         "counts_by_state": {
-          "Draft": 1214,
-          "Awaiting Review": 1050,
-          "Changes Requested": 336,
-          "Approved": 330,
-          "Merged": 219
+          "Draft": 136,
+          "Awaiting Review": 132,
+          "Changes Requested": 91,
+          "Approved": 91,
+          "Merged": 85
         }
       },
       {
         "sampled_on": "2026-05-14",
         "counts_by_state": {
-          "Draft": 1228,
-          "Awaiting Review": 1064,
-          "Changes Requested": 348,
-          "Approved": 342,
-          "Merged": 230
+          "Draft": 150,
+          "Awaiting Review": 146,
+          "Changes Requested": 103,
+          "Approved": 103,
+          "Merged": 96
         }
       },
       {
         "sampled_on": "2026-05-15",
         "counts_by_state": {
-          "Draft": 1233,
-          "Awaiting Review": 1069,
-          "Changes Requested": 354,
-          "Approved": 348,
-          "Merged": 236
+          "Draft": 155,
+          "Awaiting Review": 151,
+          "Changes Requested": 109,
+          "Approved": 109,
+          "Merged": 102
         }
       },
       {
         "sampled_on": "2026-05-16",
         "counts_by_state": {
-          "Draft": 1233,
-          "Awaiting Review": 1069,
-          "Changes Requested": 355,
-          "Approved": 349,
-          "Merged": 237
+          "Draft": 155,
+          "Awaiting Review": 151,
+          "Changes Requested": 110,
+          "Approved": 110,
+          "Merged": 103
         }
       }
     ],
@@ -344,902 +344,902 @@
       {
         "sampled_on": "2026-04-17",
         "state": "Draft",
-        "wip_in_state": 155,
-        "entered_at_or_later": 953
+        "wip_in_state": 1,
+        "entered_at_or_later": 15
       },
       {
         "sampled_on": "2026-04-17",
         "state": "Awaiting Review",
-        "wip_in_state": 685,
-        "entered_at_or_later": 798
+        "wip_in_state": 14,
+        "entered_at_or_later": 14
       },
       {
         "sampled_on": "2026-04-17",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 113
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-17",
         "state": "Approved",
-        "wip_in_state": 99,
-        "entered_at_or_later": 107
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-17",
         "state": "Merged",
-        "wip_in_state": 8,
-        "entered_at_or_later": 8
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-18",
         "state": "Draft",
-        "wip_in_state": 155,
-        "entered_at_or_later": 955
+        "wip_in_state": 1,
+        "entered_at_or_later": 15
       },
       {
         "sampled_on": "2026-04-18",
         "state": "Awaiting Review",
-        "wip_in_state": 687,
-        "entered_at_or_later": 800
+        "wip_in_state": 14,
+        "entered_at_or_later": 14
       },
       {
         "sampled_on": "2026-04-18",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 113
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-18",
         "state": "Approved",
-        "wip_in_state": 99,
-        "entered_at_or_later": 107
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-18",
         "state": "Merged",
-        "wip_in_state": 8,
-        "entered_at_or_later": 8
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-19",
         "state": "Draft",
-        "wip_in_state": 155,
-        "entered_at_or_later": 959
+        "wip_in_state": 1,
+        "entered_at_or_later": 15
       },
       {
         "sampled_on": "2026-04-19",
         "state": "Awaiting Review",
-        "wip_in_state": 691,
-        "entered_at_or_later": 804
+        "wip_in_state": 14,
+        "entered_at_or_later": 14
       },
       {
         "sampled_on": "2026-04-19",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 113
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-19",
         "state": "Approved",
-        "wip_in_state": 99,
-        "entered_at_or_later": 107
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-19",
         "state": "Merged",
-        "wip_in_state": 8,
-        "entered_at_or_later": 8
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-20",
         "state": "Draft",
-        "wip_in_state": 156,
-        "entered_at_or_later": 972
+        "wip_in_state": 1,
+        "entered_at_or_later": 15
       },
       {
         "sampled_on": "2026-04-20",
         "state": "Awaiting Review",
-        "wip_in_state": 686,
-        "entered_at_or_later": 816
+        "wip_in_state": 14,
+        "entered_at_or_later": 14
       },
       {
         "sampled_on": "2026-04-20",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 130
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-20",
         "state": "Approved",
-        "wip_in_state": 99,
-        "entered_at_or_later": 124
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
         "sampled_on": "2026-04-20",
         "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-21",
+        "state": "Draft",
+        "wip_in_state": 1,
+        "entered_at_or_later": 15
+      },
+      {
+        "sampled_on": "2026-04-21",
+        "state": "Awaiting Review",
+        "wip_in_state": 14,
+        "entered_at_or_later": 14
+      },
+      {
+        "sampled_on": "2026-04-21",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-21",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-21",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-22",
+        "state": "Draft",
+        "wip_in_state": 1,
+        "entered_at_or_later": 16
+      },
+      {
+        "sampled_on": "2026-04-22",
+        "state": "Awaiting Review",
+        "wip_in_state": 15,
+        "entered_at_or_later": 15
+      },
+      {
+        "sampled_on": "2026-04-22",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-22",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-22",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-23",
+        "state": "Draft",
+        "wip_in_state": 1,
+        "entered_at_or_later": 18
+      },
+      {
+        "sampled_on": "2026-04-23",
+        "state": "Awaiting Review",
+        "wip_in_state": 17,
+        "entered_at_or_later": 17
+      },
+      {
+        "sampled_on": "2026-04-23",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-23",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-23",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-24",
+        "state": "Draft",
+        "wip_in_state": 1,
+        "entered_at_or_later": 20
+      },
+      {
+        "sampled_on": "2026-04-24",
+        "state": "Awaiting Review",
+        "wip_in_state": 19,
+        "entered_at_or_later": 19
+      },
+      {
+        "sampled_on": "2026-04-24",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-24",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-24",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-25",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 21
+      },
+      {
+        "sampled_on": "2026-04-25",
+        "state": "Awaiting Review",
+        "wip_in_state": 19,
+        "entered_at_or_later": 19
+      },
+      {
+        "sampled_on": "2026-04-25",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-25",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-25",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-26",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 21
+      },
+      {
+        "sampled_on": "2026-04-26",
+        "state": "Awaiting Review",
+        "wip_in_state": 19,
+        "entered_at_or_later": 19
+      },
+      {
+        "sampled_on": "2026-04-26",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-26",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-26",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-27",
+        "state": "Draft",
+        "wip_in_state": 3,
+        "entered_at_or_later": 23
+      },
+      {
+        "sampled_on": "2026-04-27",
+        "state": "Awaiting Review",
+        "wip_in_state": 20,
+        "entered_at_or_later": 20
+      },
+      {
+        "sampled_on": "2026-04-27",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-27",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-27",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-28",
+        "state": "Draft",
+        "wip_in_state": 3,
+        "entered_at_or_later": 25
+      },
+      {
+        "sampled_on": "2026-04-28",
+        "state": "Awaiting Review",
+        "wip_in_state": 22,
+        "entered_at_or_later": 22
+      },
+      {
+        "sampled_on": "2026-04-28",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-28",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-28",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-29",
+        "state": "Draft",
+        "wip_in_state": 3,
+        "entered_at_or_later": 26
+      },
+      {
+        "sampled_on": "2026-04-29",
+        "state": "Awaiting Review",
+        "wip_in_state": 23,
+        "entered_at_or_later": 23
+      },
+      {
+        "sampled_on": "2026-04-29",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-29",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-29",
+        "state": "Merged",
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-04-30",
+        "state": "Draft",
+        "wip_in_state": 3,
+        "entered_at_or_later": 28
+      },
+      {
+        "sampled_on": "2026-04-30",
+        "state": "Awaiting Review",
         "wip_in_state": 25,
         "entered_at_or_later": 25
       },
       {
-        "sampled_on": "2026-04-21",
-        "state": "Draft",
-        "wip_in_state": 155,
-        "entered_at_or_later": 988
-      },
-      {
-        "sampled_on": "2026-04-21",
-        "state": "Awaiting Review",
-        "wip_in_state": 691,
-        "entered_at_or_later": 833
-      },
-      {
-        "sampled_on": "2026-04-21",
+        "sampled_on": "2026-04-30",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 142
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
-        "sampled_on": "2026-04-21",
+        "sampled_on": "2026-04-30",
         "state": "Approved",
-        "wip_in_state": 101,
-        "entered_at_or_later": 136
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
-        "sampled_on": "2026-04-21",
+        "sampled_on": "2026-04-30",
         "state": "Merged",
-        "wip_in_state": 35,
-        "entered_at_or_later": 35
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
-        "sampled_on": "2026-04-22",
+        "sampled_on": "2026-05-01",
         "state": "Draft",
-        "wip_in_state": 156,
-        "entered_at_or_later": 1006
+        "wip_in_state": 2,
+        "entered_at_or_later": 29
       },
       {
-        "sampled_on": "2026-04-22",
+        "sampled_on": "2026-05-01",
         "state": "Awaiting Review",
-        "wip_in_state": 682,
-        "entered_at_or_later": 850
+        "wip_in_state": 27,
+        "entered_at_or_later": 27
       },
       {
-        "sampled_on": "2026-04-22",
+        "sampled_on": "2026-05-01",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 168
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
-        "sampled_on": "2026-04-22",
+        "sampled_on": "2026-05-01",
         "state": "Approved",
-        "wip_in_state": 101,
-        "entered_at_or_later": 162
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
       },
       {
-        "sampled_on": "2026-04-22",
+        "sampled_on": "2026-05-01",
         "state": "Merged",
-        "wip_in_state": 61,
+        "wip_in_state": 0,
+        "entered_at_or_later": 0
+      },
+      {
+        "sampled_on": "2026-05-02",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 32
+      },
+      {
+        "sampled_on": "2026-05-02",
+        "state": "Awaiting Review",
+        "wip_in_state": 29,
+        "entered_at_or_later": 30
+      },
+      {
+        "sampled_on": "2026-05-02",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 1
+      },
+      {
+        "sampled_on": "2026-05-02",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 1
+      },
+      {
+        "sampled_on": "2026-05-02",
+        "state": "Merged",
+        "wip_in_state": 1,
+        "entered_at_or_later": 1
+      },
+      {
+        "sampled_on": "2026-05-03",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 36
+      },
+      {
+        "sampled_on": "2026-05-03",
+        "state": "Awaiting Review",
+        "wip_in_state": 32,
+        "entered_at_or_later": 34
+      },
+      {
+        "sampled_on": "2026-05-03",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 2
+      },
+      {
+        "sampled_on": "2026-05-03",
+        "state": "Approved",
+        "wip_in_state": 0,
+        "entered_at_or_later": 2
+      },
+      {
+        "sampled_on": "2026-05-03",
+        "state": "Merged",
+        "wip_in_state": 2,
+        "entered_at_or_later": 2
+      },
+      {
+        "sampled_on": "2026-05-04",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 42
+      },
+      {
+        "sampled_on": "2026-05-04",
+        "state": "Awaiting Review",
+        "wip_in_state": 30,
+        "entered_at_or_later": 40
+      },
+      {
+        "sampled_on": "2026-05-04",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 10
+      },
+      {
+        "sampled_on": "2026-05-04",
+        "state": "Approved",
+        "wip_in_state": 1,
+        "entered_at_or_later": 10
+      },
+      {
+        "sampled_on": "2026-05-04",
+        "state": "Merged",
+        "wip_in_state": 9,
+        "entered_at_or_later": 9
+      },
+      {
+        "sampled_on": "2026-05-05",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 52
+      },
+      {
+        "sampled_on": "2026-05-05",
+        "state": "Awaiting Review",
+        "wip_in_state": 28,
+        "entered_at_or_later": 50
+      },
+      {
+        "sampled_on": "2026-05-05",
+        "state": "Changes Requested",
+        "wip_in_state": 0,
+        "entered_at_or_later": 22
+      },
+      {
+        "sampled_on": "2026-05-05",
+        "state": "Approved",
+        "wip_in_state": 1,
+        "entered_at_or_later": 22
+      },
+      {
+        "sampled_on": "2026-05-05",
+        "state": "Merged",
+        "wip_in_state": 21,
+        "entered_at_or_later": 21
+      },
+      {
+        "sampled_on": "2026-05-06",
+        "state": "Draft",
+        "wip_in_state": 2,
+        "entered_at_or_later": 63
+      },
+      {
+        "sampled_on": "2026-05-06",
+        "state": "Awaiting Review",
+        "wip_in_state": 31,
         "entered_at_or_later": 61
       },
       {
-        "sampled_on": "2026-04-23",
-        "state": "Draft",
-        "wip_in_state": 159,
-        "entered_at_or_later": 1025
-      },
-      {
-        "sampled_on": "2026-04-23",
-        "state": "Awaiting Review",
-        "wip_in_state": 685,
-        "entered_at_or_later": 866
-      },
-      {
-        "sampled_on": "2026-04-23",
+        "sampled_on": "2026-05-06",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 181
+        "wip_in_state": 0,
+        "entered_at_or_later": 30
       },
       {
-        "sampled_on": "2026-04-23",
+        "sampled_on": "2026-05-06",
         "state": "Approved",
-        "wip_in_state": 101,
-        "entered_at_or_later": 175
+        "wip_in_state": 2,
+        "entered_at_or_later": 30
       },
       {
-        "sampled_on": "2026-04-23",
+        "sampled_on": "2026-05-06",
         "state": "Merged",
-        "wip_in_state": 74,
-        "entered_at_or_later": 74
+        "wip_in_state": 28,
+        "entered_at_or_later": 28
       },
       {
-        "sampled_on": "2026-04-24",
+        "sampled_on": "2026-05-07",
         "state": "Draft",
-        "wip_in_state": 159,
-        "entered_at_or_later": 1046
+        "wip_in_state": 3,
+        "entered_at_or_later": 76
       },
       {
-        "sampled_on": "2026-04-24",
+        "sampled_on": "2026-05-07",
         "state": "Awaiting Review",
-        "wip_in_state": 696,
-        "entered_at_or_later": 887
+        "wip_in_state": 33,
+        "entered_at_or_later": 73
       },
       {
-        "sampled_on": "2026-04-24",
+        "sampled_on": "2026-05-07",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 191
+        "wip_in_state": 0,
+        "entered_at_or_later": 40
       },
       {
-        "sampled_on": "2026-04-24",
+        "sampled_on": "2026-05-07",
         "state": "Approved",
-        "wip_in_state": 103,
-        "entered_at_or_later": 185
+        "wip_in_state": 3,
+        "entered_at_or_later": 40
       },
       {
-        "sampled_on": "2026-04-24",
+        "sampled_on": "2026-05-07",
         "state": "Merged",
-        "wip_in_state": 82,
-        "entered_at_or_later": 82
+        "wip_in_state": 37,
+        "entered_at_or_later": 37
       },
       {
-        "sampled_on": "2026-04-25",
+        "sampled_on": "2026-05-08",
         "state": "Draft",
-        "wip_in_state": 160,
-        "entered_at_or_later": 1049
+        "wip_in_state": 2,
+        "entered_at_or_later": 88
       },
       {
-        "sampled_on": "2026-04-25",
+        "sampled_on": "2026-05-08",
         "state": "Awaiting Review",
-        "wip_in_state": 697,
-        "entered_at_or_later": 889
+        "wip_in_state": 34,
+        "entered_at_or_later": 86
       },
       {
-        "sampled_on": "2026-04-25",
+        "sampled_on": "2026-05-08",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 192
+        "wip_in_state": 0,
+        "entered_at_or_later": 52
       },
       {
-        "sampled_on": "2026-04-25",
+        "sampled_on": "2026-05-08",
         "state": "Approved",
-        "wip_in_state": 104,
-        "entered_at_or_later": 186
+        "wip_in_state": 5,
+        "entered_at_or_later": 52
       },
       {
-        "sampled_on": "2026-04-25",
+        "sampled_on": "2026-05-08",
         "state": "Merged",
-        "wip_in_state": 82,
-        "entered_at_or_later": 82
+        "wip_in_state": 47,
+        "entered_at_or_later": 47
       },
       {
-        "sampled_on": "2026-04-26",
+        "sampled_on": "2026-05-09",
         "state": "Draft",
-        "wip_in_state": 160,
-        "entered_at_or_later": 1050
+        "wip_in_state": 2,
+        "entered_at_or_later": 94
       },
       {
-        "sampled_on": "2026-04-26",
+        "sampled_on": "2026-05-09",
         "state": "Awaiting Review",
-        "wip_in_state": 698,
-        "entered_at_or_later": 890
+        "wip_in_state": 40,
+        "entered_at_or_later": 92
       },
       {
-        "sampled_on": "2026-04-26",
+        "sampled_on": "2026-05-09",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 192
+        "wip_in_state": 0,
+        "entered_at_or_later": 52
       },
       {
-        "sampled_on": "2026-04-26",
+        "sampled_on": "2026-05-09",
         "state": "Approved",
-        "wip_in_state": 104,
-        "entered_at_or_later": 186
+        "wip_in_state": 5,
+        "entered_at_or_later": 52
       },
       {
-        "sampled_on": "2026-04-26",
+        "sampled_on": "2026-05-09",
         "state": "Merged",
-        "wip_in_state": 82,
-        "entered_at_or_later": 82
+        "wip_in_state": 47,
+        "entered_at_or_later": 47
       },
       {
-        "sampled_on": "2026-04-27",
+        "sampled_on": "2026-05-10",
         "state": "Draft",
-        "wip_in_state": 161,
-        "entered_at_or_later": 1063
+        "wip_in_state": 2,
+        "entered_at_or_later": 95
       },
       {
-        "sampled_on": "2026-04-27",
+        "sampled_on": "2026-05-10",
         "state": "Awaiting Review",
-        "wip_in_state": 695,
-        "entered_at_or_later": 902
+        "wip_in_state": 41,
+        "entered_at_or_later": 93
       },
       {
-        "sampled_on": "2026-04-27",
+        "sampled_on": "2026-05-10",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 207
+        "wip_in_state": 0,
+        "entered_at_or_later": 52
       },
       {
-        "sampled_on": "2026-04-27",
+        "sampled_on": "2026-05-10",
         "state": "Approved",
-        "wip_in_state": 104,
-        "entered_at_or_later": 201
+        "wip_in_state": 5,
+        "entered_at_or_later": 52
       },
       {
-        "sampled_on": "2026-04-27",
+        "sampled_on": "2026-05-10",
         "state": "Merged",
-        "wip_in_state": 97,
-        "entered_at_or_later": 97
+        "wip_in_state": 47,
+        "entered_at_or_later": 47
       },
       {
-        "sampled_on": "2026-04-28",
+        "sampled_on": "2026-05-11",
         "state": "Draft",
-        "wip_in_state": 161,
-        "entered_at_or_later": 1080
+        "wip_in_state": 3,
+        "entered_at_or_later": 110
       },
       {
-        "sampled_on": "2026-04-28",
+        "sampled_on": "2026-05-11",
         "state": "Awaiting Review",
-        "wip_in_state": 695,
-        "entered_at_or_later": 919
+        "wip_in_state": 46,
+        "entered_at_or_later": 107
       },
       {
-        "sampled_on": "2026-04-28",
+        "sampled_on": "2026-05-11",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 224
+        "wip_in_state": 0,
+        "entered_at_or_later": 61
       },
       {
-        "sampled_on": "2026-04-28",
+        "sampled_on": "2026-05-11",
         "state": "Approved",
-        "wip_in_state": 105,
-        "entered_at_or_later": 218
+        "wip_in_state": 5,
+        "entered_at_or_later": 61
       },
       {
-        "sampled_on": "2026-04-28",
+        "sampled_on": "2026-05-11",
         "state": "Merged",
-        "wip_in_state": 113,
-        "entered_at_or_later": 113
+        "wip_in_state": 56,
+        "entered_at_or_later": 56
       },
       {
-        "sampled_on": "2026-04-29",
+        "sampled_on": "2026-05-12",
         "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1086
+        "wip_in_state": 3,
+        "entered_at_or_later": 123
       },
       {
-        "sampled_on": "2026-04-29",
+        "sampled_on": "2026-05-12",
         "state": "Awaiting Review",
-        "wip_in_state": 691,
-        "entered_at_or_later": 924
+        "wip_in_state": 45,
+        "entered_at_or_later": 120
       },
       {
-        "sampled_on": "2026-04-29",
+        "sampled_on": "2026-05-12",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 233
+        "wip_in_state": 0,
+        "entered_at_or_later": 75
       },
       {
-        "sampled_on": "2026-04-29",
+        "sampled_on": "2026-05-12",
         "state": "Approved",
-        "wip_in_state": 105,
-        "entered_at_or_later": 227
+        "wip_in_state": 5,
+        "entered_at_or_later": 75
       },
       {
-        "sampled_on": "2026-04-29",
+        "sampled_on": "2026-05-12",
         "state": "Merged",
-        "wip_in_state": 122,
-        "entered_at_or_later": 122
+        "wip_in_state": 70,
+        "entered_at_or_later": 70
       },
       {
-        "sampled_on": "2026-04-30",
+        "sampled_on": "2026-05-13",
         "state": "Draft",
-        "wip_in_state": 163,
-        "entered_at_or_later": 1101
-      },
-      {
-        "sampled_on": "2026-04-30",
-        "state": "Awaiting Review",
-        "wip_in_state": 697,
-        "entered_at_or_later": 938
-      },
-      {
-        "sampled_on": "2026-04-30",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 241
-      },
-      {
-        "sampled_on": "2026-04-30",
-        "state": "Approved",
-        "wip_in_state": 105,
-        "entered_at_or_later": 235
-      },
-      {
-        "sampled_on": "2026-04-30",
-        "state": "Merged",
-        "wip_in_state": 130,
-        "entered_at_or_later": 130
-      },
-      {
-        "sampled_on": "2026-05-01",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1105
-      },
-      {
-        "sampled_on": "2026-05-01",
-        "state": "Awaiting Review",
-        "wip_in_state": 698,
-        "entered_at_or_later": 943
-      },
-      {
-        "sampled_on": "2026-05-01",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 245
-      },
-      {
-        "sampled_on": "2026-05-01",
-        "state": "Approved",
-        "wip_in_state": 105,
-        "entered_at_or_later": 239
-      },
-      {
-        "sampled_on": "2026-05-01",
-        "state": "Merged",
-        "wip_in_state": 134,
-        "entered_at_or_later": 134
-      },
-      {
-        "sampled_on": "2026-05-02",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1110
-      },
-      {
-        "sampled_on": "2026-05-02",
-        "state": "Awaiting Review",
-        "wip_in_state": 702,
-        "entered_at_or_later": 948
-      },
-      {
-        "sampled_on": "2026-05-02",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 246
-      },
-      {
-        "sampled_on": "2026-05-02",
-        "state": "Approved",
-        "wip_in_state": 105,
-        "entered_at_or_later": 240
-      },
-      {
-        "sampled_on": "2026-05-02",
-        "state": "Merged",
-        "wip_in_state": 135,
-        "entered_at_or_later": 135
-      },
-      {
-        "sampled_on": "2026-05-03",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1114
-      },
-      {
-        "sampled_on": "2026-05-03",
-        "state": "Awaiting Review",
-        "wip_in_state": 705,
-        "entered_at_or_later": 952
-      },
-      {
-        "sampled_on": "2026-05-03",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 247
-      },
-      {
-        "sampled_on": "2026-05-03",
-        "state": "Approved",
-        "wip_in_state": 105,
-        "entered_at_or_later": 241
-      },
-      {
-        "sampled_on": "2026-05-03",
-        "state": "Merged",
-        "wip_in_state": 136,
+        "wip_in_state": 4,
         "entered_at_or_later": 136
       },
       {
-        "sampled_on": "2026-05-04",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1120
-      },
-      {
-        "sampled_on": "2026-05-04",
+        "sampled_on": "2026-05-13",
         "state": "Awaiting Review",
-        "wip_in_state": 703,
-        "entered_at_or_later": 958
+        "wip_in_state": 41,
+        "entered_at_or_later": 132
       },
       {
-        "sampled_on": "2026-05-04",
+        "sampled_on": "2026-05-13",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 255
+        "wip_in_state": 0,
+        "entered_at_or_later": 91
       },
       {
-        "sampled_on": "2026-05-04",
+        "sampled_on": "2026-05-13",
         "state": "Approved",
-        "wip_in_state": 106,
-        "entered_at_or_later": 249
+        "wip_in_state": 6,
+        "entered_at_or_later": 91
       },
       {
-        "sampled_on": "2026-05-04",
+        "sampled_on": "2026-05-13",
         "state": "Merged",
-        "wip_in_state": 143,
-        "entered_at_or_later": 143
+        "wip_in_state": 85,
+        "entered_at_or_later": 85
       },
       {
-        "sampled_on": "2026-05-05",
+        "sampled_on": "2026-05-14",
         "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1130
+        "wip_in_state": 4,
+        "entered_at_or_later": 150
       },
       {
-        "sampled_on": "2026-05-05",
+        "sampled_on": "2026-05-14",
         "state": "Awaiting Review",
-        "wip_in_state": 701,
-        "entered_at_or_later": 968
+        "wip_in_state": 43,
+        "entered_at_or_later": 146
       },
       {
-        "sampled_on": "2026-05-05",
+        "sampled_on": "2026-05-14",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 267
+        "wip_in_state": 0,
+        "entered_at_or_later": 103
       },
       {
-        "sampled_on": "2026-05-05",
+        "sampled_on": "2026-05-14",
         "state": "Approved",
-        "wip_in_state": 106,
-        "entered_at_or_later": 261
+        "wip_in_state": 7,
+        "entered_at_or_later": 103
       },
       {
-        "sampled_on": "2026-05-05",
+        "sampled_on": "2026-05-14",
         "state": "Merged",
-        "wip_in_state": 155,
+        "wip_in_state": 96,
+        "entered_at_or_later": 96
+      },
+      {
+        "sampled_on": "2026-05-15",
+        "state": "Draft",
+        "wip_in_state": 4,
         "entered_at_or_later": 155
       },
       {
-        "sampled_on": "2026-05-06",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1141
-      },
-      {
-        "sampled_on": "2026-05-06",
-        "state": "Awaiting Review",
-        "wip_in_state": 704,
-        "entered_at_or_later": 979
-      },
-      {
-        "sampled_on": "2026-05-06",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 275
-      },
-      {
-        "sampled_on": "2026-05-06",
-        "state": "Approved",
-        "wip_in_state": 107,
-        "entered_at_or_later": 269
-      },
-      {
-        "sampled_on": "2026-05-06",
-        "state": "Merged",
-        "wip_in_state": 162,
-        "entered_at_or_later": 162
-      },
-      {
-        "sampled_on": "2026-05-07",
-        "state": "Draft",
-        "wip_in_state": 163,
-        "entered_at_or_later": 1154
-      },
-      {
-        "sampled_on": "2026-05-07",
-        "state": "Awaiting Review",
-        "wip_in_state": 706,
-        "entered_at_or_later": 991
-      },
-      {
-        "sampled_on": "2026-05-07",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 285
-      },
-      {
-        "sampled_on": "2026-05-07",
-        "state": "Approved",
-        "wip_in_state": 108,
-        "entered_at_or_later": 279
-      },
-      {
-        "sampled_on": "2026-05-07",
-        "state": "Merged",
-        "wip_in_state": 171,
-        "entered_at_or_later": 171
-      },
-      {
-        "sampled_on": "2026-05-08",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1166
-      },
-      {
-        "sampled_on": "2026-05-08",
-        "state": "Awaiting Review",
-        "wip_in_state": 707,
-        "entered_at_or_later": 1004
-      },
-      {
-        "sampled_on": "2026-05-08",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 297
-      },
-      {
-        "sampled_on": "2026-05-08",
-        "state": "Approved",
-        "wip_in_state": 110,
-        "entered_at_or_later": 291
-      },
-      {
-        "sampled_on": "2026-05-08",
-        "state": "Merged",
-        "wip_in_state": 181,
-        "entered_at_or_later": 181
-      },
-      {
-        "sampled_on": "2026-05-09",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1172
-      },
-      {
-        "sampled_on": "2026-05-09",
-        "state": "Awaiting Review",
-        "wip_in_state": 713,
-        "entered_at_or_later": 1010
-      },
-      {
-        "sampled_on": "2026-05-09",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 297
-      },
-      {
-        "sampled_on": "2026-05-09",
-        "state": "Approved",
-        "wip_in_state": 110,
-        "entered_at_or_later": 291
-      },
-      {
-        "sampled_on": "2026-05-09",
-        "state": "Merged",
-        "wip_in_state": 181,
-        "entered_at_or_later": 181
-      },
-      {
-        "sampled_on": "2026-05-10",
-        "state": "Draft",
-        "wip_in_state": 162,
-        "entered_at_or_later": 1173
-      },
-      {
-        "sampled_on": "2026-05-10",
-        "state": "Awaiting Review",
-        "wip_in_state": 714,
-        "entered_at_or_later": 1011
-      },
-      {
-        "sampled_on": "2026-05-10",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 297
-      },
-      {
-        "sampled_on": "2026-05-10",
-        "state": "Approved",
-        "wip_in_state": 110,
-        "entered_at_or_later": 291
-      },
-      {
-        "sampled_on": "2026-05-10",
-        "state": "Merged",
-        "wip_in_state": 181,
-        "entered_at_or_later": 181
-      },
-      {
-        "sampled_on": "2026-05-11",
-        "state": "Draft",
-        "wip_in_state": 163,
-        "entered_at_or_later": 1188
-      },
-      {
-        "sampled_on": "2026-05-11",
-        "state": "Awaiting Review",
-        "wip_in_state": 719,
-        "entered_at_or_later": 1025
-      },
-      {
-        "sampled_on": "2026-05-11",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 306
-      },
-      {
-        "sampled_on": "2026-05-11",
-        "state": "Approved",
-        "wip_in_state": 110,
-        "entered_at_or_later": 300
-      },
-      {
-        "sampled_on": "2026-05-11",
-        "state": "Merged",
-        "wip_in_state": 190,
-        "entered_at_or_later": 190
-      },
-      {
-        "sampled_on": "2026-05-12",
-        "state": "Draft",
-        "wip_in_state": 163,
-        "entered_at_or_later": 1201
-      },
-      {
-        "sampled_on": "2026-05-12",
-        "state": "Awaiting Review",
-        "wip_in_state": 718,
-        "entered_at_or_later": 1038
-      },
-      {
-        "sampled_on": "2026-05-12",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 320
-      },
-      {
-        "sampled_on": "2026-05-12",
-        "state": "Approved",
-        "wip_in_state": 110,
-        "entered_at_or_later": 314
-      },
-      {
-        "sampled_on": "2026-05-12",
-        "state": "Merged",
-        "wip_in_state": 204,
-        "entered_at_or_later": 204
-      },
-      {
-        "sampled_on": "2026-05-13",
-        "state": "Draft",
-        "wip_in_state": 164,
-        "entered_at_or_later": 1214
-      },
-      {
-        "sampled_on": "2026-05-13",
-        "state": "Awaiting Review",
-        "wip_in_state": 714,
-        "entered_at_or_later": 1050
-      },
-      {
-        "sampled_on": "2026-05-13",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 336
-      },
-      {
-        "sampled_on": "2026-05-13",
-        "state": "Approved",
-        "wip_in_state": 111,
-        "entered_at_or_later": 330
-      },
-      {
-        "sampled_on": "2026-05-13",
-        "state": "Merged",
-        "wip_in_state": 219,
-        "entered_at_or_later": 219
-      },
-      {
-        "sampled_on": "2026-05-14",
-        "state": "Draft",
-        "wip_in_state": 164,
-        "entered_at_or_later": 1228
-      },
-      {
-        "sampled_on": "2026-05-14",
-        "state": "Awaiting Review",
-        "wip_in_state": 716,
-        "entered_at_or_later": 1064
-      },
-      {
-        "sampled_on": "2026-05-14",
-        "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 348
-      },
-      {
-        "sampled_on": "2026-05-14",
-        "state": "Approved",
-        "wip_in_state": 112,
-        "entered_at_or_later": 342
-      },
-      {
-        "sampled_on": "2026-05-14",
-        "state": "Merged",
-        "wip_in_state": 230,
-        "entered_at_or_later": 230
-      },
-      {
-        "sampled_on": "2026-05-15",
-        "state": "Draft",
-        "wip_in_state": 164,
-        "entered_at_or_later": 1233
-      },
-      {
         "sampled_on": "2026-05-15",
         "state": "Awaiting Review",
-        "wip_in_state": 715,
-        "entered_at_or_later": 1069
+        "wip_in_state": 42,
+        "entered_at_or_later": 151
       },
       {
         "sampled_on": "2026-05-15",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 354
+        "wip_in_state": 0,
+        "entered_at_or_later": 109
       },
       {
         "sampled_on": "2026-05-15",
         "state": "Approved",
-        "wip_in_state": 112,
-        "entered_at_or_later": 348
+        "wip_in_state": 7,
+        "entered_at_or_later": 109
       },
       {
         "sampled_on": "2026-05-15",
         "state": "Merged",
-        "wip_in_state": 236,
-        "entered_at_or_later": 236
+        "wip_in_state": 102,
+        "entered_at_or_later": 102
       },
       {
         "sampled_on": "2026-05-16",
         "state": "Draft",
-        "wip_in_state": 164,
-        "entered_at_or_later": 1233
+        "wip_in_state": 4,
+        "entered_at_or_later": 155
       },
       {
         "sampled_on": "2026-05-16",
         "state": "Awaiting Review",
-        "wip_in_state": 714,
-        "entered_at_or_later": 1069
+        "wip_in_state": 41,
+        "entered_at_or_later": 151
       },
       {
         "sampled_on": "2026-05-16",
         "state": "Changes Requested",
-        "wip_in_state": 6,
-        "entered_at_or_later": 355
+        "wip_in_state": 0,
+        "entered_at_or_later": 110
       },
       {
         "sampled_on": "2026-05-16",
         "state": "Approved",
-        "wip_in_state": 112,
-        "entered_at_or_later": 349
+        "wip_in_state": 7,
+        "entered_at_or_later": 110
       },
       {
         "sampled_on": "2026-05-16",
         "state": "Merged",
-        "wip_in_state": 237,
-        "entered_at_or_later": 237
+        "wip_in_state": 103,
+        "entered_at_or_later": 103
       }
     ]
   },

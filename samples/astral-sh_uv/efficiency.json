@@ -1,25 +1,25 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-17T12:15:04.476177-06:00",
-  "headline": "0.8% flow efficiency across 49 completed items (39 human, 10 bot) over 7 days, May 10, 2026 \u2192 May 16, 2026.",
+  "generated_at": "2026-05-17T13:04:24.445887-06:00",
+  "headline": "2.8% flow efficiency across 49 completed items (39 human, 10 bot) over 7 days, May 10, 2026 \u2192 May 16, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
     "pr_count": 49,
     "human_pr_count": 39,
     "bot_pr_count": 10,
-    "portfolio_efficiency": 0.008419560442572391,
+    "portfolio_efficiency": 0.02799948440021556,
     "median_efficiency": 1.0,
-    "mean_efficiency": 0.6708644389335278,
+    "mean_efficiency": 0.8493724202680206,
     "total_cycle": {
       "seconds": 40643927.0,
       "hours": 11289.979722222222,
       "days": 470.41582175925925
     },
     "total_active": {
-      "seconds": 342204.0,
-      "hours": 95.05666666666667,
-      "days": 3.9606944444444445
+      "seconds": 1138009.0,
+      "hours": 316.1136111111111,
+      "days": 13.171400462962962
     },
     "observed_statuses": [
       "Awaiting Review",
@@ -35,7 +35,7 @@
   ],
   "caveats": [
     "Do not compare this number across engineers \u2014 wait time on a single PR is shared between author, reviewer, and CI, and one slow reviewer can drop an author's per-PR FE to single digits regardless of how fast the author actually worked.",
-    "Active time uses gap=4.0h and min_cluster=30.0min \u2014 raising the gap credits longer idle stretches as active, which raises FE; lowering it does the opposite."
+    "Active time uses gap=24.0h and min_cluster=30.0min \u2014 raising the gap credits longer idle stretches as active, which raises FE; lowering it does the opposite."
   ],
   "vocabulary": {
     "Cycle time": "Wall-clock time from when a PR was opened until it was merged. The clock starts at `created_at` and stops at `completed_at`.",
@@ -65,7 +65,7 @@
       },
       {
         "item_id": "#19417",
-        "efficiency": 0.36435877582623577
+        "efficiency": 1.0
       },
       {
         "item_id": "#19414",
@@ -97,7 +97,7 @@
       },
       {
         "item_id": "#19398",
-        "efficiency": 0.3510716585410726
+        "efficiency": 1.0
       },
       {
         "item_id": "#19394",
@@ -109,11 +109,11 @@
       },
       {
         "item_id": "#19387",
-        "efficiency": 0.18234156881699032
+        "efficiency": 1.0
       },
       {
         "item_id": "#19386",
-        "efficiency": 0.07218045112781955
+        "efficiency": 1.0
       },
       {
         "item_id": "#19384",
@@ -121,7 +121,7 @@
       },
       {
         "item_id": "#19383",
-        "efficiency": 0.15844838087503807
+        "efficiency": 1.0
       },
       {
         "item_id": "#19382",
@@ -145,15 +145,15 @@
       },
       {
         "item_id": "#19366",
-        "efficiency": 0.06302252385167699
+        "efficiency": 1.0
       },
       {
         "item_id": "#19365",
-        "efficiency": 0.2105591123350453
+        "efficiency": 1.0
       },
       {
         "item_id": "#19364",
-        "efficiency": 0.14853001332060708
+        "efficiency": 1.0
       },
       {
         "item_id": "#19361",
@@ -169,7 +169,7 @@
       },
       {
         "item_id": "#19353",
-        "efficiency": 0.07253677211364094
+        "efficiency": 1.0
       },
       {
         "item_id": "#19352",
@@ -213,7 +213,7 @@
       },
       {
         "item_id": "#19340",
-        "efficiency": 0.05994405221792993
+        "efficiency": 1.0
       },
       {
         "item_id": "#19332",
@@ -229,7 +229,7 @@
       },
       {
         "item_id": "#19311",
-        "efficiency": 0.023174971031286212
+        "efficiency": 0.39110853611432983
       },
       {
         "item_id": "#19305",
@@ -237,11 +237,11 @@
       },
       {
         "item_id": "#19206",
-        "efficiency": 0.010853537694315385
+        "efficiency": 0.07236421907184204
       },
       {
         "item_id": "#12156",
-        "efficiency": 0.0014207362327043104
+        "efficiency": 0.0018608841883393048
       }
     ]
   },
@@ -249,7 +249,7 @@
     "repo": "astral-sh/uv",
     "start": "2026-05-10",
     "stop": "2026-05-16",
-    "gap_hours": 4.0,
+    "gap_hours": 24.0,
     "min_cluster_minutes": 30.0,
     "offline": true,
     "active_statuses": [
@@ -347,11 +347,11 @@
           "days": 0.28401620370370373
         },
         "active_time": {
-          "seconds": 8941.0,
-          "hours": 2.483611111111111,
-          "days": 0.1034837962962963
+          "seconds": 24539.0,
+          "hours": 6.816388888888889,
+          "days": 0.28401620370370373
         },
-        "efficiency": 0.36435877582623577,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -499,11 +499,11 @@
           "days": 0.2516435185185185
         },
         "active_time": {
-          "seconds": 7633.0,
-          "hours": 2.120277777777778,
-          "days": 0.08834490740740741
+          "seconds": 21742.0,
+          "hours": 6.039444444444444,
+          "days": 0.2516435185185185
         },
-        "efficiency": 0.3510716585410726,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -556,11 +556,11 @@
           "days": 0.8141898148148148
         },
         "active_time": {
-          "seconds": 12827.0,
-          "hours": 3.5630555555555556,
-          "days": 0.14846064814814816
+          "seconds": 70346.0,
+          "hours": 19.540555555555557,
+          "days": 0.8141898148148148
         },
-        "efficiency": 0.18234156881699032,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -575,11 +575,11 @@
           "days": 0.5772569444444444
         },
         "active_time": {
-          "seconds": 3600.0,
-          "hours": 1.0,
-          "days": 0.041666666666666664
+          "seconds": 49875.0,
+          "hours": 13.854166666666666,
+          "days": 0.5772569444444444
         },
-        "efficiency": 0.07218045112781955,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -613,11 +613,11 @@
           "days": 0.9121296296296296
         },
         "active_time": {
-          "seconds": 12487.0,
-          "hours": 3.468611111111111,
-          "days": 0.14452546296296295
+          "seconds": 78808.0,
+          "hours": 21.891111111111112,
+          "days": 0.9121296296296296
         },
-        "efficiency": 0.15844838087503807,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -727,11 +727,11 @@
           "days": 0.9413888888888889
         },
         "active_time": {
-          "seconds": 5126.0,
-          "hours": 1.423888888888889,
-          "days": 0.0593287037037037
+          "seconds": 81336.0,
+          "hours": 22.593333333333334,
+          "days": 0.9413888888888889
         },
-        "efficiency": 0.06302252385167699,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -746,11 +746,11 @@
           "days": 1.1515856481481481
         },
         "active_time": {
-          "seconds": 20950.0,
-          "hours": 5.819444444444445,
-          "days": 0.24247685185185186
+          "seconds": 99497.0,
+          "hours": 27.638055555555557,
+          "days": 1.1515856481481481
         },
-        "efficiency": 0.2105591123350453,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -765,11 +765,11 @@
           "days": 1.1034837962962962
         },
         "active_time": {
-          "seconds": 14161.0,
-          "hours": 3.933611111111111,
-          "days": 0.16390046296296296
+          "seconds": 95341.0,
+          "hours": 26.48361111111111,
+          "days": 1.1034837962962962
         },
-        "efficiency": 0.14853001332060708,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -841,11 +841,11 @@
           "days": 0.5744212962962963
         },
         "active_time": {
-          "seconds": 3600.0,
-          "hours": 1.0,
-          "days": 0.041666666666666664
+          "seconds": 49630.0,
+          "hours": 13.786111111111111,
+          "days": 0.5744212962962963
         },
-        "efficiency": 0.07253677211364094,
+        "efficiency": 1.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -1050,11 +1050,11 @@
           "days": 1.042638888888889
         },
         "active_time": {
-          "seconds": 5400.0,
-          "hours": 1.5,
-          "days": 0.0625
+          "seconds": 90084.0,
+          "hours": 25.023333333333333,
+          "days": 1.042638888888889
         },
-        "efficiency": 0.05994405221792993,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -1126,11 +1126,11 @@
           "days": 4.494791666666667
         },
         "active_time": {
-          "seconds": 9000.0,
-          "hours": 2.5,
-          "days": 0.10416666666666667
+          "seconds": 151887.0,
+          "hours": 42.19083333333333,
+          "days": 1.757951388888889
         },
-        "efficiency": 0.023174971031286212,
+        "efficiency": 0.39110853611432983,
         "is_bot": false,
         "author_login": "woodruffw"
       },
@@ -1164,11 +1164,11 @@
           "days": 13.210405092592593
         },
         "active_time": {
-          "seconds": 12388.0,
-          "hours": 3.4411111111111112,
-          "days": 0.14337962962962963
+          "seconds": 82595.0,
+          "hours": 22.943055555555556,
+          "days": 0.9559606481481482
         },
-        "efficiency": 0.010853537694315385,
+        "efficiency": 0.07236421907184204,
         "is_bot": false,
         "author_login": "zsol"
       },
@@ -1183,11 +1183,11 @@
           "days": 426.9923611111111
         },
         "active_time": {
-          "seconds": 52414.0,
-          "hours": 14.559444444444445,
-          "days": 0.6066435185185185
+          "seconds": 68652.0,
+          "hours": 19.07,
+          "days": 0.7945833333333333
         },
-        "efficiency": 0.0014207362327043104,
+        "efficiency": 0.0018608841883393048,
         "is_bot": false,
         "author_login": "Choudhry18"
       }
@@ -1198,6 +1198,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow efficiency --repo astral-sh/uv --start 2026-05-10 --stop 2026-05-16 --gap-hours 4.0 --min-cluster-minutes 30.0 --offline",
+  "cli_invocation": "uv run flow efficiency --repo astral-sh/uv --start 2026-05-10 --stop 2026-05-16 --gap-hours 24.0 --min-cluster-minutes 30.0 --offline",
   "logs": []
 }

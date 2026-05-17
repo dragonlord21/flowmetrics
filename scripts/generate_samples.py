@@ -61,6 +61,19 @@ class Repo:
     # by a PR-merge, cycle time uses the PR's mergedAt (the causal 'done').
     # GitHub-only.
     stitch_issues: bool = False
+    # Per-repo `--gap-hours` for the efficiency command. None = use the
+    # CLI default (4h, Vacanti's corporate-synchronous setting). OSS
+    # repos with async review cadence typically need a wider gap so
+    # cross-day pickup counts as one session — empirically the right
+    # knee is at 12–48h depending on the repo's inter-event gap
+    # distribution. See docs/TUNING.md.
+    efficiency_gap_hours: float | None = None
+    # Per-repo `--exclude-stale-days` for CFD + aging. Drops items with
+    # no real event activity within N days of the window stop. Useful
+    # for repos with large external-contribution backlogs (huggingface,
+    # rust-lang/rust) where zombie PRs dominate the headline counts.
+    # See docs/TUNING.md.
+    exclude_stale_days: int | None = None
 
 
 # Default GitHub PR aging workflow — driven by `isDraft` + `reviewDecision`,
@@ -80,35 +93,60 @@ GITHUB_CFD_WORKFLOW = (
 REPOS: list[Repo] = [
     Repo(
         slug="astral-sh/uv",
-        archetype="Fast-moving Rust/Python tooling (GitHub)",
+        archetype=(
+            "Async OSS PR workflow — review cycles span days, not hours. "
+            "Uses `--gap-hours=24` because the inter-event gap distribution "
+            "(P85=10h, P90=19h) shows cross-day pickup as a single session. "
+            "Demonstrates per-repo clustering tuning."
+        ),
         cli_args=["--repo", "astral-sh/uv"],
         cfd_workflow=GITHUB_CFD_WORKFLOW,
         aging_workflow=GITHUB_AGING_WORKFLOW,
+        efficiency_gap_hours=24.0,
     ),
     Repo(
         slug="pytest-dev/pytest",
-        archetype="Mature Python framework with active maintenance (GitHub)",
+        archetype=(
+            "Established OSS team with conventional review cadence. "
+            "Default `--gap-hours=4` (Vacanti's corporate-synchronous "
+            "setting) is appropriate here — contrast with uv's async "
+            "rhythm above."
+        ),
         cli_args=["--repo", "pytest-dev/pytest"],
         cfd_workflow=GITHUB_CFD_WORKFLOW,
         aging_workflow=GITHUB_AGING_WORKFLOW,
     ),
     Repo(
         slug="huggingface/transformers",
-        archetype="ML library, mixed community + maintainer flow (GitHub)",
+        archetype=(
+            "Massive scale with large external-contribution backlog. "
+            "Uses `--exclude-stale-days=14` so headline metrics reflect "
+            "engaged work, not zombie PRs sitting in queue indefinitely. "
+            "Demonstrates signal-vs-noise filtering at OSS scale."
+        ),
         cli_args=["--repo", "huggingface/transformers"],
         cfd_workflow=GITHUB_CFD_WORKFLOW,
         aging_workflow=GITHUB_AGING_WORKFLOW,
+        exclude_stale_days=14,
     ),
     Repo(
         slug="pre-commit/pre-commit",
-        archetype="Developer-tooling Python project (GitHub)",
+        archetype=(
+            "Small-team OSS baseline — minimal label vocabulary, default "
+            "settings work. The 'no tuning required' anchor for the demo set."
+        ),
         cli_args=["--repo", "pre-commit/pre-commit"],
         cfd_workflow=GITHUB_CFD_WORKFLOW,
         aging_workflow=GITHUB_AGING_WORKFLOW,
     ),
     Repo(
         slug="CalcMark/go-calcmark",
-        archetype="Custom request: Go computational-document tool (GitHub)",
+        archetype=(
+            "Solo developer using Issue+PR linking. Issues capture the work "
+            "request, PRs the implementation; `--include-issues` folds both "
+            "into the same canonical pipeline and stitched cycle times use "
+            "the closing PR's mergedAt. Demonstrates Issue+PR stitching."
+        ),
         cli_args=["--repo", "CalcMark/go-calcmark"],
         # Wider aging workflow: Issues land in the leading columns
         # (Open / in-progress) and flow into the PR review lifecycle.
@@ -126,7 +164,12 @@ REPOS: list[Repo] = [
     ),
     Repo(
         slug="ASF/CASSANDRA",
-        archetype="Apache Cassandra — active distributed-database project (Jira)",
+        archetype=(
+            "Apache Cassandra — rich Jira workflow with 5+ explicit statuses. "
+            "`status_intervals` come directly from the changelog so efficiency "
+            "is computed via status-duration (no event clustering). "
+            "Demonstrates Jira-direct workflow versus GitHub-cluster heuristic."
+        ),
         cli_args=[
             "--jira-url", "https://issues.apache.org/jira",
             "--jira-project", "CASSANDRA",
@@ -144,7 +187,11 @@ REPOS: list[Repo] = [
     ),
     Repo(
         slug="ASF/BIGTOP",
-        archetype="Apache Bigtop — smaller-team build/packaging project (Jira)",
+        archetype=(
+            "Apache Bigtop — smaller-team Jira project. Same canonical "
+            "pipeline as Cassandra; scale variation shows how the same "
+            "workflow definitions handle very different team sizes."
+        ),
         cli_args=[
             "--jira-url", "https://issues.apache.org/jira",
             "--jira-project", "BIGTOP",
@@ -197,6 +244,7 @@ REPO_URL = "https://github.com/dvhthomas/flowmetrics"
 REFERENCE_DOCS: list[tuple[str, str, str]] = [
     ("README.md", "README", "What flowmetrics is and how to run it."),
     ("docs/METRICS.md", "Metrics", "How cycle / active / wait / flow efficiency are computed."),
+    ("docs/TUNING.md", "Tuning", "Per-repo --gap-hours / --exclude-stale-days / --include-issues."),
     ("docs/FORECAST.md", "Forecasting", "Monte Carlo when-done and how-many."),
     ("docs/DECISIONS.md", "Decisions", "Architectural trade-offs and known constraints."),
     ("docs/GLOSSARY.md", "Glossary", "Vacanti terms and our usage."),
@@ -462,6 +510,19 @@ def _produce_one_repo(
     # GitHub-only; Issues are a GitHub concept. The CLI rejects
     # --include-issues with Jira sources, so guard at script level.
     stitch_args = ["--include-issues"] if repo.stitch_issues else []
+    # Per-repo tuning (see docs/TUNING.md):
+    #   efficiency_gap_hours: widens the active-time clustering gap so
+    #     async OSS PR rhythm reads as one session.
+    #   exclude_stale_days: drops items with no activity in N days
+    #     from CFD + aging (the noise filter for OSS backlogs).
+    gap_args = (
+        ["--gap-hours", str(repo.efficiency_gap_hours)]
+        if repo.efficiency_gap_hours is not None else []
+    )
+    stale_args = (
+        ["--exclude-stale-days", str(repo.exclude_stale_days)]
+        if repo.exclude_stale_days is not None else []
+    )
 
     common_efficiency = [
         "efficiency",
@@ -469,6 +530,7 @@ def _produce_one_repo(
         "--start", week_start, "--stop", week_stop,
         *common_cache,
         *stitch_args,
+        *gap_args,
     ]
     history_start = (
         datetime.strptime(history_end, "%Y-%m-%d").replace(tzinfo=UTC).date() - timedelta(days=29)
@@ -520,6 +582,7 @@ def _produce_one_repo(
                     "--workflow", repo.cfd_workflow,
                     *common_cache,
                     *stitch_args,
+                    *stale_args,
                 ],
                 "cfd",
             )
@@ -536,6 +599,7 @@ def _produce_one_repo(
                     "--history-end", history_end,
                     *common_cache,
                     *stitch_args,
+                    *stale_args,
                 ],
                 "aging",
             )
