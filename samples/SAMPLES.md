@@ -1,6 +1,6 @@
 # Sample reports
 
-_Generated 2026-05-17 19:18:37 UTC_
+_Generated 2026-05-17 19:31:44 UTC_
 
 Open the `.html` files directly in a browser — no server needed; Vega-Lite loads from CDN via plain `<script>` tags.
 
@@ -57,6 +57,19 @@ _Small-team OSS baseline — minimal label vocabulary, default settings work. Th
 | Cycle-time scatterplot | [html](pre-commit_pre-commit/scatterplot.html) · [txt](pre-commit_pre-commit/scatterplot.txt) · [json](pre-commit_pre-commit/scatterplot.json) |
 | CFD | [html](pre-commit_pre-commit/cfd.html) · [txt](pre-commit_pre-commit/cfd.txt) · [json](pre-commit_pre-commit/cfd.json) |
 | Aging WIP | [html](pre-commit_pre-commit/aging.html) · [txt](pre-commit_pre-commit/aging.txt) · [json](pre-commit_pre-commit/aging.json) |
+
+## rust-lang/rust
+
+_Rust compiler — large, label-driven OSS workflow with rich S-* state labels (`S-waiting-on-author`, `S-waiting-on-review`, etc.). The Aging chart is the standout: columns map directly to the team's WIP states, so each in-flight PR shows up under the state it's actually blocked on. Demonstrates label-driven WIP workflow._
+
+| Report | Formats |
+| --- | --- |
+| Efficiency | [html](rust-lang_rust/efficiency.html) · [txt](rust-lang_rust/efficiency.txt) · [json](rust-lang_rust/efficiency.json) |
+| WWIBD: Date | [html](rust-lang_rust/forecast-when-done.html) · [txt](rust-lang_rust/forecast-when-done.txt) · [json](rust-lang_rust/forecast-when-done.json) |
+| WWIBD: How Many | [html](rust-lang_rust/forecast-how-many.html) · [txt](rust-lang_rust/forecast-how-many.txt) · [json](rust-lang_rust/forecast-how-many.json) |
+| Cycle-time scatterplot | [html](rust-lang_rust/scatterplot.html) · [txt](rust-lang_rust/scatterplot.txt) · [json](rust-lang_rust/scatterplot.json) |
+| CFD | _n/a_ |
+| Aging WIP | [html](rust-lang_rust/aging.html) · [txt](rust-lang_rust/aging.txt) · [json](rust-lang_rust/aging.json) |
 
 ## CalcMark/go-calcmark
 

@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.scatterplot.v1",
   "command": "scatterplot",
-  "generated_at": "2026-05-17T13:26:01.806797-06:00",
+  "generated_at": "2026-05-17T13:31:55.581551-06:00",
   "headline": "673 items completed in 30 days; 85% finished within 17.8 days (Apr 17, 2026 -> May 16, 2026).",
   "definition": "Each dot is one completed item: x = completion date, y = cycle time (days from creation to completion). Horizontal percentile lines mark probability thresholds \u2014 a new item entering the system has an 85% chance of finishing in P85 days or less, by definition of the percentile.",
   "summary": {
@@ -4752,7 +4752,7 @@
     "repo": "rust-lang/rust",
     "start": "2026-04-17",
     "stop": "2026-05-16",
-    "offline": false,
+    "offline": true,
     "jira_url": null
   },
   "docs": {
@@ -4760,6 +4760,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow scatterplot --repo rust-lang/rust --start 2026-04-17 --stop 2026-05-16",
+  "cli_invocation": "uv run flow scatterplot --repo rust-lang/rust --start 2026-04-17 --stop 2026-05-16 --offline",
   "logs": []
 }

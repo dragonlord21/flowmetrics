@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.aging.v1",
   "command": "aging",
-  "generated_at": "2026-05-17T13:19:46.106085-06:00",
+  "generated_at": "2026-05-17T13:32:02.758518-06:00",
   "headline": "WIP Aging for jira:CASSANDRA as of May 17, 2026: 3191 in-flight items, 2446 already past P85 (893.0d), 1585 past P95 (2543.5d).",
   "definition": "Each dot is one in-flight item, placed in the column of its current workflow state at a height equal to its Age (days since entering the workflow). Percentile lines come from the cycle times of recently completed items \u2014 read horizontally as risk thresholds: an item aging past P85 likely misses its forecast.",
   "summary": {
@@ -22604,7 +22604,7 @@
     ],
     "history_start": "2026-04-17",
     "history_end": "2026-05-16",
-    "offline": false,
+    "offline": true,
     "max_age_days": null
   },
   "docs": {
@@ -22612,6 +22612,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow aging --jira-url https://issues.apache.org/jira --jira-project CASSANDRA --asof 2026-05-17 --workflow 'Triage Needed,Open,In Progress,Patch Available,Review In Progress,Ready to Commit' --history-start 2026-04-17 --history-end 2026-05-16",
+  "cli_invocation": "uv run flow aging --jira-url https://issues.apache.org/jira --jira-project CASSANDRA --asof 2026-05-17 --workflow 'Triage Needed,Open,In Progress,Patch Available,Review In Progress,Ready to Commit' --history-start 2026-04-17 --history-end 2026-05-16 --offline",
   "logs": []
 }

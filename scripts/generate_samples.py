@@ -157,11 +157,16 @@ REPOS: list[Repo] = [
         ),
         cli_args=["--repo", "rust-lang/rust"],
         cfd_workflow=GITHUB_CFD_WORKFLOW,
-        # Aging uses --wip-labels to derive the column order; aging_workflow
-        # set to the same string so the script emits the aging command.
-        aging_workflow="S-waiting-on-author,S-waiting-on-review,S-waiting-on-bors",
-        aging_wip_labels="S-waiting-on-author,S-waiting-on-review,S-waiting-on-bors",
-        exclude_stale_days=14,
+        # Lowercase: WipLabels.parse normalizes to lower-case (GitHub
+        # enforces case-insensitive label uniqueness) and the
+        # materialized status_intervals carry lowercase status names.
+        # Aging's per-state matching is exact, so --workflow must use
+        # the same casing.
+        aging_workflow="s-waiting-on-author,s-waiting-on-review,s-waiting-on-bors",
+        aging_wip_labels="s-waiting-on-author,s-waiting-on-review,s-waiting-on-bors",
+        # Deliberately NO --exclude-stale-days. The whole point of the
+        # rust sample is the rich S-state column distribution; filtering
+        # aggressively drops the body of PRs that fill the columns.
     ),
     Repo(
         slug="CalcMark/go-calcmark",
