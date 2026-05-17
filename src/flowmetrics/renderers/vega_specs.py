@@ -58,6 +58,18 @@ def _forecast_histogram_spec(
         "mark": {"type": "bar", "color": "#2b7cff", "opacity": 0.65,
                  "size": 18},
         "data": {"values": histogram_rows},
+        # Drag-to-zoom + scroll-zoom on both axes. Default view shows
+        # the full distribution (long tail visible); zoom focuses on
+        # the bell. Lives on the bar layer (not top-level) — top-level
+        # params on a layered spec produce per-layer copies that clash
+        # on Vega signal names at runtime.
+        "params": [
+            {
+                "name": "forecast_zoom",
+                "select": {"type": "interval", "encodings": ["x", "y"]},
+                "bind": "scales",
+            }
+        ],
         "encoding": {
             "x": {
                 "field": "outcome",
@@ -334,6 +346,18 @@ def aging_distribution_spec(report: AgingReport) -> dict[str, Any]:
     bar_layer = {
         "mark": {"type": "bar"},
         "data": {"values": values},
+        # Drag-to-zoom on the count axis. When 'Above P95' dominates
+        # (typical OSS pipeline), the smaller bands collapse next to
+        # it; zoom the X scale to compare them. Y is ordinal (band
+        # labels) so we don't bind it — interval-zoom on an ordinal
+        # scale isn't useful.
+        "params": [
+            {
+                "name": "aging_dist_zoom",
+                "select": {"type": "interval", "encodings": ["x"]},
+                "bind": "scales",
+            }
+        ],
         "encoding": {
             "y": {
                 "field": "band",
@@ -424,6 +448,18 @@ def cfd_spec(report: CfdReport) -> dict[str, Any]:
         # belongs to — the tick at T lines up with the vertex at T.
         "mark": {"type": "area", "interpolate": "linear", "opacity": 0.85},
         "data": {"values": rows},
+        # Drag-to-zoom + scroll-zoom on both axes. CFD often has a
+        # small first cohort that's a thin sliver against the cumulative
+        # top line; zoom lets the reader investigate it. Params on the
+        # area layer so the hover-rule layer's `cfd_hover` point param
+        # doesn't clash with this interval selection.
+        "params": [
+            {
+                "name": "cfd_zoom",
+                "select": {"type": "interval", "encodings": ["x", "y"]},
+                "bind": "scales",
+            }
+        ],
         "encoding": {
             "x": {
                 "field": "sampled_on",
@@ -586,6 +622,17 @@ def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
     bar_layer: dict[str, Any] = {
         "mark": {"type": "bar", "height": {"band": 0.8}},
         "data": {"values": values},
+        # Drag-to-zoom + scroll-zoom. Default shows the full FE range
+        # (0–100% on X) and every item on Y; zoom narrows either axis.
+        # On the nominal Y, zoom scrolls through items — useful when a
+        # long-tail chart has hundreds of rows.
+        "params": [
+            {
+                "name": "efficiency_zoom",
+                "select": {"type": "interval", "encodings": ["x", "y"]},
+                "bind": "scales",
+            }
+        ],
         "encoding": {
             "y": {
                 "field": "item_id",

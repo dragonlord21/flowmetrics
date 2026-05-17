@@ -1463,3 +1463,96 @@ class TestScatterplotSpec:
             f"both compress badly without per-axis zoom. Got encodings="
             f"{encodings}"
         )
+
+
+# ============================================================
+# Zoom parity - every chart with a quantitative axis should
+# support drag-to-zoom-and-pan via interval-bind:scales. Default
+# view shows the full data range (outliers visible); zoom lets
+# the reader focus.
+# ============================================================
+
+
+def _zoom_param(layer: dict) -> dict | None:
+    """Return the interval-bind:scales zoom param on a layer, or None."""
+    for p in layer.get("params", []) or []:
+        sel = p.get("select", {})
+        if isinstance(sel, dict) and sel.get("type") == "interval" and p.get("bind") == "scales":
+            return p
+    return None
+
+
+def _find_zoom_in_spec(spec: dict) -> dict | None:
+    """Look across every layer (and the top-level spec) for an
+    interval-bind:scales param. Vega-Lite signals clash if the
+    same zoom is on multiple layers; one is enough."""
+    for layer in spec.get("layer", []) or []:
+        z = _zoom_param(layer)
+        if z is not None:
+            return z
+    return _zoom_param(spec)
+
+
+class TestZoomParityAcrossCharts:
+    def test_when_done_forecast_supports_drag_zoom(self):
+        """Forecast histograms have a long tail: P95 can be 3x the
+        median, so the visible bars collapse without zoom. Drag a
+        box to focus on a count range; scroll wheel zooms."""
+        spec = vega_specs.when_done_spec(_when_done_fixture())
+        zoom = _find_zoom_in_spec(spec)
+        assert zoom is not None, "when_done_spec must declare an interval-bind:scales zoom"
+        encs = zoom["select"].get("encodings", [])
+        assert "x" in encs and "y" in encs, f"Zoom must cover X and Y. Got {encs}"
+
+    def test_how_many_forecast_supports_drag_zoom(self):
+        spec = vega_specs.how_many_spec(_how_many_fixture())
+        zoom = _find_zoom_in_spec(spec)
+        assert zoom is not None, "how_many_spec must declare an interval-bind:scales zoom"
+        encs = zoom["select"].get("encodings", [])
+        assert "x" in encs and "y" in encs, f"Zoom must cover X and Y. Got {encs}"
+
+    def test_cfd_supports_drag_zoom(self):
+        """CFD often has a small first cohort that's invisible next
+        to the cumulative top line; zoom is the escape hatch."""
+        spec = vega_specs.cfd_spec(_cfd_report([]))
+        zoom = _find_zoom_in_spec(spec)
+        assert zoom is not None, "cfd_spec must declare an interval-bind:scales zoom"
+        encs = zoom["select"].get("encodings", [])
+        assert "x" in encs and "y" in encs, f"Zoom must cover X and Y. Got {encs}"
+
+    def test_efficiency_supports_drag_zoom(self):
+        """Efficiency cycle-time band has the same long-tail problem
+        as the scatterplot."""
+        from datetime import UTC as _UTC
+        from datetime import datetime as _dt
+        from datetime import timedelta as _td
+
+        from flowmetrics.compute import FlowEfficiency
+        pr = FlowEfficiency(
+            item_id="#1", title="t",
+            created_at=_dt(2026, 5, 1, tzinfo=_UTC),
+            completed_at=_dt(2026, 5, 5, tzinfo=_UTC),
+            cycle_time=_td(days=4), active_time=_td(days=2), efficiency=0.5,
+        )
+        spec = vega_specs.efficiency_spec(_efficiency_report([pr]))
+        zoom = _find_zoom_in_spec(spec)
+        assert zoom is not None, "efficiency_spec must declare an interval-bind:scales zoom"
+        encs = zoom["select"].get("encodings", [])
+        assert "x" in encs and "y" in encs, f"Zoom must cover X and Y. Got {encs}"
+
+    def test_aging_distribution_supports_drag_zoom(self):
+        """Aging distribution histogram's 'Above P95' band often
+        eclipses the smaller bands; let the reader zoom the count
+        axis to compare them."""
+        from flowmetrics.aging import AgingItem
+        items = [
+            AgingItem("#1", "t", "Open", 5),
+            AgingItem("#2", "t", "Open", 7),
+        ]
+        spec = vega_specs.aging_distribution_spec(_aging_report(items))
+        zoom = _find_zoom_in_spec(spec)
+        assert zoom is not None, "aging_distribution_spec must declare an interval-bind:scales zoom"
+        # Horizontal bar - the long axis is X (count). Y is the
+        # ordinal band label - no need to zoom an ordinal scale.
+        encs = zoom["select"].get("encodings", [])
+        assert "x" in encs, f"Zoom must include X (count axis). Got {encs}"
