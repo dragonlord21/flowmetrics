@@ -16,6 +16,7 @@ from datetime import date
 
 from .compute import FlowEfficiency, WorkItem
 from .percentiles import CANONICAL_PERCENTILES, chart_percentiles
+from .stream import Stream
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,43 @@ def compute_aging(
                 item_id=item.item_id,
                 title=item.title,
                 current_state=current,
+                age_days=age_days,
+                url=item.url,
+            )
+        )
+    return out
+
+
+def compute_aging_from_stream(
+    stream: Stream,
+    *,
+    asof: date,
+    max_age_days: int | None = None,
+) -> list[AgingItem]:
+    """Canonical-stream version of compute_aging.
+
+    Same return shape as `compute_aging` so renderers don't change.
+    Inputs differ: this reads the two-table Stream so the same
+    code path handles a pure-PR flow, a pure-Issue flow, and an
+    Issue+PR stitched flow without per-source branching.
+
+    `asof` selects the snapshot date. An item appears in the result
+    iff its current stage (per the Stream) is in the workflow's
+    `wip_set` and the item exists by `asof`.
+    """
+    out: list[AgingItem] = []
+    for item in stream:
+        stage = stream.current_stage_at(item.item_id, asof)
+        if stage is None or stage not in stream.workflow.wip_set:
+            continue
+        age_days = (asof - item.created_at.date()).days
+        if max_age_days is not None and age_days > max_age_days:
+            continue
+        out.append(
+            AgingItem(
+                item_id=item.item_id,
+                title=item.title,
+                current_state=stage,
                 age_days=age_days,
                 url=item.url,
             )
