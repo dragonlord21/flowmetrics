@@ -108,3 +108,48 @@ class TestParseSearchResult:
             assert isinstance(item, StreamItem)
             assert all(isinstance(t, StageTransition) for t in txs)
             assert len(txs) >= 2  # created + closed minimum
+
+
+# ---------------------------------------------------------------------------
+# Open-issue parser — for the aging chart's in-flight column.
+# ---------------------------------------------------------------------------
+
+OPEN_FIXTURE = Path(__file__).parent / "fixtures" / "canonical" / "github_open_issues_calcmark.json"
+
+
+@pytest.fixture
+def open_issue_nodes() -> list[dict]:
+    raw = json.loads(OPEN_FIXTURE.read_text())
+    return raw["data"]["search"]["nodes"]
+
+
+class TestParseOpenIssue:
+    def test_unlabeled_open_issue_current_state_is_open(self, open_issue_nodes):
+        from flowmetrics.sources.github_issues import parse_open_issue_to_workitem
+        node = next(n for n in open_issue_nodes if not n["labels"]["nodes"])
+        wi = parse_open_issue_to_workitem(node, repo="CalcMark/go-calcmark", asof_dt=None)
+        assert wi.completed_at is None  # in-flight
+        # Aging reads the LAST status_interval's status.
+        assert wi.status_intervals[-1].status == "Open"
+
+    def test_labeled_open_issue_current_state_is_label_name(self, open_issue_nodes):
+        from flowmetrics.sources.github_issues import parse_open_issue_to_workitem
+        node = next(
+            n for n in open_issue_nodes
+            if any(lbl["name"] == "in-progress" for lbl in n["labels"]["nodes"])
+        )
+        wi = parse_open_issue_to_workitem(node, repo="CalcMark/go-calcmark", asof_dt=None)
+        assert wi.completed_at is None
+        assert wi.status_intervals[-1].status == "in-progress"
+
+    def test_item_id_carries_canonical_issue_marker(self, open_issue_nodes):
+        from flowmetrics.sources.github_issues import parse_open_issue_to_workitem
+        node = open_issue_nodes[0]
+        wi = parse_open_issue_to_workitem(node, repo="CalcMark/go-calcmark", asof_dt=None)
+        assert wi.item_id == f"I#{node['number']}"
+
+    def test_url_field_carries_through(self, open_issue_nodes):
+        from flowmetrics.sources.github_issues import parse_open_issue_to_workitem
+        node = open_issue_nodes[0]
+        wi = parse_open_issue_to_workitem(node, repo="CalcMark/go-calcmark", asof_dt=None)
+        assert wi.url == node["url"]

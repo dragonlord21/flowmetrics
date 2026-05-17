@@ -110,8 +110,13 @@ REPOS: list[Repo] = [
         slug="CalcMark/go-calcmark",
         archetype="Custom request: Go computational-document tool (GitHub)",
         cli_args=["--repo", "CalcMark/go-calcmark"],
-        cfd_workflow=GITHUB_CFD_WORKFLOW,
-        aging_workflow=GITHUB_AGING_WORKFLOW,
+        # Wider aging workflow: Issues land in the leading columns
+        # (Open / in-progress) and flow into the PR review lifecycle.
+        # CFD also benefits — Issue-driven work shows up before PR
+        # creation; PR-only repos still produce identical CFDs because
+        # the leading columns simply stay empty.
+        cfd_workflow="Open,in-progress,Draft,Awaiting Review,Changes Requested,Approved,Merged",
+        aging_workflow="Open,in-progress,Draft,Awaiting Review,Changes Requested,Approved",
         # The Issue+PR stitched demo. This repo's workflow uses an Issue
         # for the work request and a PR for the implementation; with
         # --include-issues every chart command surfaces both populations

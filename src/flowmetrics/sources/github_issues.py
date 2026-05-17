@@ -197,6 +197,141 @@ def parse_search_result(
     return [parse_issue_node(n, repo=repo) for n in nodes if n.get("number")]
 
 
+OPEN_ISSUE_SEARCH_QUERY = """
+query($q: String!, $first: Int!, $after: String) {
+  search(query: $q, type: ISSUE, first: $first, after: $after) {
+    pageInfo { hasNextPage endCursor }
+    issueCount
+    nodes {
+      ... on Issue {
+        number
+        title
+        createdAt
+        url
+        author { login }
+        labels(first: 20) { nodes { name } }
+        timelineItems(first: 100,
+                      itemTypes: [LABELED_EVENT, UNLABELED_EVENT]) {
+          nodes {
+            __typename
+            ... on LabeledEvent { createdAt label { name } }
+            ... on UnlabeledEvent { createdAt label { name } }
+          }
+        }
+      }
+    }
+  }
+  rateLimit { remaining cost }
+}
+""".strip()
+
+
+def parse_open_issue_to_workitem(
+    node: dict[str, Any],
+    *,
+    repo: str,
+    asof_dt: datetime | None,
+) -> WorkItem:
+    """Build a WorkItem for an in-flight Issue.
+
+    `status_intervals[-1].status` is the *current* stage — what the
+    aging chart reads to place this Issue in a column.
+
+    Stage rules:
+      - With no labels (or labels removed): status is "Open".
+      - With one or more labels: status is the most recently added
+        label name (label-driven workflow stage). For multiple labels,
+        the latest-added one wins.
+
+    Intervals walk the label timeline so each label-add closes the
+    previous interval. If `asof_dt` is given, the final interval ends
+    there; otherwise it ends at its own start (consumer extends).
+    """
+    number = node["number"]
+    item_id = f"I#{number}"
+    created_at = _parse_dt(node["createdAt"])
+    url = node.get("url")
+    title = node.get("title") or ""
+
+    # Walk timeline chronologically; each event reshapes the current stage.
+    events: list[tuple[datetime, str]] = []  # (timestamp, resulting stage)
+    for ti in (node.get("timelineItems") or {}).get("nodes") or []:
+        typ = ti.get("__typename")
+        ts_str = ti.get("createdAt")
+        if not ts_str:
+            continue
+        ts = _parse_dt(ts_str)
+        if typ == "LabeledEvent" and ti.get("label"):
+            events.append((ts, ti["label"]["name"]))
+        elif typ == "UnlabeledEvent":
+            # Stage falls back to "Open" — we don't know which other
+            # labels remain at this instant from the event alone.
+            events.append((ts, _OPEN_STAGE))
+    events.sort(key=lambda e: e[0])
+
+    # Build intervals.
+    intervals: list[StatusInterval] = []
+    cur_start = created_at
+    cur_stage = _OPEN_STAGE
+    for ts, stage in events:
+        if ts <= cur_start:
+            cur_stage = stage
+            continue
+        intervals.append(StatusInterval(cur_start, ts, cur_stage))
+        cur_start = ts
+        cur_stage = stage
+
+    # Final open-ended segment: ends at asof_dt if given, else its start.
+    end = asof_dt if asof_dt is not None and asof_dt > cur_start else cur_start
+    intervals.append(StatusInterval(cur_start, end, cur_stage))
+
+    return WorkItem(
+        item_id=item_id,
+        title=title,
+        created_at=created_at,
+        completed_at=None,
+        activity=[ts for ts, _ in events],
+        is_bot=False,
+        author_login=(node.get("author") or {}).get("login"),
+        status_intervals=intervals,
+        url=url,
+    )
+
+
+def fetch_open_issues_as_workitems(
+    repo: str, asof: date, *, client,
+) -> list[WorkItem]:
+    """Live (cached) fetch of every currently-open Issue in `repo`.
+
+    Returns WorkItems whose `status_intervals[-1].status` is the
+    current stage — the aging chart reads this to place each Issue
+    in a workflow column.
+    """
+    asof_dt = datetime.combine(asof, datetime.max.time()).replace(tzinfo=UTC)
+    out: list[WorkItem] = []
+    cursor: str | None = None
+    while True:
+        variables = {
+            "q": f"repo:{repo} is:issue is:open",
+            "first": 50,
+            "after": cursor,
+        }
+        payload = client.graphql(OPEN_ISSUE_SEARCH_QUERY, variables)
+        nodes = (
+            payload.get("data", {}).get("search", {}).get("nodes") or []
+        )
+        for n in nodes:
+            if n.get("number"):
+                out.append(parse_open_issue_to_workitem(n, repo=repo, asof_dt=asof_dt))
+        page = payload.get("data", {}).get("search", {}).get("pageInfo", {})
+        if not page.get("hasNextPage"):
+            break
+        cursor = page.get("endCursor")
+        if not cursor:
+            break
+    return out
+
+
 def issue_to_workitem(
     item: StreamItem, txs: list[StageTransition], *, number: int,
 ) -> WorkItem:

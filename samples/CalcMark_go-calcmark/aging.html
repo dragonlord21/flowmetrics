@@ -140,7 +140,7 @@
 <p class="subtitle">
   for <a href="https://github.com/CalcMark/go-calcmark">CalcMark/go-calcmark</a> ·
   as of May 17, 2026 ·
-  <span class="stamp">generated 2026-05-17 07:57 MDT</span>
+  <span class="stamp">generated 2026-05-17 08:02 MDT</span>
 </p>
 
 
@@ -156,10 +156,10 @@
 </div>
 
 <h2>Distribution by percentile band</h2>
-<div id="aging-dist-chart" role="img" aria-label="Aging distribution by percentile band: Above P95 2 (100%)"
+<div id="aging-dist-chart" role="img" aria-label="Aging distribution by percentile band: Above P95 5 (100%)"
      class="chart short"></div>
 <script>
-  vegaEmbed("#aging-dist-chart", {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "width": "container", "height": {"step": 32}, "background": "transparent", "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}}, "layer": [{"mark": {"type": "bar"}, "data": {"values": [{"band": "Below P50", "count": 0, "share": 0.0}, {"band": "P50–P70", "count": 0, "share": 0.0}, {"band": "P70–P85", "count": 0, "share": 0.0}, {"band": "P85–P95", "count": 0, "share": 0.0}, {"band": "Above P95", "count": 2, "share": 1.0}]}, "params": [{"name": "aging_dist_zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}], "encoding": {"y": {"field": "band", "type": "ordinal", "sort": ["Below P50", "P50–P70", "P70–P85", "P85–P95", "Above P95"], "axis": {"title": "Percentile band", "titleFontWeight": "bold"}}, "x": {"field": "count", "type": "quantitative", "axis": {"title": "In-flight items", "titleFontWeight": "bold"}}, "color": {"field": "band", "type": "ordinal", "sort": ["Below P50", "P50–P70", "P70–P85", "P85–P95", "Above P95"], "scale": {"scheme": "yelloworangered"}, "legend": null}, "tooltip": [{"field": "band", "title": "Band"}, {"field": "count", "title": "Items"}, {"field": "share", "title": "Share", "format": ".0%"}]}}]}, {
+  vegaEmbed("#aging-dist-chart", {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "width": "container", "height": {"step": 32}, "background": "transparent", "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}}, "layer": [{"mark": {"type": "bar"}, "data": {"values": [{"band": "Below P50", "count": 0, "share": 0.0}, {"band": "P50–P70", "count": 0, "share": 0.0}, {"band": "P70–P85", "count": 0, "share": 0.0}, {"band": "P85–P95", "count": 0, "share": 0.0}, {"band": "Above P95", "count": 5, "share": 1.0}]}, "params": [{"name": "aging_dist_zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}], "encoding": {"y": {"field": "band", "type": "ordinal", "sort": ["Below P50", "P50–P70", "P70–P85", "P85–P95", "Above P95"], "axis": {"title": "Percentile band", "titleFontWeight": "bold"}}, "x": {"field": "count", "type": "quantitative", "axis": {"title": "In-flight items", "titleFontWeight": "bold"}}, "color": {"field": "band", "type": "ordinal", "sort": ["Below P50", "P50–P70", "P70–P85", "P85–P95", "Above P95"], "scale": {"scheme": "yelloworangered"}, "legend": null}, "tooltip": [{"field": "band", "title": "Band"}, {"field": "count", "title": "Items"}, {"field": "share", "title": "Share", "format": ".0%"}]}}]}, {
     actions: false,
     renderer: "svg"
   }).catch(function(err) {
@@ -180,7 +180,7 @@ cycle-time range. Thresholds come from the
 <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 <script>
-  vegaEmbed("#aging-chart", {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "width": "container", "height": 360, "padding": {"top": 24, "bottom": 8, "left": 8, "right": 8}, "background": "transparent", "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}}, "layer": [{"mark": {"type": "rect", "color": "#1a1a1a", "opacity": 0.04}, "data": {"values": [{"current_state": "Draft"}, {"current_state": "Changes Requested"}]}, "encoding": {"x": {"field": "current_state", "type": "nominal", "sort": ["Draft", "Awaiting Review", "Changes Requested", "Approved"], "scale": {"domain": ["Draft", "Awaiting Review", "Changes Requested", "Approved"]}}}}, {"mark": {"type": "rule"}, "data": {"values": [{"pct": "P50", "y": 0.023541666666666666, "label": "P50 (0.0d)"}, {"pct": "P70", "y": 1.1613888888888888, "label": "P70 (1.2d)"}, {"pct": "P85", "y": 14.847905092592592, "label": "P85 (14.8d)"}, {"pct": "P95", "y": 34.79913194444445, "label": "P95 (34.8d)"}]}, "encoding": {"y": {"field": "y", "type": "quantitative"}, "color": {"field": "pct", "type": "ordinal", "sort": ["P50", "P70", "P85", "P95"], "scale": {"scheme": "yelloworangered"}, "legend": {"title": "Cycle-time percentile", "orient": "right"}}, "strokeDash": {"condition": {"test": "datum.pct === 'P85'", "value": [1, 0]}, "value": [6, 4]}, "size": {"condition": {"test": "datum.pct === 'P85'", "value": 4}, "value": 2}, "tooltip": [{"field": "label", "title": "Threshold"}]}}, {"mark": {"type": "text", "align": "left", "baseline": "bottom", "dx": 4, "dy": -3, "fontSize": 11, "fontWeight": "bold"}, "data": {"values": [{"pct": "P50", "y": 0.023541666666666666, "label": "P50 (0.0d)"}, {"pct": "P70", "y": 1.1613888888888888, "label": "P70 (1.2d)"}, {"pct": "P85", "y": 14.847905092592592, "label": "P85 (14.8d)"}, {"pct": "P95", "y": 34.79913194444445, "label": "P95 (34.8d)"}]}, "encoding": {"y": {"field": "y", "type": "quantitative"}, "text": {"field": "label"}, "color": {"field": "pct", "type": "ordinal", "sort": ["P50", "P70", "P85", "P95"], "scale": {"scheme": "yelloworangered"}, "legend": null}}}, {"mark": {"type": "circle", "size": 60, "opacity": 0.5}, "data": {"values": [{"item_id": "#120", "title": "feat: named tables and array type", "current_state": "Draft", "age_days": 40, "url": "https://github.com/CalcMark/go-calcmark/pull/120"}, {"item_id": "#115", "title": "fix: interpolation bold doubling and error recovery display fixes", "current_state": "Awaiting Review", "age_days": 41, "url": "https://github.com/CalcMark/go-calcmark/pull/115"}]}, "transform": [{"calculate": "random()", "as": "jitter"}], "params": [{"name": "zoom", "select": {"type": "interval", "encodings": ["y"]}, "bind": "scales"}], "encoding": {"x": {"field": "current_state", "type": "nominal", "axis": {"title": "WIP Stage", "labelAngle": 0, "titleFontWeight": "bold", "titlePadding": 8}, "sort": ["Draft", "Awaiting Review", "Changes Requested", "Approved"], "scale": {"domain": ["Draft", "Awaiting Review", "Changes Requested", "Approved"]}}, "y": {"field": "age_days", "type": "quantitative", "axis": {"title": "Age (days)"}}, "xOffset": {"field": "jitter", "type": "quantitative"}, "tooltip": [{"field": "item_id", "title": "ID"}, {"field": "title", "title": "Title"}, {"field": "current_state", "title": "State"}, {"field": "age_days", "title": "Age (d)"}], "href": {"field": "url", "type": "nominal"}}}, {"mark": {"type": "text", "baseline": "bottom", "fontWeight": "bold", "fontSize": 12, "dy": -6}, "data": {"values": [{"current_state": "Draft", "count": 1, "label": "1 · 50%"}, {"current_state": "Awaiting Review", "count": 1, "label": "1 · 50%"}, {"current_state": "Changes Requested", "count": 0, "label": "0 · 0%"}, {"current_state": "Approved", "count": 0, "label": "0 · 0%"}]}, "encoding": {"x": {"field": "current_state", "type": "nominal", "sort": ["Draft", "Awaiting Review", "Changes Requested", "Approved"], "scale": {"domain": ["Draft", "Awaiting Review", "Changes Requested", "Approved"]}}, "y": {"value": 0}, "text": {"field": "label"}}}]}, {
+  vegaEmbed("#aging-chart", {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "width": "container", "height": 360, "padding": {"top": 24, "bottom": 8, "left": 8, "right": 8}, "background": "transparent", "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}}, "layer": [{"mark": {"type": "rect", "color": "#1a1a1a", "opacity": 0.04}, "data": {"values": [{"current_state": "Open"}, {"current_state": "Draft"}, {"current_state": "Changes Requested"}]}, "encoding": {"x": {"field": "current_state", "type": "nominal", "sort": ["Open", "in-progress", "Draft", "Awaiting Review", "Changes Requested", "Approved"], "scale": {"domain": ["Open", "in-progress", "Draft", "Awaiting Review", "Changes Requested", "Approved"]}}}}, {"mark": {"type": "rule"}, "data": {"values": [{"pct": "P50", "y": 0.023541666666666666, "label": "P50 (0.0d)"}, {"pct": "P70", "y": 1.1613888888888888, "label": "P70 (1.2d)"}, {"pct": "P85", "y": 14.847905092592592, "label": "P85 (14.8d)"}, {"pct": "P95", "y": 34.79913194444445, "label": "P95 (34.8d)"}]}, "encoding": {"y": {"field": "y", "type": "quantitative"}, "color": {"field": "pct", "type": "ordinal", "sort": ["P50", "P70", "P85", "P95"], "scale": {"scheme": "yelloworangered"}, "legend": {"title": "Cycle-time percentile", "orient": "right"}}, "strokeDash": {"condition": {"test": "datum.pct === 'P85'", "value": [1, 0]}, "value": [6, 4]}, "size": {"condition": {"test": "datum.pct === 'P85'", "value": 4}, "value": 2}, "tooltip": [{"field": "label", "title": "Threshold"}]}}, {"mark": {"type": "text", "align": "left", "baseline": "bottom", "dx": 4, "dy": -3, "fontSize": 11, "fontWeight": "bold"}, "data": {"values": [{"pct": "P50", "y": 0.023541666666666666, "label": "P50 (0.0d)"}, {"pct": "P70", "y": 1.1613888888888888, "label": "P70 (1.2d)"}, {"pct": "P85", "y": 14.847905092592592, "label": "P85 (14.8d)"}, {"pct": "P95", "y": 34.79913194444445, "label": "P95 (34.8d)"}]}, "encoding": {"y": {"field": "y", "type": "quantitative"}, "text": {"field": "label"}, "color": {"field": "pct", "type": "ordinal", "sort": ["P50", "P70", "P85", "P95"], "scale": {"scheme": "yelloworangered"}, "legend": null}}}, {"mark": {"type": "circle", "size": 60, "opacity": 0.5}, "data": {"values": [{"item_id": "#120", "title": "feat: named tables and array type", "current_state": "Draft", "age_days": 40, "url": "https://github.com/CalcMark/go-calcmark/pull/120"}, {"item_id": "#115", "title": "fix: interpolation bold doubling and error recovery display fixes", "current_state": "Awaiting Review", "age_days": 41, "url": "https://github.com/CalcMark/go-calcmark/pull/115"}, {"item_id": "I#118", "title": "feat: named tables and array type", "current_state": "in-progress", "age_days": 40, "url": "https://github.com/CalcMark/go-calcmark/issues/118"}, {"item_id": "I#114", "title": "refactor: simplify custom HTML template authoring for CalcMark consumers", "current_state": "Open", "age_days": 41, "url": "https://github.com/CalcMark/go-calcmark/issues/114"}, {"item_id": "I#113", "title": "feat: semantic error recovery — interpret statements that pass semantic checking", "current_state": "Open", "age_days": 41, "url": "https://github.com/CalcMark/go-calcmark/issues/113"}]}, "transform": [{"calculate": "random()", "as": "jitter"}], "params": [{"name": "zoom", "select": {"type": "interval", "encodings": ["y"]}, "bind": "scales"}], "encoding": {"x": {"field": "current_state", "type": "nominal", "axis": {"title": "WIP Stage", "labelAngle": 0, "titleFontWeight": "bold", "titlePadding": 8}, "sort": ["Open", "in-progress", "Draft", "Awaiting Review", "Changes Requested", "Approved"], "scale": {"domain": ["Open", "in-progress", "Draft", "Awaiting Review", "Changes Requested", "Approved"]}}, "y": {"field": "age_days", "type": "quantitative", "axis": {"title": "Age (days)"}}, "xOffset": {"field": "jitter", "type": "quantitative"}, "tooltip": [{"field": "item_id", "title": "ID"}, {"field": "title", "title": "Title"}, {"field": "current_state", "title": "State"}, {"field": "age_days", "title": "Age (d)"}], "href": {"field": "url", "type": "nominal"}}}, {"mark": {"type": "text", "baseline": "bottom", "fontWeight": "bold", "fontSize": 12, "dy": -6}, "data": {"values": [{"current_state": "Open", "count": 2, "label": "2 · 40%"}, {"current_state": "in-progress", "count": 1, "label": "1 · 20%"}, {"current_state": "Draft", "count": 1, "label": "1 · 20%"}, {"current_state": "Awaiting Review", "count": 1, "label": "1 · 20%"}, {"current_state": "Changes Requested", "count": 0, "label": "0 · 0%"}, {"current_state": "Approved", "count": 0, "label": "0 · 0%"}]}, "encoding": {"x": {"field": "current_state", "type": "nominal", "sort": ["Open", "in-progress", "Draft", "Awaiting Review", "Changes Requested", "Approved"], "scale": {"domain": ["Open", "in-progress", "Draft", "Awaiting Review", "Changes Requested", "Approved"]}}, "y": {"value": 0}, "text": {"field": "label"}}}]}, {
     actions: {export: true, source: false, compiled: false, editor: false},
     renderer: "svg"
   }).catch(function(err) {
@@ -203,6 +203,24 @@ cycle-time range. Thresholds come from the
     <span class="age">40d</span>
     <span class="title">feat: named tables and array type</span>
   </div>
+  <div class="intervention">
+    <span class="state"><span class="pill">in-progress</span></span>
+    <span class="id"><a href="https://github.com/CalcMark/go-calcmark/issues/118">I#118</a></span>
+    <span class="age">40d</span>
+    <span class="title">feat: named tables and array type</span>
+  </div>
+  <div class="intervention">
+    <span class="state"><span class="pill">Open</span></span>
+    <span class="id"><a href="https://github.com/CalcMark/go-calcmark/issues/114">I#114</a></span>
+    <span class="age">41d</span>
+    <span class="title">refactor: simplify custom HTML template authoring for CalcMark consumers</span>
+  </div>
+  <div class="intervention">
+    <span class="state"><span class="pill">Open</span></span>
+    <span class="id"><a href="https://github.com/CalcMark/go-calcmark/issues/113">I#113</a></span>
+    <span class="age">41d</span>
+    <span class="title">feat: semantic error recovery — interpret statements that pass semantic checking</span>
+  </div>
 </div>
 
 <h2>Per-state aging</h2>
@@ -219,6 +237,24 @@ cycle-time range. Thresholds come from the
     </tr>
   </thead>
   <tbody>
+    <tr>
+      <td><span class="pill">Open</span></td>
+      <td class="num">2</td>
+      <td class="num">41d</td>
+      <td class="num">41d</td>
+      <td class="num">0</td>
+      <td class="num">2</td>
+      <td class="num">2</td>
+    </tr>
+    <tr>
+      <td><span class="pill">in-progress</span></td>
+      <td class="num">1</td>
+      <td class="num">40d</td>
+      <td class="num">40d</td>
+      <td class="num">0</td>
+      <td class="num">1</td>
+      <td class="num">1</td>
+    </tr>
     <tr>
       <td><span class="pill">Draft</span></td>
       <td class="num">1</td>
@@ -284,9 +320,27 @@ or escalate.
     <td>fix: interpolation bold doubling and error recovery display fixes</td>
   </tr>
   <tr>
+    <td><a href="https://github.com/CalcMark/go-calcmark/issues/114">I#114</a></td>
+    <td class="num">41d</td>
+    <td><span class="pill">Open</span></td>
+    <td>refactor: simplify custom HTML template authoring for CalcMark consumers</td>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/CalcMark/go-calcmark/issues/113">I#113</a></td>
+    <td class="num">41d</td>
+    <td><span class="pill">Open</span></td>
+    <td>feat: semantic error recovery — interpret statements that pass semantic checking</td>
+  </tr>
+  <tr>
     <td><a href="https://github.com/CalcMark/go-calcmark/pull/120">#120</a></td>
     <td class="num">40d</td>
     <td><span class="pill">Draft</span></td>
+    <td>feat: named tables and array type</td>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/CalcMark/go-calcmark/issues/118">I#118</a></td>
+    <td class="num">40d</td>
+    <td><span class="pill">in-progress</span></td>
     <td>feat: named tables and array type</td>
   </tr>
 </tbody>
@@ -297,7 +351,7 @@ or escalate.
 <summary>Reproduce this report</summary>
 <table>
   <tr><th>Workflow</th><td>
-<span class="pill">Draft</span> <span class="pill">Awaiting Review</span> <span class="pill">Changes Requested</span> <span class="pill">Approved</span>  </td></tr>
+<span class="pill">Open</span> <span class="pill">in-progress</span> <span class="pill">Draft</span> <span class="pill">Awaiting Review</span> <span class="pill">Changes Requested</span> <span class="pill">Approved</span>  </td></tr>
   <tr>
     <th>Percentile training window</th>
     <td>
@@ -306,7 +360,7 @@ or escalate.
     </td>
   </tr>
 </table>
-<div class="invocation">uv run flow aging --repo CalcMark/go-calcmark --asof 2026-05-17 --workflow &#39;Draft,Awaiting Review,Changes Requested,Approved&#39; --history-start 2026-04-17 --history-end 2026-05-16 --offline</div>
+<div class="invocation">uv run flow aging --repo CalcMark/go-calcmark --asof 2026-05-17 --workflow &#39;Open,in-progress,Draft,Awaiting Review,Changes Requested,Approved&#39; --history-start 2026-04-17 --history-end 2026-05-16 --offline</div>
 </details>
 
 <details>

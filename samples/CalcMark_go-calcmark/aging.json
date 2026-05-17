@@ -1,17 +1,19 @@
 {
   "schema": "flowmetrics.aging.v1",
   "command": "aging",
-  "generated_at": "2026-05-17T07:57:19.115393-06:00",
-  "headline": "WIP Aging for CalcMark/go-calcmark as of May 17, 2026: 2 in-flight items, 2 already past P85 (14.8d), 2 past P95 (34.8d).",
+  "generated_at": "2026-05-17T08:02:49.215959-06:00",
+  "headline": "WIP Aging for CalcMark/go-calcmark as of May 17, 2026: 5 in-flight items, 5 already past P85 (14.8d), 5 past P95 (34.8d).",
   "definition": "Each dot is one in-flight item, placed in the column of its current workflow state at a height equal to its Age (days since entering the workflow). Percentile lines come from the cycle times of recently completed items \u2014 read horizontally as risk thresholds: an item aging past P85 likely misses its forecast.",
   "summary": {
-    "in_flight_count": 2,
-    "in_flight_total": 2,
-    "in_flight_shown": 2,
+    "in_flight_count": 5,
+    "in_flight_total": 5,
+    "in_flight_shown": 5,
     "excluded_above_max_age": 0,
     "wip_by_state": {
       "Draft": 1,
-      "Awaiting Review": 1
+      "Awaiting Review": 1,
+      "in-progress": 1,
+      "Open": 2
     },
     "cycle_time_percentiles_days": {
       "50": 0.023541666666666666,
@@ -53,11 +55,29 @@
         "label": "Above P95",
         "lower": 34.79913194444445,
         "upper": null,
-        "count": 2,
+        "count": 5,
         "share": 1.0
       }
     ],
     "per_state_diagnostic": [
+      {
+        "state": "Open",
+        "count": 2,
+        "median_age_days": 41,
+        "oldest_age_days": 41,
+        "at_risk_p50_to_p85": 0,
+        "past_p85": 2,
+        "past_p95": 2
+      },
+      {
+        "state": "in-progress",
+        "count": 1,
+        "median_age_days": 40,
+        "oldest_age_days": 40,
+        "at_risk_p50_to_p85": 0,
+        "past_p85": 1,
+        "past_p95": 1
+      },
       {
         "state": "Draft",
         "count": 1,
@@ -109,13 +129,34 @@
         "current_state": "Draft",
         "age_days": 40,
         "url": "https://github.com/CalcMark/go-calcmark/pull/120"
+      },
+      {
+        "item_id": "I#118",
+        "title": "feat: named tables and array type",
+        "current_state": "in-progress",
+        "age_days": 40,
+        "url": "https://github.com/CalcMark/go-calcmark/issues/118"
+      },
+      {
+        "item_id": "I#114",
+        "title": "refactor: simplify custom HTML template authoring for CalcMark consumers",
+        "current_state": "Open",
+        "age_days": 41,
+        "url": "https://github.com/CalcMark/go-calcmark/issues/114"
+      },
+      {
+        "item_id": "I#113",
+        "title": "feat: semantic error recovery \u2014 interpret statements that pass semantic checking",
+        "current_state": "Open",
+        "age_days": 41,
+        "url": "https://github.com/CalcMark/go-calcmark/issues/113"
       }
     ]
   },
-  "key_insight": "2 item(s) have aged past the P85 cycle time (14.8d) \u2014 items in this band have a high chance of missing the 85% forecast. Oldest: #115, #120. Concentrate decision-making here.",
+  "key_insight": "5 item(s) have aged past the P85 cycle time (14.8d) \u2014 items in this band have a high chance of missing the 85% forecast. Oldest: #115, I#114, I#113. Concentrate decision-making here.",
   "next_actions": [
-    "2 item(s) past P95 (34.8d): decide explicitly to expedite, split, or drop. They are now outliers in your own historical distribution.",
-    "Biggest WIP column is 'Draft' with 1 item(s). Investigate this stage \u2014 either work is arriving faster than it can leave, or items are waiting on a downstream resource (reviewers, environments, decisions).",
+    "5 item(s) past P95 (34.8d): decide explicitly to expedite, split, or drop. They are now outliers in your own historical distribution.",
+    "Biggest WIP column is 'Open' with 2 item(s). Investigate this stage \u2014 either work is arriving faster than it can leave, or items are waiting on a downstream resource (reviewers, environments, decisions).",
     "Re-check daily; Aging is a leading indicator of forecast slip."
   ],
   "caveats": [
@@ -148,6 +189,27 @@
         "current_state": "Awaiting Review",
         "age_days": 41,
         "url": "https://github.com/CalcMark/go-calcmark/pull/115"
+      },
+      {
+        "item_id": "I#118",
+        "title": "feat: named tables and array type",
+        "current_state": "in-progress",
+        "age_days": 40,
+        "url": "https://github.com/CalcMark/go-calcmark/issues/118"
+      },
+      {
+        "item_id": "I#114",
+        "title": "refactor: simplify custom HTML template authoring for CalcMark consumers",
+        "current_state": "Open",
+        "age_days": 41,
+        "url": "https://github.com/CalcMark/go-calcmark/issues/114"
+      },
+      {
+        "item_id": "I#113",
+        "title": "feat: semantic error recovery \u2014 interpret statements that pass semantic checking",
+        "current_state": "Open",
+        "age_days": 41,
+        "url": "https://github.com/CalcMark/go-calcmark/issues/113"
       }
     ]
   },
@@ -155,6 +217,8 @@
     "repo": "CalcMark/go-calcmark",
     "asof": "2026-05-17",
     "workflow": [
+      "Open",
+      "in-progress",
       "Draft",
       "Awaiting Review",
       "Changes Requested",
@@ -170,6 +234,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow aging --repo CalcMark/go-calcmark --asof 2026-05-17 --workflow 'Draft,Awaiting Review,Changes Requested,Approved' --history-start 2026-04-17 --history-end 2026-05-16 --offline",
+  "cli_invocation": "uv run flow aging --repo CalcMark/go-calcmark --asof 2026-05-17 --workflow 'Open,in-progress,Draft,Awaiting Review,Changes Requested,Approved' --history-start 2026-04-17 --history-end 2026-05-16 --offline",
   "logs": []
 }

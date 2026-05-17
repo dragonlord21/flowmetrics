@@ -125,6 +125,11 @@ class _GitHubSourceAdapter:
         Label mode (``wip_labels`` set): the user's named WIP labels drive
         per-PR ``status_intervals`` via timeline events; items not currently
         in a WIP column are filtered out. See docs/SPEC-github-labels.md.
+
+        When ``include_issues`` is set, also fetches every currently-open
+        Issue and folds them in. Each Issue's `status_intervals[-1].status`
+        is its current label (or ``"Open"`` if unlabeled) — so the aging
+        chart shows them in their respective workflow columns.
         """
         try:
             if self._wip_labels is not None:
@@ -134,8 +139,15 @@ class _GitHubSourceAdapter:
                     asof=asof,
                     wip=self._wip_labels,
                 )
-                return [item for item in items if is_aging_wip(item)]
-            return fetch_open_prs(self._client, self._repo, asof=asof)
+                items = [item for item in items if is_aging_wip(item)]
+            else:
+                items = fetch_open_prs(self._client, self._repo, asof=asof)
+            if self._include_issues:
+                from .sources.github_issues import fetch_open_issues_as_workitems
+                items = items + fetch_open_issues_as_workitems(
+                    self._repo, asof, client=self._client
+                )
+            return items
         finally:
             self._client.close()
 
