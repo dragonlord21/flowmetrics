@@ -399,6 +399,18 @@ def efficiency(
     "alongside PRs. Issue stages come from labels; the closing PR's "
     "merge moves an Issue to Done.",
 )
+@click.option(
+    "--exclude-stale-days",
+    type=int,
+    default=None,
+    help=(
+        "Drop items whose most recent event (commit / comment / "
+        "review / label change) is more than N days before the "
+        "window stop. Vacanti's noise filter: OSS pipelines have "
+        "hundreds of zombie items that aren't really 'in flight'. "
+        "Default: no filter."
+    ),
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -413,6 +425,7 @@ def cfd(
     cache_dir: Path,
     offline: bool,
     include_issues: bool,
+    exclude_stale_days: int | None,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -447,7 +460,9 @@ def cfd(
         # currently-open items, which made the CFD show a suspect
         # perfect balance (every arrival also a departure).
         from .service import fetch_items_active_in_window
+        from .stale import filter_stale
         items = fetch_items_active_in_window(src, start_d, stop_d)
+        items = filter_stale(items, asof=stop_d, days=exclude_stale_days)
         points = build_cfd(
             items,
             workflow=workflow_tuple,
@@ -663,6 +678,16 @@ def scatterplot(
     "stages come from labels; an Issue closed by a PR-merge is treated "
     "as Done at the PR's mergedAt for percentile-line training.",
 )
+@click.option(
+    "--exclude-stale-days",
+    type=int,
+    default=None,
+    help=(
+        "Drop in-flight items whose most recent event is more than "
+        "N days before --asof. Filters out zombie items dominating "
+        "the chart. Try 14 for OSS repos."
+    ),
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -679,6 +704,7 @@ def aging(
     cache_dir: Path,
     offline: bool,
     include_issues: bool,
+    exclude_stale_days: int | None,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -732,7 +758,9 @@ def aging(
     )
 
     def build() -> AgingReport:
+        from .stale import filter_stale
         in_flight = src.fetch_in_flight(asof_d)
+        in_flight = filter_stale(in_flight, asof=asof_d, days=exclude_stale_days)
 
         # Percentile window: completed items, defaulting to Vacanti's 30 days.
         hist_end = _parse_date(history_end) if history_end else (asof_d - timedelta(days=1))

@@ -219,13 +219,21 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
         for pt in report.points
     ]
 
-    # Cap y-axis below P95 * 1.5 so a single deep-tail outlier doesn't
-    # crush the rest of the chart. The outlier is still on the dot
-    # data; only the percentile-line that's pathologically high gets
-    # rendered out of band.
+    # Vacanti's deep-tail handling. A single 1500-day outlier crushes
+    # every other point into a thin strip; capping the visible y-axis
+    # at P95 * 1.5 keeps the bulk legible. Items above the cap are
+    # still in the dataset (tooltips, JSON, slowest-finishers table)
+    # — just clipped from the chart. An overflow text layer names the
+    # count so they aren't silently disappeared.
+    #
+    # The cap factor (1.5x P95) is empirically the Vacanti threshold
+    # between "deep tail to investigate" and "outlier to filter."
+    # When P95 is itself 0 (degenerate small datasets), fall back to
+    # 1.1x max so the data still fits.
     p95 = report.cycle_time_percentiles.get(95, 0.0)
     max_cycle = max((p.cycle_time_days for p in report.points), default=0.0)
-    y_cap = max(p95 * 1.5, max_cycle * 1.1) if report.points else 0
+    y_cap = p95 * 1.5 if p95 > 0 else (max_cycle * 1.1 if report.points else 0)
+    overflow_count = sum(1 for p in report.points if p.cycle_time_days > y_cap)
     percentile_rows = [
         {
             "pct": f"P{p}",
@@ -267,6 +275,10 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
             "y": {
                 "field": "cycle_time_days",
                 "type": "quantitative",
+                # `clamp: true` clips outliers to the cap so they don't
+                # render off-canvas. The overflow text layer below
+                # reports how many.
+                "scale": {"domainMin": 0, "domainMax": y_cap, "clamp": True},
                 "axis": {"title": "Cycle time (days)",
                          "titleFontWeight": "bold"},
             },
@@ -329,13 +341,39 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
         },
     }
 
+    # Overflow callout: when items are clipped by the y-cap, name the
+    # count in the top-right corner so they aren't silently absent.
+    # Vacanti's framing: outliers belong in retrospective conversations,
+    # not in the headline statistics — but they shouldn't vanish either.
+    layers: list[dict[str, Any]] = [circle_layer, rule_layer, text_layer]
+    if overflow_count > 0:
+        overflow_layer = {
+            "mark": {
+                "type": "text",
+                "align": "right", "baseline": "top",
+                "dx": -8, "dy": 8,
+                "fontSize": 11, "fontStyle": "italic",
+                "color": "#666",
+            },
+            "data": {"values": [{"_": 1}]},
+            "encoding": {
+                "x": {"datum": {"expr": "domain('x')[1]"}, "type": "temporal"},
+                "y": {"datum": y_cap, "type": "quantitative"},
+                "text": {
+                    "value": f"{overflow_count} items above the cap "
+                             f"(>{y_cap:.0f}d) — see slowest table",
+                },
+            },
+        }
+        layers.append(overflow_layer)
+
     return {
         "$schema": _VEGA_LITE_SCHEMA,
         "width": "container",
         "height": 380,
         "background": "transparent",
         "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}},
-        "layer": [circle_layer, rule_layer, text_layer],
+        "layer": layers,
     }
 
 
@@ -730,6 +768,44 @@ def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
     }
 
 
+def _aging_layers(
+    shade_layer: dict[str, Any],
+    rule_layers: list[dict[str, Any]],
+    circle_layer: dict[str, Any],
+    header_layer: dict[str, Any],
+    *,
+    overflow_count: int,
+    y_cap: float,
+    workflow: tuple[str, ...] | list[str],
+) -> list[dict[str, Any]]:
+    """Compose aging-spec layers, optionally appending an overflow
+    callout when y-cap clipped some items."""
+    layers: list[dict[str, Any]] = [
+        shade_layer, *rule_layers, circle_layer, header_layer,
+    ]
+    if overflow_count > 0 and y_cap != float("inf"):
+        # Place the callout at the top-right of the chart: use the
+        # rightmost workflow state and y = cap (clamped at top).
+        rightmost = workflow[-1] if workflow else ""
+        layers.append({
+            "mark": {
+                "type": "text", "align": "right", "baseline": "top",
+                "dx": -8, "dy": 8,
+                "fontSize": 11, "fontStyle": "italic", "color": "#666",
+            },
+            "data": {"values": [{"x": rightmost, "y": y_cap}]},
+            "encoding": {
+                "x": {"field": "x", "type": "nominal"},
+                "y": {"field": "y", "type": "quantitative"},
+                "text": {
+                    "value": f"{overflow_count} items above the cap "
+                             f"(>{y_cap:.0f}d) — see interventions list below",
+                },
+            },
+        })
+    return layers
+
+
 def aging_spec(report: AgingReport) -> dict[str, Any]:
     """Build the Vega-Lite spec for an Aging chart.
 
@@ -770,6 +846,23 @@ def aging_spec(report: AgingReport) -> dict[str, Any]:
         for state, count in state_counts.items()
     ]
 
+    # Compute y-cap BEFORE the circle layer so its scale encoding can
+    # reference it. Cap = min(P95*1.5, max_age*1.5) — the tighter of:
+    #   - P95 deep-tail threshold from completed cycle times
+    #   - 1.5x the highest in-flight age (keeps the chart tight when
+    #     all in-flight items are reasonable but completed P95 is huge)
+    # Items above the cap stay in the dataset (Next actions, JSON) but
+    # are clipped visually; the overflow_layer reports the count.
+    p95 = report.cycle_time_percentiles.get(95, 0.0)
+    max_age = max((it.age_days for it in report.items), default=0)
+    candidates: list[float] = []
+    if p95 > 0:
+        candidates.append(p95 * 1.5)
+    if max_age > 0:
+        candidates.append(max_age * 1.5)
+    y_cap: float = min(candidates) if candidates else float("inf")
+    overflow_count = sum(1 for it in report.items if it.age_days > y_cap)
+
     circle_layer: dict[str, Any] = {
         "mark": {"type": "circle", "size": 60, "opacity": 0.5},
         "data": {"values": values},
@@ -809,6 +902,14 @@ def aging_spec(report: AgingReport) -> dict[str, Any]:
                 "field": "age_days",
                 "type": "quantitative",
                 "axis": {"title": "Age (days)"},
+                # Cap y so a few abandoned items at 800d don't crush
+                # the bulk of recent WIP. `clamp: true` clips dots
+                # above the cap; the overflow_layer below names them.
+                "scale": {
+                    "domainMin": 0,
+                    **({"domainMax": y_cap} if y_cap != float("inf") else {}),
+                    "clamp": True,
+                },
             },
             "xOffset": {
                 "field": "jitter",
@@ -824,17 +925,6 @@ def aging_spec(report: AgingReport) -> dict[str, Any]:
         },
     }
 
-    # Consolidate all four threshold values into one dataset so the
-    # rule layer can carry a single color/text encoding across them.
-    # Yellow→red sequential palette: P50 reads as "still ok", P95 reads
-    # as "danger". Matches the headline's "past P85/P95" risk framing.
-    #
-    # Thresholds above ~1.5x the highest in-flight age are dropped so
-    # the chart fits the actual data. Otherwise a P95 that's far above
-    # the in-flight range (common in long-tail backlogs) stretches the
-    # Y axis 5x and wastes most of the canvas.
-    max_age = max((it.age_days for it in report.items), default=0)
-    y_cap = max_age * 1.5 if max_age > 0 else float("inf")
     percentile_rows = [
         {"pct": f"P{p}", "y": v, "label": f"P{p} ({v:.1f}d)"}
         for p, v in sorted(report.cycle_time_percentiles.items())
@@ -974,7 +1064,12 @@ def aging_spec(report: AgingReport) -> dict[str, Any]:
             "view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1},
         },
         # Layer order: column shade → percentile rules → circles →
-        # per-state header labels. Shade paints first (behind
+        # per-state header labels → overflow callout (when items
+        # were clipped by the y-cap). Shade paints first (behind
         # everything); rules paint behind dots; dots on top.
-        "layer": [shade_layer, *rule_layers, circle_layer, header_layer],
+        "layer": _aging_layers(
+            shade_layer, rule_layers, circle_layer, header_layer,
+            overflow_count=overflow_count, y_cap=y_cap,
+            workflow=report.input.workflow,
+        ),
     }

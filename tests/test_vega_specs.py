@@ -1562,3 +1562,172 @@ class TestZoomParityAcrossCharts:
         # ordinal band label - no need to zoom an ordinal scale.
         encs = zoom["select"].get("encodings", [])
         assert "x" in encs, f"Zoom must include X (count axis). Got {encs}"
+
+
+class TestScatterplotYCapWithOverflow:
+    """Vacanti's deep-tail handling: a single 1500d outlier crushes
+    every other point into a thin strip at the bottom. Visual cap at
+    P95 * 1.5 keeps the bulk visible; an overflow callout names the
+    items that landed off-chart so they can still be investigated."""
+
+    def _fixture_with_outliers(self):
+        from flowmetrics.report import (
+            Interpretation,
+            ScatterplotInput,
+            ScatterplotPoint,
+            ScatterplotReport,
+        )
+        return ScatterplotReport(
+            input=ScatterplotInput(
+                repo="acme/widget",
+                start=date(2026, 4, 15), stop=date(2026, 5, 14),
+                offline=False,
+            ),
+            points=[
+                # Bulk of the data — under any reasonable cap.
+                *[
+                    ScatterplotPoint(
+                        item_id=f"#{i}", title=f"n{i}",
+                        completed_at=date(2026, 4, 20),
+                        cycle_time_days=float(i % 10 + 1),
+                        url=None,
+                    )
+                    for i in range(20)
+                ],
+                # Three deep-tail outliers above the cap.
+                ScatterplotPoint(
+                    item_id="#wild1", title="outlier 1",
+                    completed_at=date(2026, 5, 10),
+                    cycle_time_days=420.0, url=None,
+                ),
+                ScatterplotPoint(
+                    item_id="#wild2", title="outlier 2",
+                    completed_at=date(2026, 5, 11),
+                    cycle_time_days=1500.0, url=None,
+                ),
+                ScatterplotPoint(
+                    item_id="#wild3", title="outlier 3",
+                    completed_at=date(2026, 5, 12),
+                    cycle_time_days=600.0, url=None,
+                ),
+            ],
+            cycle_time_percentiles={50: 5.0, 70: 7.0, 85: 9.0, 95: 12.0},
+            interpretation=Interpretation(
+                headline="h", key_insight="k", next_actions=["a"], caveats=["c"],
+            ),
+        )
+
+    def test_y_scale_has_explicit_domain_max_at_p95_buffer(self):
+        spec = vega_specs.scatterplot_spec(self._fixture_with_outliers())
+        circle = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "circle"
+        )
+        scale = circle["encoding"]["y"].get("scale", {})
+        # Cap should be a small multiple of P95 (=12) — much less than
+        # the 1500d outlier. We assert it's bounded; exact factor is
+        # an implementation choice.
+        assert "domainMax" in scale or "domain" in scale, (
+            "y encoding must declare an explicit cap "
+            f"(got scale={scale})"
+        )
+        domain_max = (
+            scale.get("domainMax")
+            if "domainMax" in scale
+            else scale["domain"][1]
+        )
+        assert domain_max < 1500.0, (
+            f"cap must be below the 1500d outlier, got {domain_max}"
+        )
+        # Sanity: the cap leaves room for the P95 line.
+        assert domain_max >= 12.0
+
+    def test_overflow_annotation_layer_is_present_when_outliers_exist(self):
+        spec = vega_specs.scatterplot_spec(self._fixture_with_outliers())
+        # A text layer whose value mentions the overflow count.
+        text_layers = [
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "text"
+        ]
+        annotation_texts = []
+        for layer in text_layers:
+            txt = layer.get("encoding", {}).get("text", {})
+            if "value" in txt:
+                annotation_texts.append(txt["value"])
+        # 3 outliers above the cap; the annotation should mention them.
+        assert any("3" in t and ("above" in t.lower() or "cap" in t.lower())
+                   for t in annotation_texts), (
+            f"expected overflow annotation mentioning 3 items above the "
+            f"cap; got text values = {annotation_texts}"
+        )
+
+    def test_no_overflow_annotation_when_data_fits(self):
+        """When all data fits under the cap, no overflow callout."""
+        # Use a fixture with no outliers.
+        spec = vega_specs.scatterplot_spec(_scatterplot_fixture())
+        text_layers = [
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "text"
+        ]
+        annotation_texts = []
+        for layer in text_layers:
+            txt = layer.get("encoding", {}).get("text", {})
+            if "value" in txt:
+                annotation_texts.append(txt["value"])
+        for t in annotation_texts:
+            assert "above" not in t.lower() and "cap" not in t.lower(), (
+                f"unexpected overflow callout when no outliers: {t}"
+            )
+
+
+class TestAgingYCapWithOverflow:
+    """Aging chart needs the same deep-tail handling: a few abandoned
+    items at 800d crush the bulk of recent WIP into an unreadable strip
+    at the bottom. Cap at P95 * 1.5 and call out the overflow."""
+
+    def _aging_with_outliers(self):
+        items = [
+            # Recent WIP (~3-12 days)
+            *[_item(f"#{i}", "Awaiting Review", i % 12 + 1) for i in range(15)],
+            # Three deep-tail abandoned items.
+            _item("#wild1", "Awaiting Review", 800),
+            _item("#wild2", "Draft", 600),
+            _item("#wild3", "Changes Requested", 400),
+        ]
+        return _aging_report(items)
+
+    def test_y_scale_has_explicit_domain_max(self):
+        spec = vega_specs.aging_spec(self._aging_with_outliers())
+        circle = next(
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "circle"
+        )
+        scale = circle["encoding"]["y"].get("scale", {})
+        domain_max = (
+            scale.get("domainMax") if "domainMax" in scale
+            else (scale.get("domain") or [None, None])[1]
+        )
+        assert domain_max is not None, f"y must declare a cap, got {scale}"
+        assert domain_max < 800, (
+            f"cap must be below the 800d outlier; got {domain_max}"
+        )
+
+    def test_overflow_annotation_layer_when_outliers_exist(self):
+        spec = vega_specs.aging_spec(self._aging_with_outliers())
+        text_layers = [
+            layer for layer in spec["layer"]
+            if (layer["mark"].get("type") if isinstance(layer["mark"], dict)
+                else layer["mark"]) == "text"
+        ]
+        annotation_texts = [
+            layer.get("encoding", {}).get("text", {}).get("value", "")
+            for layer in text_layers
+        ]
+        assert any("3" in t and ("above" in t.lower() or "cap" in t.lower())
+                   for t in annotation_texts), (
+            f"expected 3-items-above-cap annotation; got {annotation_texts}"
+        )
