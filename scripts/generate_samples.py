@@ -74,6 +74,12 @@ class Repo:
     # rust-lang/rust) where zombie PRs dominate the headline counts.
     # See docs/TUNING.md.
     exclude_stale_days: int | None = None
+    # Per-repo `--wip-labels` for the AGING command only (other commands
+    # don't accept it). When set, aging uses the team's named WIP labels
+    # as the column order instead of the default Draft → Awaiting Review
+    # → Changes Requested → Approved lifecycle. rust-lang/rust uses
+    # `S-waiting-on-author,S-waiting-on-review,S-waiting-on-bors` etc.
+    aging_wip_labels: str | None = None
 
 
 # Default GitHub PR aging workflow — driven by `isDraft` + `reviewDecision`,
@@ -138,6 +144,24 @@ REPOS: list[Repo] = [
         cli_args=["--repo", "pre-commit/pre-commit"],
         cfd_workflow=GITHUB_CFD_WORKFLOW,
         aging_workflow=GITHUB_AGING_WORKFLOW,
+    ),
+    Repo(
+        slug="rust-lang/rust",
+        archetype=(
+            "Rust compiler — large, label-driven OSS workflow with rich "
+            "S-* state labels (`S-waiting-on-author`, `S-waiting-on-review`, "
+            "etc.). The Aging chart is the standout: columns map directly "
+            "to the team's WIP states, so each in-flight PR shows up under "
+            "the state it's actually blocked on. Demonstrates label-driven "
+            "WIP workflow."
+        ),
+        cli_args=["--repo", "rust-lang/rust"],
+        cfd_workflow=GITHUB_CFD_WORKFLOW,
+        # Aging uses --wip-labels to derive the column order; aging_workflow
+        # set to the same string so the script emits the aging command.
+        aging_workflow="S-waiting-on-author,S-waiting-on-review,S-waiting-on-bors",
+        aging_wip_labels="S-waiting-on-author,S-waiting-on-review,S-waiting-on-bors",
+        exclude_stale_days=14,
     ),
     Repo(
         slug="CalcMark/go-calcmark",
@@ -588,6 +612,10 @@ def _produce_one_repo(
             )
         )
     if repo.aging_workflow is not None:
+        aging_label_args = (
+            ["--wip-labels", repo.aging_wip_labels]
+            if repo.aging_wip_labels is not None else []
+        )
         commands.append(
             (
                 [
@@ -600,17 +628,32 @@ def _produce_one_repo(
                     *common_cache,
                     *stitch_args,
                     *stale_args,
+                    *aging_label_args,
                 ],
                 "aging",
             )
         )
 
+    # Per-command resilience. Some commands time out on very large
+    # repos (rust-lang/rust hits GitHub's 504 on the efficiency fetch).
+    # Skipping the failing command lets the rest of the repo's samples
+    # still render — important when the failure is a transient
+    # gateway timeout, and important when one command is genuinely
+    # too heavy (rust CFD) but another (rust aging, which fetches
+    # only open PRs) is cheap.
     for cmd_args, name in commands:
+        cmd_failed = False
         for fmt, ext in [("text", "txt"), ("json", "json"), ("html", "html")]:
+            if cmd_failed:
+                break  # Don't retry the other formats of a failed command.
             path = out_dir / f"{name}.{ext}"
             print(f"  {repo.slug} {name} --format {fmt}")
             args = [*cmd_args, "--format", fmt, "--output", str(path)]
-            _run_cli(*args)
+            try:
+                _run_cli(*args)
+            except RuntimeError as exc:
+                print(f"    SKIP {repo.slug} {name}: {exc}")
+                cmd_failed = True
 
     def _opt(name: str, ext: str) -> Path | None:
         p = out_dir / f"{name}.{ext}"
