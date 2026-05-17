@@ -1,25 +1,25 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-17T08:23:25.043554-06:00",
-  "headline": "0.0% flow efficiency across 10 completed items (7 human, 3 bot) over 7 days, May 10, 2026 \u2192 May 16, 2026.",
+  "generated_at": "2026-05-17T08:35:36.125782-06:00",
+  "headline": "0.7% flow efficiency across 10 completed items (7 human, 3 bot) over 7 days, May 10, 2026 \u2192 May 16, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
     "pr_count": 10,
     "human_pr_count": 7,
     "bot_pr_count": 3,
-    "portfolio_efficiency": 0.0,
-    "median_efficiency": 0.0,
-    "mean_efficiency": 0.0,
+    "portfolio_efficiency": 0.006624464798567321,
+    "median_efficiency": 0.10826890569973988,
+    "mean_efficiency": 0.27012083392704994,
     "total_cycle": {
       "seconds": 12237215.0,
       "hours": 3399.226388888889,
       "days": 141.63443287037038
     },
     "total_active": {
-      "seconds": 0.0,
-      "hours": 0.0,
-      "days": 0.0
+      "seconds": 81065.0,
+      "hours": 22.518055555555556,
+      "days": 0.9382523148148149
     },
     "observed_statuses": [
       "Awaiting Review",
@@ -29,7 +29,6 @@
   },
   "key_insight": "This is in the typical 5-15% range for knowledge work \u2014 most clock time is wait, not active. Slowest PR (#14071)  ran 136.9d and dominates the ratio.",
   "next_actions": [
-    "Configured --active-statuses ('In Development', 'In Progress') don't appear in this workflow. Statuses actually observed: 'Awaiting Review', 'Draft', 'Merged'. Pick whichever represent active development and pass them as `--active-statuses 'X,Y'` \u2014 or accept that work happens outside the issue tracker.",
     "Inspect the three slowest PRs (#14071, #14472, #14478) \u2014 they likely sat in review queue.",
     "Compare to the previous 2-4 weeks to spot a trend.",
     "Look at where the wait time concentrates (pre-first-review, post-approval, blocked) rather than setting a target on the number itself."
@@ -50,43 +49,43 @@
     "per_pr_efficiency": [
       {
         "item_id": "#14479",
-        "efficiency": 0.0
+        "efficiency": 0.057151021574510644
       },
       {
         "item_id": "#14478",
-        "efficiency": 0.0
+        "efficiency": 0.056459075012154386
       },
       {
         "item_id": "#14475",
-        "efficiency": 0.0
+        "efficiency": 0.11658408627222384
       },
       {
         "item_id": "#14472",
-        "efficiency": 0.0
+        "efficiency": 0.03059845477803371
       },
       {
         "item_id": "#14467",
-        "efficiency": 0.0
+        "efficiency": 0.16317650258362795
       },
       {
         "item_id": "#14466",
-        "efficiency": 0.0
+        "efficiency": 1.0
       },
       {
         "item_id": "#14464",
-        "efficiency": 0.0
+        "efficiency": 1.0
       },
       {
         "item_id": "#14460",
-        "efficiency": 0.0
+        "efficiency": 0.0999537251272559
       },
       {
         "item_id": "#14455",
-        "efficiency": 0.0
+        "efficiency": 0.17563545884763623
       },
       {
         "item_id": "#14071",
-        "efficiency": 0.0
+        "efficiency": 0.0016500150750570482
       }
     ]
   },
@@ -116,11 +115,11 @@
           "days": 0.7290625
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.057151021574510644,
         "is_bot": false,
         "author_login": "lphuc2250gma"
       },
@@ -135,11 +134,11 @@
           "days": 0.7379976851851852
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.056459075012154386,
         "is_bot": true,
         "author_login": "patchback"
       },
@@ -154,11 +153,11 @@
           "days": 0.35739583333333336
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.11658408627222384,
         "is_bot": false,
         "author_login": "EternalRights"
       },
@@ -173,11 +172,11 @@
           "days": 1.361724537037037
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.03059845477803371,
         "is_bot": false,
         "author_login": "algojogacor"
       },
@@ -192,11 +191,11 @@
           "days": 0.2553472222222222
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.16317650258362795,
         "is_bot": false,
         "author_login": "1Utkarsh1"
       },
@@ -211,11 +210,11 @@
           "days": 0.36144675925925923
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 31229.0,
+          "hours": 8.674722222222222,
+          "days": 0.36144675925925923
         },
-        "efficiency": 0.0,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "EternalRights"
       },
@@ -230,11 +229,11 @@
           "days": 0.03836805555555556
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3315.0,
+          "hours": 0.9208333333333333,
+          "days": 0.03836805555555556
         },
-        "efficiency": 0.0,
+        "efficiency": 1.0,
         "is_bot": true,
         "author_login": "pre-commit-ci"
       },
@@ -249,11 +248,11 @@
           "days": 0.6252893518518519
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 5400.0,
+          "hours": 1.5,
+          "days": 0.0625
         },
-        "efficiency": 0.0,
+        "efficiency": 0.0999537251272559,
         "is_bot": false,
         "author_login": "bluetech"
       },
@@ -268,11 +267,11 @@
           "days": 0.2372337962962963
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.17563545884763623,
         "is_bot": true,
         "author_login": "github-actions"
       },
@@ -287,11 +286,11 @@
           "days": 136.93056712962962
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 19521.0,
+          "hours": 5.4225,
+          "days": 0.2259375
         },
-        "efficiency": 0.0,
+        "efficiency": 0.0016500150750570482,
         "is_bot": false,
         "author_login": "yastcher"
       }

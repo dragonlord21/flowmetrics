@@ -106,7 +106,25 @@ def compute_pr_flow(
     # named-status intervals (Jira) AND the caller has mapped some statuses
     # as active. This is Vacanti's canonical Jira computation — measured,
     # not inferred.
-    if pr.status_intervals and active_statuses:
+    #
+    # Discriminator between "Jira-style status_intervals" and "GitHub-PR-
+    # lifecycle status_intervals": GitHub PRs ALSO carry rich `activity`
+    # timestamps from their timeline events; Jira items don't. When
+    # status_intervals exist but no interval matches active_statuses AND
+    # activity is non-empty, we treat the item as GitHub-style and fall
+    # through to event-clustering. This prevents PR-lifecycle stages
+    # (Draft / Awaiting Review / Merged) from being silently scored 0%
+    # against Jira-default active_statuses like 'In Progress'.
+    has_matching_interval = (
+        active_statuses is not None
+        and any(iv.status in active_statuses for iv in pr.status_intervals)
+    )
+    use_status_duration_path = (
+        pr.status_intervals
+        and active_statuses
+        and (has_matching_interval or not pr.activity)
+    )
+    if use_status_duration_path:
         raw_active = sum(
             (
                 (interval.end - interval.start)

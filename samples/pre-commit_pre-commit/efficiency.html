@@ -140,9 +140,9 @@
 <p class="subtitle">
   for <a href="https://github.com/pre-commit/pre-commit">pre-commit/pre-commit</a> ·
   2026-05-10 → 2026-05-16 ·
-  <span class="stamp">generated 2026-05-17 08:23 MDT</span>
+  <span class="stamp">generated 2026-05-17 08:35 MDT</span>
 </p>
-<div class="headline">0.0% flow efficiency across 2 completed items (1 human, 1 bot) over 7 days, May 10, 2026 → May 16, 2026.</div>
+<div class="headline">6.1% flow efficiency across 2 completed items (1 human, 1 bot) over 7 days, May 10, 2026 → May 16, 2026.</div>
 
 
 <div class="definition"><strong>What this shows.</strong> Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as Σ active ÷ Σ cycle across every merged PR in the window — totals first, so one short PR cannot inflate the system-level number.</div>
@@ -164,13 +164,13 @@ them moves the portfolio number more than improving a typical PR.
   <div class="intervention">
     <span class="id"><a href="https://github.com/pre-commit/pre-commit/pull/3681">#3681</a></span>
     <span class="age">18.6h</span>
-    <span class="state"><span class="pill">FE 0.0%</span></span>
+    <span class="state"><span class="pill">FE 5.4%</span></span>
     <span class="title">[pre-commit.ci] pre-commit autoupdate</span>
   </div>
   <div class="intervention">
     <span class="id"><a href="https://github.com/pre-commit/pre-commit/pull/3683">#3683</a></span>
     <span class="age">0.1h</span>
-    <span class="state"><span class="pill">FE 0.0%</span></span>
+    <span class="state"><span class="pill">FE 100.0%</span></span>
     <span class="title">bash on windows-latest now reports cygwin</span>
   </div>
 </div>
@@ -180,7 +180,7 @@ them moves the portfolio number more than improving a typical PR.
 <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
 <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 <script>
-  vegaEmbed("#efficiency-chart", {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "width": "container", "height": 120, "background": "transparent", "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}}, "layer": [{"mark": {"type": "bar", "height": {"band": 0.8}}, "data": {"values": [{"item_id": "#3683", "title": "bash on windows-latest now reports cygwin", "cycle_hours": 0.15, "active_hours": 0.0, "efficiency_pct": 0.0, "is_bot": false, "band": "\u003c 10% (slow)", "url": "https://github.com/pre-commit/pre-commit/pull/3683"}, {"item_id": "#3681", "title": "[pre-commit.ci] pre-commit autoupdate", "cycle_hours": 18.62, "active_hours": 0.0, "efficiency_pct": 0.0, "is_bot": true, "band": "bot", "url": "https://github.com/pre-commit/pre-commit/pull/3681"}]}, "params": [{"name": "efficiency_zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}], "encoding": {"y": {"field": "item_id", "type": "nominal", "axis": {"title": null, "labelLimit": 80, "labelFontSize": 10}, "sort": {"field": "efficiency_pct", "order": "ascending"}}, "x": {"field": "efficiency_pct", "type": "quantitative", "axis": {"title": "Flow efficiency (%)", "titleFontWeight": "bold"}, "scale": {"domain": [0, 100]}}, "color": {"field": "band", "type": "nominal", "scale": {"domain": ["\u003c 10% (slow)", "10–50%", "≥ 50% (healthy)", "bot"], "range": ["#cc3333", "#d4a72c", "#2ca02c", "#bbbbbb"]}, "legend": {"title": "FE band", "orient": "right"}}, "tooltip": [{"field": "item_id", "title": "ID"}, {"field": "title", "title": "Title"}, {"field": "efficiency_pct", "title": "FE %"}, {"field": "cycle_hours", "title": "Cycle (h)"}, {"field": "active_hours", "title": "Active (h)"}], "href": {"field": "url", "type": "nominal"}}}, {"mark": {"type": "rule", "color": "#2b7cff", "size": 2, "strokeDash": [6, 4]}, "data": {"values": [{"portfolio_pct": 0.0, "label": "Portfolio FE: 0.0%"}]}, "encoding": {"x": {"field": "portfolio_pct", "type": "quantitative"}, "tooltip": [{"field": "label"}]}}]}, {
+  vegaEmbed("#efficiency-chart", {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "width": "container", "height": 120, "background": "transparent", "config": {"view": {"fill": "transparent", "stroke": "#e5e5e5", "strokeWidth": 1}}, "layer": [{"mark": {"type": "bar", "height": {"band": 0.8}}, "data": {"values": [{"item_id": "#3683", "title": "bash on windows-latest now reports cygwin", "cycle_hours": 0.15, "active_hours": 0.15, "efficiency_pct": 100.0, "is_bot": false, "band": "≥ 50% (healthy)", "url": "https://github.com/pre-commit/pre-commit/pull/3683"}, {"item_id": "#3681", "title": "[pre-commit.ci] pre-commit autoupdate", "cycle_hours": 18.62, "active_hours": 1.0, "efficiency_pct": 5.4, "is_bot": true, "band": "bot", "url": "https://github.com/pre-commit/pre-commit/pull/3681"}]}, "params": [{"name": "efficiency_zoom", "select": {"type": "interval", "encodings": ["x"]}, "bind": "scales"}], "encoding": {"y": {"field": "item_id", "type": "nominal", "axis": {"title": null, "labelLimit": 80, "labelFontSize": 10}, "sort": {"field": "efficiency_pct", "order": "ascending"}}, "x": {"field": "efficiency_pct", "type": "quantitative", "axis": {"title": "Flow efficiency (%)", "titleFontWeight": "bold"}, "scale": {"domain": [0, 100]}}, "color": {"field": "band", "type": "nominal", "scale": {"domain": ["\u003c 10% (slow)", "10–50%", "≥ 50% (healthy)", "bot"], "range": ["#cc3333", "#d4a72c", "#2ca02c", "#bbbbbb"]}, "legend": {"title": "FE band", "orient": "right"}}, "tooltip": [{"field": "item_id", "title": "ID"}, {"field": "title", "title": "Title"}, {"field": "efficiency_pct", "title": "FE %"}, {"field": "cycle_hours", "title": "Cycle (h)"}, {"field": "active_hours", "title": "Active (h)"}], "href": {"field": "url", "type": "nominal"}}}, {"mark": {"type": "rule", "color": "#2b7cff", "size": 2, "strokeDash": [6, 4]}, "data": {"values": [{"portfolio_pct": 6.1, "label": "Portfolio FE: 6.1%"}]}, "encoding": {"x": {"field": "portfolio_pct", "type": "quantitative"}, "tooltip": [{"field": "label"}]}}]}, {
     actions: {export: true, source: false, compiled: false, editor: false},
     renderer: "svg"
   }).catch(function(err) {
@@ -209,18 +209,18 @@ up the way they drag this bar's count up.
 <thead><tr><th>#</th><th>Cycle</th><th>Active</th><th>FE</th><th>Title</th></tr></thead>
 <tbody>
   <tr>
-    <td><a href="https://github.com/pre-commit/pre-commit/pull/3683">#3683</a></td>
-    <td class="num">0.1h</td>
-    <td class="num">0.0h</td>
-    <td class="num">0.0%</td>
-    <td>bash on windows-latest now reports cygwin</td>
-  </tr>
-  <tr>
     <td><a href="https://github.com/pre-commit/pre-commit/pull/3681">#3681</a></td>
     <td class="num">18.6h</td>
-    <td class="num">0.0h</td>
-    <td class="num">0.0%</td>
+    <td class="num">1.0h</td>
+    <td class="num">5.4%</td>
     <td>[pre-commit.ci] pre-commit autoupdate</td>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/pre-commit/pre-commit/pull/3683">#3683</a></td>
+    <td class="num">0.1h</td>
+    <td class="num">0.1h</td>
+    <td class="num">100.0%</td>
+    <td>bash on windows-latest now reports cygwin</td>
   </tr>
 </tbody>
 </table>
@@ -297,16 +297,15 @@ is a different question from "how efficient is our system overall".
 For decisions about where wait time is leaking, use the portfolio
 number in the headline; these two are listed for completeness.</p>
 <table>
-  <tr><th>Median per-PR FE</th><td class="num">0.0%</td></tr>
-  <tr><th>Mean per-PR FE</th><td class="num">0.0%</td></tr>
+  <tr><th>Median per-PR FE</th><td class="num">52.7%</td></tr>
+  <tr><th>Mean per-PR FE</th><td class="num">52.7%</td></tr>
 </table>
 
 <p><strong>Key insight.</strong> This is in the typical 5-15% range for knowledge work — most clock time is wait, not active. Slowest PR (#3681)  ran 0.8d and dominates the ratio.</p>
 
 <p><strong>Next actions</strong></p>
 <ol class="compact-prose">
-  <li>Configured --active-statuses (&#39;In Development&#39;, &#39;In Progress&#39;) don&#39;t appear in this workflow. Statuses actually observed: &#39;Awaiting Review&#39;, &#39;Merged&#39;. Pick whichever represent active development and pass them as `--active-statuses &#39;X,Y&#39;` — or accept that work happens outside the issue tracker.</li>
-  <li>Inspect the three slowest PRs (#3681, #3683) — they likely sat in review queue.</li>
+  <li>Inspect the three slowest PRs (#3681) — they likely sat in review queue.</li>
   <li>Compare to the previous 2-4 weeks to spot a trend.</li>
   <li>Look at where the wait time concentrates (pre-first-review, post-approval, blocked) rather than setting a target on the number itself.</li>
 </ol>

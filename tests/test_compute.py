@@ -378,3 +378,80 @@ class TestAggregate:
         # The two values must diverge — otherwise the test wouldn't pin
         # the right definition.
         assert result.portfolio_efficiency != pytest.approx(mean_of_ratios)
+
+
+class TestRegressionGithubPrLifecycleWithJiraActiveStatuses:
+    """Regression: when GitHub PRs gained derived status_intervals
+    (Draft → Awaiting Review → Merged) for the CFD, the efficiency
+    calc started using Vacanti's Jira-only status-duration path
+    for every PR — but the caller passes Jira-specific
+    active_statuses ('In Progress', 'In Development') which don't
+    match any of the PR lifecycle stages. Result: every PR scored
+    0.0% FE.
+
+    The fix is to fall through to event-clustering when no
+    interval's status matches active_statuses — the status-
+    duration path was always meant for Jira items where the
+    user's active_statuses ACTUALLY match the changelog statuses.
+    """
+
+    def test_pr_with_lifecycle_intervals_falls_through_when_no_status_matches(self):
+        # Real-world shape: PR lifecycle stages from timeline events,
+        # PLUS event-clustering activity timestamps that should drive
+        # the efficiency calculation.
+        created = ts(2026, 5, 5, 9, 0)
+        merged = ts(2026, 5, 6, 9, 0)  # 24 h cycle
+        pr = WorkItem(
+            item_id="#1",
+            title="real PR",
+            created_at=created,
+            completed_at=merged,
+            activity=[
+                ts(2026, 5, 5, 9, 0),    # creation event
+                ts(2026, 5, 5, 9, 30),   # 30 min later
+                ts(2026, 5, 5, 10, 0),   # 60 min later — same cluster
+                ts(2026, 5, 6, 9, 0),    # merge
+            ],
+            status_intervals=[
+                StatusInterval(created, ts(2026, 5, 5, 11), "Draft"),
+                StatusInterval(ts(2026, 5, 5, 11), merged, "Awaiting Review"),
+                StatusInterval(merged, merged, "Merged"),
+            ],
+        )
+        # active_statuses set as the CLI passes them — Jira terms that
+        # don't match any of the PR lifecycle stages.
+        result = compute_pr_flow(
+            pr, gap=GAP, min_cluster=MIN_CLUSTER,
+            active_statuses=frozenset({"In Progress", "In Development"}),
+        )
+        # Active time should reflect the EVENT CLUSTERS (~1h of active
+        # work bookended by creation and merge), NOT zero.
+        assert result.active_time > timedelta(0), (
+            f"PR with non-matching status_intervals should fall through to "
+            f"event-clustering, got active={result.active_time}"
+        )
+        assert result.efficiency > 0.0
+
+    def test_jira_with_matching_active_statuses_still_uses_status_duration(self):
+        """Negative regression — don't break the Jira path. If at least
+        one interval matches active_statuses, use status-duration."""
+        created = ts(2026, 5, 5, 9, 0)
+        resolved = ts(2026, 5, 6, 9, 0)
+        item = WorkItem(
+            item_id="BIGTOP-1",
+            title="jira item",
+            created_at=created,
+            completed_at=resolved,
+            activity=[],
+            status_intervals=[
+                StatusInterval(created, ts(2026, 5, 5, 13), "Open"),
+                StatusInterval(ts(2026, 5, 5, 13), ts(2026, 5, 5, 21), "In Progress"),
+                StatusInterval(ts(2026, 5, 5, 21), resolved, "Resolved"),
+            ],
+        )
+        result = compute_pr_flow(
+            item, gap=GAP, min_cluster=MIN_CLUSTER,
+            active_statuses=frozenset({"In Progress"}),
+        )
+        # Active time = the In Progress span (8 hours), not all of cycle.
+        assert result.active_time == timedelta(hours=8)

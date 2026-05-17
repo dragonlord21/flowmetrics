@@ -1,25 +1,25 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-17T08:23:36.875937-06:00",
+  "generated_at": "2026-05-17T08:35:46.111559-06:00",
   "headline": "0.0% flow efficiency across 6 completed items over 7 days, May 10, 2026 \u2192 May 16, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
     "pr_count": 6,
     "human_pr_count": 6,
     "bot_pr_count": 0,
-    "portfolio_efficiency": 2.5101899229347498e-06,
-    "median_efficiency": 0.0,
-    "mean_efficiency": 0.00044565791551026034,
+    "portfolio_efficiency": 0.000323195923668788,
+    "median_efficiency": 0.0023324201600519946,
+    "mean_efficiency": 0.1990574358244727,
     "total_cycle": {
       "seconds": 84521493.0,
       "hours": 23478.1925,
       "days": 978.2580208333334
     },
     "total_active": {
-      "seconds": 212.165,
-      "hours": 0.05893472222222222,
-      "days": 0.0024556134259259258
+      "seconds": 27317.002,
+      "hours": 7.588056111111111,
+      "days": 0.31616900462962966
     },
     "observed_statuses": [
       "In Progress",
@@ -54,11 +54,11 @@
     "per_pr_efficiency": [
       {
         "item_id": "CASSANDRA-21364",
-        "efficiency": 0.0
+        "efficiency": 1.0
       },
       {
         "item_id": "CASSANDRA-21367",
-        "efficiency": 0.0
+        "efficiency": 0.1896067172690447
       },
       {
         "item_id": "CASSANDRA-21366",
@@ -70,11 +70,11 @@
       },
       {
         "item_id": "CASSANDRA-21301",
-        "efficiency": 0.0
+        "efficiency": 0.001993963788530002
       },
       {
         "item_id": "CASSANDRA-19151",
-        "efficiency": 0.0
+        "efficiency": 6.9986396199832e-05
       }
     ]
   },
@@ -104,11 +104,11 @@
           "days": 0.1317361111111111
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 11382.0,
+          "hours": 3.1616666666666666,
+          "days": 0.1317361111111111
         },
-        "efficiency": 0.0,
+        "efficiency": 1.0,
         "is_bot": false,
         "author_login": "jmckenzie"
       },
@@ -123,11 +123,11 @@
           "days": 0.2942939814814815
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 4821.13,
+          "hours": 1.3392027777777777,
+          "days": 0.055800115740740744
         },
-        "efficiency": 0.0,
+        "efficiency": 0.1896067172690447,
         "is_bot": false,
         "author_login": "dnk"
       },
@@ -180,11 +180,11 @@
           "days": 31.934965277777778
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 5501.707,
+          "hours": 1.5282519444444445,
+          "days": 0.06367716435185186
         },
-        "efficiency": 0.0,
+        "efficiency": 0.001993963788530002,
         "is_bot": false,
         "author_login": "maoling"
       },
@@ -199,11 +199,11 @@
           "days": 893.0306944444444
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 5400.0,
+          "hours": 1.5,
+          "days": 0.0625
         },
-        "efficiency": 0.0,
+        "efficiency": 6.9986396199832e-05,
         "is_bot": false,
         "author_login": "ifesdjeen"
       }

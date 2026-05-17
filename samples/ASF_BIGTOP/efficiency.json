@@ -1,25 +1,25 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-17T08:23:42.061057-06:00",
-  "headline": "0.0% flow efficiency across 2 completed items over 7 days, May 10, 2026 \u2192 May 16, 2026.",
+  "generated_at": "2026-05-17T08:35:50.044113-06:00",
+  "headline": "0.1% flow efficiency across 2 completed items over 7 days, May 10, 2026 \u2192 May 16, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
     "pr_count": 2,
     "human_pr_count": 2,
     "bot_pr_count": 0,
-    "portfolio_efficiency": 0.0,
-    "median_efficiency": 0.0,
-    "mean_efficiency": 0.0,
+    "portfolio_efficiency": 0.0009998789035550138,
+    "median_efficiency": 0.0039066312780626925,
+    "mean_efficiency": 0.0039066312780626925,
     "total_cycle": {
       "seconds": 9001090.0,
       "hours": 2500.302777777778,
       "days": 104.17928240740741
     },
     "total_active": {
-      "seconds": 0.0,
-      "hours": 0.0,
-      "days": 0.0
+      "seconds": 9000.0,
+      "hours": 2.5,
+      "days": 0.10416666666666667
     },
     "observed_statuses": [
       "Open",
@@ -28,7 +28,6 @@
   },
   "key_insight": "This is in the typical 5-15% range for knowledge work \u2014 most clock time is wait, not active. Slowest PR (BIGTOP-4515)  ran 98.4d and dominates the ratio.",
   "next_actions": [
-    "Configured --active-statuses ('In Development', 'In Progress') don't appear in this workflow. Statuses actually observed: 'Open', 'Patch Available'. Pick whichever represent active development and pass them as `--active-statuses 'X,Y'` \u2014 or accept that work happens outside the issue tracker.",
     "Inspect the three slowest PRs (BIGTOP-4515, BIGTOP-4528) \u2014 they likely sat in review queue.",
     "Compare to the previous 2-4 weeks to spot a trend.",
     "Look at where the wait time concentrates (pre-first-review, post-approval, blocked) rather than setting a target on the number itself."
@@ -49,11 +48,11 @@
     "per_pr_efficiency": [
       {
         "item_id": "BIGTOP-4528",
-        "efficiency": 0.0
+        "efficiency": 0.007177935027724774
       },
       {
         "item_id": "BIGTOP-4515",
-        "efficiency": 0.0
+        "efficiency": 0.0006353275284006112
       }
     ]
   },
@@ -83,11 +82,11 @@
           "days": 5.8048263888888885
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 3600.0,
+          "hours": 1.0,
+          "days": 0.041666666666666664
         },
-        "efficiency": 0.0,
+        "efficiency": 0.007177935027724774,
         "is_bot": false,
         "author_login": "eub"
       },
@@ -102,11 +101,11 @@
           "days": 98.37445601851852
         },
         "active_time": {
-          "seconds": 0.0,
-          "hours": 0.0,
-          "days": 0.0
+          "seconds": 5400.0,
+          "hours": 1.5,
+          "days": 0.0625
         },
-        "efficiency": 0.0,
+        "efficiency": 0.0006353275284006112,
         "is_bot": false,
         "author_login": "iwasakims"
       }
