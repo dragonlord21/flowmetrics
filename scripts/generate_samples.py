@@ -67,11 +67,14 @@ class Repo:
 # applies to every public repo without configuration. See docs/DECISIONS.md #9.
 GITHUB_AGING_WORKFLOW = "Draft,Awaiting Review,Changes Requested,Approved"
 
-# Default GitHub PR CFD workflow — degenerate two-state since PRs don't expose
-# a multi-state workflow. The chart looks like arrivals on top, merges on
-# bottom; useful as a "what does CFD look like when there's only one band"
-# learning reference.
-GITHUB_CFD_WORKFLOW = "Open,Merged"
+# Default GitHub PR CFD workflow — the five-stage PR review lifecycle
+# (Draft → Awaiting Review → Changes Requested → Approved → Merged),
+# derived from each PR's timeline events by pr_lifecycle_intervals.
+# Issues, when included via --include-issues, flow through "Open" before
+# joining the PR lifecycle at the closing PR's merge time.
+GITHUB_CFD_WORKFLOW = (
+    "Draft,Awaiting Review,Changes Requested,Approved,Merged"
+)
 
 
 REPOS: list[Repo] = [

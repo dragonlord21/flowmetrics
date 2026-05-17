@@ -1,33 +1,36 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-17T06:40:54.726906-06:00",
+  "generated_at": "2026-05-17T07:57:16.991608-06:00",
   "headline": "0.0% flow efficiency across 5 completed items over 7 days, May 10, 2026 \u2192 May 16, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
     "pr_count": 5,
     "human_pr_count": 5,
     "bot_pr_count": 0,
-    "portfolio_efficiency": 1.217227300183304e-05,
+    "portfolio_efficiency": 0.0,
     "median_efficiency": 0.0,
-    "mean_efficiency": 0.2,
+    "mean_efficiency": 0.0,
     "total_cycle": {
       "seconds": 7640315.0,
       "hours": 2122.3097222222223,
       "days": 88.42957175925926
     },
     "total_active": {
-      "seconds": 93.0,
-      "hours": 0.025833333333333333,
-      "days": 0.0010763888888888889
+      "seconds": 0.0,
+      "hours": 0.0,
+      "days": 0.0
     },
     "observed_statuses": [
+      "Awaiting Review",
       "Done",
+      "Merged",
       "Open"
     ]
   },
   "key_insight": "This is in the typical 5-15% range for knowledge work \u2014 most clock time is wait, not active. Slowest PR (I#129)  ran 35.7d and dominates the ratio.",
   "next_actions": [
+    "Configured --active-statuses ('In Development', 'In Progress') don't appear in this workflow. Statuses actually observed: 'Awaiting Review', 'Done', 'Merged', 'Open'. Pick whichever represent active development and pass them as `--active-statuses 'X,Y'` \u2014 or accept that work happens outside the issue tracker.",
     "Inspect the three slowest PRs (I#129, I#130, I#146) \u2014 they likely sat in review queue.",
     "Compare to the previous 2-4 weeks to spot a trend.",
     "Look at where the wait time concentrates (pre-first-review, post-approval, blocked) rather than setting a target on the number itself."
@@ -48,7 +51,7 @@
     "per_pr_efficiency": [
       {
         "item_id": "#161",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "I#160",
@@ -74,7 +77,7 @@
     "stop": "2026-05-16",
     "gap_hours": 4.0,
     "min_cluster_minutes": 30.0,
-    "offline": false,
+    "offline": true,
     "active_statuses": [
       "In Development",
       "In Progress"
@@ -94,11 +97,11 @@
           "days": 0.0010763888888888889
         },
         "active_time": {
-          "seconds": 93.0,
-          "hours": 0.025833333333333333,
-          "days": 0.0010763888888888889
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "dvhthomas"
       },
@@ -185,6 +188,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow efficiency --repo CalcMark/go-calcmark --start 2026-05-10 --stop 2026-05-16 --gap-hours 4.0 --min-cluster-minutes 30.0",
+  "cli_invocation": "uv run flow efficiency --repo CalcMark/go-calcmark --start 2026-05-10 --stop 2026-05-16 --gap-hours 4.0 --min-cluster-minutes 30.0 --offline",
   "logs": []
 }

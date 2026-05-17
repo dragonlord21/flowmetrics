@@ -652,10 +652,12 @@ def efficiency_spec(report: EfficiencyReport) -> dict[str, Any]:
                 "field": "efficiency_pct",
                 "type": "quantitative",
                 "axis": {"title": "Flow efficiency (%)", "titleFontWeight": "bold"},
-                # No explicit scale - Vega-Lite auto-fits to data range.
-                # `domain: [0, 100]` (or domainMin/Max combo) locks the
-                # scale and makes bind:scales zoom a no-op
-                # (caught by test_zoom_browser.py).
+                # Lock the X scale at [0, 100] because efficiency's
+                # value-add IS comparing items against the full
+                # percentage range. Auto-fitting to the data range
+                # (e.g. 0–5%) loses the visual semantics. Trade-off:
+                # bind:scales zoom is a no-op on this chart, by design.
+                "scale": {"domain": [0, 100]},
             },
             "color": {
                 "field": "band",

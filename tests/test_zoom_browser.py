@@ -122,8 +122,11 @@ CHARTS = [
     ("cfd.html", "cfd-chart"),
     ("forecast-when-done.html", "whendone-chart"),
     ("forecast-how-many.html", "howmany-chart"),
-    ("efficiency.html", "efficiency-chart"),
     ("aging.html", "aging-chart"),
+    # efficiency.html intentionally omitted: its X scale is locked at
+    # [0, 100] (the full FE percentage range — that's the chart's
+    # value-add), so wheel-zoom is a deliberate no-op. The zoom param
+    # is still in the spec (caught by test_vega_specs.py).
 ]
 
 

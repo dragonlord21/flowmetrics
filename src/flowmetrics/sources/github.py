@@ -231,6 +231,103 @@ def _item_url(repo: str, number: int) -> str:
     return f"https://github.com/{repo}/pull/{number}"
 
 
+def pr_lifecycle_intervals(node: dict[str, Any]) -> list[StatusInterval]:
+    """Build a chronological list of `StatusInterval` covering a PR's
+    lifecycle: Draft / Awaiting Review / Changes Requested / Approved /
+    Merged. Derived from the timelineItems already returned by
+    PR_SEARCH_QUERY — no extra GraphQL needed.
+
+    Algorithm:
+      - Start at Awaiting Review on `createdAt`. (If the PR started as
+        a draft, a ReadyForReviewEvent will overwrite the entry stage
+        below.)
+      - ConvertToDraftEvent  → Draft
+      - ReadyForReviewEvent  → Awaiting Review
+      - PullRequestReview with state=CHANGES_REQUESTED → Changes Requested
+      - PullRequestReview with state=APPROVED          → Approved
+      - MergedEvent          → Merged (terminal)
+
+    `COMMENTED` review state isn't a workflow transition; it's a
+    side-chat. Skipped.
+
+    For in-flight PRs (no `mergedAt`), the last interval is left
+    half-open (end set to the most recent transition timestamp); CFD
+    consumers project to the current sample date.
+    """
+    created_at = _parse_dt(node["createdAt"])
+    merged_at = _parse_dt(node["mergedAt"]) if node.get("mergedAt") else None
+    timeline = (node.get("timelineItems") or {}).get("nodes") or []
+
+    # Collect (timestamp, stage_name) transitions.
+    transitions: list[tuple[datetime, str]] = []
+    for ti in timeline:
+        typ = ti.get("__typename")
+        ts_str = ti.get("createdAt") or ti.get("submittedAt")
+        if not ts_str:
+            continue
+        ts = _parse_dt(ts_str)
+        if typ == "ConvertToDraftEvent":
+            transitions.append((ts, "Draft"))
+        elif typ == "ReadyForReviewEvent":
+            transitions.append((ts, "Awaiting Review"))
+        elif typ == "PullRequestReview":
+            state = ti.get("state")
+            if state == "CHANGES_REQUESTED":
+                transitions.append((ts, "Changes Requested"))
+            elif state == "APPROVED":
+                transitions.append((ts, "Approved"))
+            # COMMENTED, DISMISSED, PENDING: not a workflow stage change.
+        elif typ == "MergedEvent" and merged_at is not None:
+            transitions.append((merged_at, "Merged"))
+
+    transitions.sort(key=lambda x: x[0])
+
+    # Initial stage: A PR was created AS a draft iff the FIRST
+    # draft-related event in its timeline is ReadyForReviewEvent
+    # (meaning: it was drafted, then made ready). If the first
+    # draft-related event is ConvertToDraftEvent, the PR was created
+    # as non-draft and only later converted.
+    first_draft_event = next(
+        (stage for _, stage in transitions if stage in ("Draft", "Awaiting Review")),
+        None,
+    )
+    initial_stage = "Draft" if first_draft_event == "Awaiting Review" else "Awaiting Review"
+
+    intervals: list[StatusInterval] = []
+    cur_start = created_at
+    cur_stage = initial_stage
+    for ts, stage in transitions:
+        if ts <= cur_start:
+            # Out-of-order or identical timestamp — overwrite without
+            # producing a zero-length interval.
+            cur_stage = stage
+            continue
+        intervals.append(StatusInterval(cur_start, ts, cur_stage))
+        cur_start = ts
+        cur_stage = stage
+
+    # Close the final segment. For merged PRs, the last transition is
+    # MergedEvent itself — record a zero-length terminal interval so the
+    # "Merged" stage shows up. For in-flight, leave open (consumer
+    # decides end).
+    if merged_at is not None:
+        # Terminal Merged interval — zero-length but present so consumers
+        # see the stage.
+        if cur_stage == "Merged":
+            intervals.append(StatusInterval(cur_start, cur_start, "Merged"))
+        else:
+            # Trailing stage from before merge — close it at merged_at,
+            # then add a zero-length Merged.
+            intervals.append(StatusInterval(cur_start, merged_at, cur_stage))
+            intervals.append(StatusInterval(merged_at, merged_at, "Merged"))
+    else:
+        # In-flight: close the last interval at its own start (consumer
+        # extends via asof).
+        intervals.append(StatusInterval(cur_start, cur_start, cur_stage))
+
+    return intervals
+
+
 def _pr_node_to_events(repo: str, node: dict[str, Any]) -> WorkItem | None:
     if not node.get("mergedAt"):
         return None
@@ -244,6 +341,7 @@ def _pr_node_to_events(repo: str, node: dict[str, Any]) -> WorkItem | None:
         is_bot=_is_bot(author),
         author_login=(author or {}).get("login"),
         url=_item_url(repo, node["number"]),
+        status_intervals=pr_lifecycle_intervals(node),
     )
 
 

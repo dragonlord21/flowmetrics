@@ -1,30 +1,35 @@
 {
   "schema": "flowmetrics.efficiency.v1",
   "command": "efficiency",
-  "generated_at": "2026-05-17T06:40:44.603383-06:00",
-  "headline": "0.8% flow efficiency across 49 completed items (39 human, 10 bot) over 7 days, May 10, 2026 \u2192 May 16, 2026.",
+  "generated_at": "2026-05-17T07:57:06.340444-06:00",
+  "headline": "0.0% flow efficiency across 49 completed items (39 human, 10 bot) over 7 days, May 10, 2026 \u2192 May 16, 2026.",
   "definition": "Portfolio flow efficiency: the share of cycle time that was actively worked on, versus waiting in review or other queues. Computed as \u03a3 active \u00f7 \u03a3 cycle across every merged PR in the window \u2014 totals first, so one short PR cannot inflate the system-level number.",
   "summary": {
     "pr_count": 49,
     "human_pr_count": 39,
     "bot_pr_count": 10,
-    "portfolio_efficiency": 0.008419560442572391,
-    "median_efficiency": 1.0,
-    "mean_efficiency": 0.6708644389335278,
+    "portfolio_efficiency": 0.0,
+    "median_efficiency": 0.0,
+    "mean_efficiency": 0.0,
     "total_cycle": {
       "seconds": 40643927.0,
       "hours": 11289.979722222222,
       "days": 470.41582175925925
     },
     "total_active": {
-      "seconds": 342204.0,
-      "hours": 95.05666666666667,
-      "days": 3.9606944444444445
+      "seconds": 0.0,
+      "hours": 0.0,
+      "days": 0.0
     },
-    "observed_statuses": []
+    "observed_statuses": [
+      "Awaiting Review",
+      "Draft",
+      "Merged"
+    ]
   },
   "key_insight": "This is in the typical 5-15% range for knowledge work \u2014 most clock time is wait, not active. Slowest PR (#12156)  ran 427.0d and dominates the ratio.",
   "next_actions": [
+    "Configured --active-statuses ('In Development', 'In Progress') don't appear in this workflow. Statuses actually observed: 'Awaiting Review', 'Draft', 'Merged'. Pick whichever represent active development and pass them as `--active-statuses 'X,Y'` \u2014 or accept that work happens outside the issue tracker.",
     "Inspect the three slowest PRs (#12156, #19206, #19305) \u2014 they likely sat in review queue.",
     "Compare to the previous 2-4 weeks to spot a trend.",
     "Look at where the wait time concentrates (pre-first-review, post-approval, blocked) rather than setting a target on the number itself."
@@ -45,199 +50,199 @@
     "per_pr_efficiency": [
       {
         "item_id": "#19425",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19422",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19421",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19418",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19417",
-        "efficiency": 0.36435877582623577
+        "efficiency": 0.0
       },
       {
         "item_id": "#19414",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19413",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19409",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19407",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19406",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19405",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19402",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19398",
-        "efficiency": 0.3510716585410726
+        "efficiency": 0.0
       },
       {
         "item_id": "#19394",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19392",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19387",
-        "efficiency": 0.18234156881699032
+        "efficiency": 0.0
       },
       {
         "item_id": "#19386",
-        "efficiency": 0.07218045112781955
+        "efficiency": 0.0
       },
       {
         "item_id": "#19384",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19383",
-        "efficiency": 0.15844838087503807
+        "efficiency": 0.0
       },
       {
         "item_id": "#19382",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19381",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19378",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19377",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19370",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19366",
-        "efficiency": 0.06302252385167699
+        "efficiency": 0.0
       },
       {
         "item_id": "#19365",
-        "efficiency": 0.2105591123350453
+        "efficiency": 0.0
       },
       {
         "item_id": "#19364",
-        "efficiency": 0.14853001332060708
+        "efficiency": 0.0
       },
       {
         "item_id": "#19361",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19358",
-        "efficiency": 0.05901479732894894
+        "efficiency": 0.0
       },
       {
         "item_id": "#19354",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19353",
-        "efficiency": 0.07253677211364094
+        "efficiency": 0.0
       },
       {
         "item_id": "#19352",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19351",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19350",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19349",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19348",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19346",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19345",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19343",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19342",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19341",
-        "efficiency": 1.0
+        "efficiency": 0.0
       },
       {
         "item_id": "#19340",
-        "efficiency": 0.05994405221792993
+        "efficiency": 0.0
       },
       {
         "item_id": "#19332",
-        "efficiency": 0.02999857488955394
+        "efficiency": 0.0
       },
       {
         "item_id": "#19328",
-        "efficiency": 0.020967523549778527
+        "efficiency": 0.0
       },
       {
         "item_id": "#19312",
-        "efficiency": 0.017621030373435317
+        "efficiency": 0.0
       },
       {
         "item_id": "#19311",
-        "efficiency": 0.023174971031286212
+        "efficiency": 0.0
       },
       {
         "item_id": "#19305",
-        "efficiency": 0.02631302761677967
+        "efficiency": 0.0
       },
       {
         "item_id": "#19206",
-        "efficiency": 0.010853537694315385
+        "efficiency": 0.0
       },
       {
         "item_id": "#12156",
-        "efficiency": 0.0014207362327043104
+        "efficiency": 0.0
       }
     ]
   },
@@ -247,7 +252,7 @@
     "stop": "2026-05-16",
     "gap_hours": 4.0,
     "min_cluster_minutes": 30.0,
-    "offline": false,
+    "offline": true,
     "active_statuses": [
       "In Development",
       "In Progress"
@@ -267,11 +272,11 @@
           "days": 0.12752314814814814
         },
         "active_time": {
-          "seconds": 11018.0,
-          "hours": 3.0605555555555557,
-          "days": 0.12752314814814814
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "Dev-X25874"
       },
@@ -286,11 +291,11 @@
           "days": 0.09017361111111111
         },
         "active_time": {
-          "seconds": 7791.0,
-          "hours": 2.1641666666666666,
-          "days": 0.09017361111111111
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -305,11 +310,11 @@
           "days": 0.03328703703703704
         },
         "active_time": {
-          "seconds": 2876.0,
-          "hours": 0.7988888888888889,
-          "days": 0.03328703703703704
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -324,11 +329,11 @@
           "days": 0.15336805555555555
         },
         "active_time": {
-          "seconds": 13251.0,
-          "hours": 3.680833333333333,
-          "days": 0.15336805555555555
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "EliteTK"
       },
@@ -343,11 +348,11 @@
           "days": 0.28401620370370373
         },
         "active_time": {
-          "seconds": 8941.0,
-          "hours": 2.483611111111111,
-          "days": 0.1034837962962963
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.36435877582623577,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -362,11 +367,11 @@
           "days": 0.03159722222222222
         },
         "active_time": {
-          "seconds": 2730.0,
-          "hours": 0.7583333333333333,
-          "days": 0.03159722222222222
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "EliteTK"
       },
@@ -381,11 +386,11 @@
           "days": 0.06335648148148149
         },
         "active_time": {
-          "seconds": 5474.0,
-          "hours": 1.5205555555555557,
-          "days": 0.06335648148148149
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "EliteTK"
       },
@@ -400,11 +405,11 @@
           "days": 0.04721064814814815
         },
         "active_time": {
-          "seconds": 4079.0,
-          "hours": 1.1330555555555555,
-          "days": 0.04721064814814815
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -419,11 +424,11 @@
           "days": 0.013842592592592592
         },
         "active_time": {
-          "seconds": 1196.0,
-          "hours": 0.3322222222222222,
-          "days": 0.013842592592592592
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -438,11 +443,11 @@
           "days": 0.006238425925925926
         },
         "active_time": {
-          "seconds": 539.0,
-          "hours": 0.14972222222222223,
-          "days": 0.006238425925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "ntBre"
       },
@@ -457,11 +462,11 @@
           "days": 0.01050925925925926
         },
         "active_time": {
-          "seconds": 908.0,
-          "hours": 0.25222222222222224,
-          "days": 0.01050925925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -476,11 +481,11 @@
           "days": 0.09797453703703704
         },
         "active_time": {
-          "seconds": 8465.0,
-          "hours": 2.3513888888888888,
-          "days": 0.09797453703703704
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "EliteTK"
       },
@@ -495,11 +500,11 @@
           "days": 0.2516435185185185
         },
         "active_time": {
-          "seconds": 7633.0,
-          "hours": 2.120277777777778,
-          "days": 0.08834490740740741
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.3510716585410726,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -514,11 +519,11 @@
           "days": 0.10662037037037037
         },
         "active_time": {
-          "seconds": 9212.0,
-          "hours": 2.5588888888888888,
-          "days": 0.10662037037037037
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "vip892766gma"
       },
@@ -533,11 +538,11 @@
           "days": 0.01894675925925926
         },
         "active_time": {
-          "seconds": 1637.0,
-          "hours": 0.45472222222222225,
-          "days": 0.01894675925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "zsol"
       },
@@ -552,11 +557,11 @@
           "days": 0.8141898148148148
         },
         "active_time": {
-          "seconds": 12827.0,
-          "hours": 3.5630555555555556,
-          "days": 0.14846064814814816
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.18234156881699032,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -571,11 +576,11 @@
           "days": 0.5772569444444444
         },
         "active_time": {
-          "seconds": 3600.0,
-          "hours": 1.0,
-          "days": 0.041666666666666664
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.07218045112781955,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -590,11 +595,11 @@
           "days": 0.01355324074074074
         },
         "active_time": {
-          "seconds": 1171.0,
-          "hours": 0.3252777777777778,
-          "days": 0.01355324074074074
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -609,11 +614,11 @@
           "days": 0.9121296296296296
         },
         "active_time": {
-          "seconds": 12487.0,
-          "hours": 3.468611111111111,
-          "days": 0.14452546296296295
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.15844838087503807,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -628,11 +633,11 @@
           "days": 0.020833333333333332
         },
         "active_time": {
-          "seconds": 1800.0,
-          "hours": 0.5,
-          "days": 0.020833333333333332
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -647,11 +652,11 @@
           "days": 0.007488425925925926
         },
         "active_time": {
-          "seconds": 647.0,
-          "hours": 0.17972222222222223,
-          "days": 0.007488425925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -666,11 +671,11 @@
           "days": 0.011342592592592593
         },
         "active_time": {
-          "seconds": 980.0,
-          "hours": 0.2722222222222222,
-          "days": 0.011342592592592593
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -685,11 +690,11 @@
           "days": 0.07076388888888889
         },
         "active_time": {
-          "seconds": 6114.0,
-          "hours": 1.6983333333333333,
-          "days": 0.07076388888888889
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "github-actions"
       },
@@ -704,11 +709,11 @@
           "days": 0.01275462962962963
         },
         "active_time": {
-          "seconds": 1102.0,
-          "hours": 0.3061111111111111,
-          "days": 0.01275462962962963
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "woodruffw"
       },
@@ -723,11 +728,11 @@
           "days": 0.9413888888888889
         },
         "active_time": {
-          "seconds": 5126.0,
-          "hours": 1.423888888888889,
-          "days": 0.0593287037037037
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.06302252385167699,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -742,11 +747,11 @@
           "days": 1.1515856481481481
         },
         "active_time": {
-          "seconds": 20950.0,
-          "hours": 5.819444444444445,
-          "days": 0.24247685185185186
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.2105591123350453,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -761,11 +766,11 @@
           "days": 1.1034837962962962
         },
         "active_time": {
-          "seconds": 14161.0,
-          "hours": 3.933611111111111,
-          "days": 0.16390046296296296
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.14853001332060708,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -780,11 +785,11 @@
           "days": 0.04394675925925926
         },
         "active_time": {
-          "seconds": 3797.0,
-          "hours": 1.0547222222222221,
-          "days": 0.04394675925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "zanieb"
       },
@@ -799,11 +804,11 @@
           "days": 1.2600810185185185
         },
         "active_time": {
-          "seconds": 6425.0,
-          "hours": 1.7847222222222223,
-          "days": 0.07436342592592593
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.05901479732894894,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "zsol"
       },
@@ -818,11 +823,11 @@
           "days": 0.008263888888888888
         },
         "active_time": {
-          "seconds": 714.0,
-          "hours": 0.19833333333333333,
-          "days": 0.008263888888888888
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -837,11 +842,11 @@
           "days": 0.5744212962962963
         },
         "active_time": {
-          "seconds": 3600.0,
-          "hours": 1.0,
-          "days": 0.041666666666666664
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.07253677211364094,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -856,11 +861,11 @@
           "days": 0.014988425925925926
         },
         "active_time": {
-          "seconds": 1295.0,
-          "hours": 0.3597222222222222,
-          "days": 0.014988425925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -875,11 +880,11 @@
           "days": 0.1085300925925926
         },
         "active_time": {
-          "seconds": 9377.0,
-          "hours": 2.604722222222222,
-          "days": 0.1085300925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -894,11 +899,11 @@
           "days": 0.10048611111111111
         },
         "active_time": {
-          "seconds": 8682.0,
-          "hours": 2.4116666666666666,
-          "days": 0.10048611111111111
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -913,11 +918,11 @@
           "days": 0.008020833333333333
         },
         "active_time": {
-          "seconds": 693.0,
-          "hours": 0.1925,
-          "days": 0.008020833333333333
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -932,11 +937,11 @@
           "days": 0.09988425925925926
         },
         "active_time": {
-          "seconds": 8630.0,
-          "hours": 2.397222222222222,
-          "days": 0.09988425925925926
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -951,11 +956,11 @@
           "days": 0.0069560185185185185
         },
         "active_time": {
-          "seconds": 601.0,
-          "hours": 0.16694444444444445,
-          "days": 0.0069560185185185185
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "renovate"
       },
@@ -970,11 +975,11 @@
           "days": 0.02375
         },
         "active_time": {
-          "seconds": 2052.0,
-          "hours": 0.57,
-          "days": 0.02375
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "jjhelmus"
       },
@@ -989,11 +994,11 @@
           "days": 0.17282407407407407
         },
         "active_time": {
-          "seconds": 14932.0,
-          "hours": 4.147777777777778,
-          "days": 0.17282407407407407
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -1008,11 +1013,11 @@
           "days": 0.02693287037037037
         },
         "active_time": {
-          "seconds": 2327.0,
-          "hours": 0.6463888888888889,
-          "days": 0.02693287037037037
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": true,
         "author_login": "github-actions"
       },
@@ -1027,11 +1032,11 @@
           "days": 0.02125
         },
         "active_time": {
-          "seconds": 1836.0,
-          "hours": 0.51,
-          "days": 0.02125
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 1.0,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -1046,11 +1051,11 @@
           "days": 1.042638888888889
         },
         "active_time": {
-          "seconds": 5400.0,
-          "hours": 1.5,
-          "days": 0.0625
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.05994405221792993,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -1065,11 +1070,11 @@
           "days": 1.461875
         },
         "active_time": {
-          "seconds": 3789.0,
-          "hours": 1.0525,
-          "days": 0.043854166666666666
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.02999857488955394,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "nooscraft"
       },
@@ -1084,11 +1089,11 @@
           "days": 2.393472222222222
         },
         "active_time": {
-          "seconds": 4336.0,
-          "hours": 1.2044444444444444,
-          "days": 0.05018518518518519
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.020967523549778527,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "woodruffw"
       },
@@ -1103,11 +1108,11 @@
           "days": 3.546898148148148
         },
         "active_time": {
-          "seconds": 5400.0,
-          "hours": 1.5,
-          "days": 0.0625
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.017621030373435317,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "charliermarsh"
       },
@@ -1122,11 +1127,11 @@
           "days": 4.494791666666667
         },
         "active_time": {
-          "seconds": 9000.0,
-          "hours": 2.5,
-          "days": 0.10416666666666667
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.023174971031286212,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "woodruffw"
       },
@@ -1141,11 +1146,11 @@
           "days": 7.829965277777778
         },
         "active_time": {
-          "seconds": 17801.0,
-          "hours": 4.9447222222222225,
-          "days": 0.20603009259259258
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.02631302761677967,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "woodruffw"
       },
@@ -1160,11 +1165,11 @@
           "days": 13.210405092592593
         },
         "active_time": {
-          "seconds": 12388.0,
-          "hours": 3.4411111111111112,
-          "days": 0.14337962962962963
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.010853537694315385,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "zsol"
       },
@@ -1179,11 +1184,11 @@
           "days": 426.9923611111111
         },
         "active_time": {
-          "seconds": 52414.0,
-          "hours": 14.559444444444445,
-          "days": 0.6066435185185185
+          "seconds": 0.0,
+          "hours": 0.0,
+          "days": 0.0
         },
-        "efficiency": 0.0014207362327043104,
+        "efficiency": 0.0,
         "is_bot": false,
         "author_login": "Choudhry18"
       }
@@ -1194,6 +1199,6 @@
     "forecast": "docs/FORECAST.md",
     "decisions": "docs/DECISIONS.md"
   },
-  "cli_invocation": "uv run flow efficiency --repo astral-sh/uv --start 2026-05-10 --stop 2026-05-16 --gap-hours 4.0 --min-cluster-minutes 30.0",
+  "cli_invocation": "uv run flow efficiency --repo astral-sh/uv --start 2026-05-10 --stop 2026-05-16 --gap-hours 4.0 --min-cluster-minutes 30.0 --offline",
   "logs": []
 }
