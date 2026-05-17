@@ -202,10 +202,11 @@ def test_every_chart_actually_renders_svg(
         for cid in container_ids:
             page.wait_for_selector(f"#{cid} svg", timeout=15000)
         page.wait_for_timeout(1500)
-        # No "vegaEmbed is not defined" or spec-compile errors.
-        relevant = [e for e in page_errors if "vegaEmbed" in e or "Cannot" in e]
-        assert not relevant, (
-            f"{filename}: chart script errored — {relevant}"
+        # ANY pageerror is a render failure — the previous narrower
+        # filter ("vegaEmbed" or "Cannot") missed "Cycle detected in
+        # dataflow graph" from a misused expression. Catch them all.
+        assert not page_errors, (
+            f"{filename}: chart script errored — {page_errors}"
         )
         # Each container's SVG must have real content (axes + marks).
         for cid in container_ids:

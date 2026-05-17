@@ -347,6 +347,14 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
     # not in the headline statistics — but they shouldn't vanish either.
     layers: list[dict[str, Any]] = [circle_layer, rule_layer, text_layer]
     if overflow_count > 0:
+        # Anchor the callout at the actual latest completion date in
+        # the data (right edge of visible plot). Earlier attempts used
+        # an `expr: domain('x')[1]` reference inside the x encoding,
+        # which produced "Cycle detected in dataflow graph" because
+        # the x scale's domain depended on the same encoding that
+        # referenced it. Embedding a literal from Python avoids the
+        # cycle entirely.
+        anchor_x = max(p.completed_at for p in report.points).isoformat()
         overflow_layer = {
             "mark": {
                 "type": "text",
@@ -355,10 +363,10 @@ def scatterplot_spec(report: ScatterplotReport) -> dict[str, Any]:
                 "fontSize": 11, "fontStyle": "italic",
                 "color": "#666",
             },
-            "data": {"values": [{"_": 1}]},
+            "data": {"values": [{"x": anchor_x, "y": y_cap}]},
             "encoding": {
-                "x": {"datum": {"expr": "domain('x')[1]"}, "type": "temporal"},
-                "y": {"datum": y_cap, "type": "quantitative"},
+                "x": {"field": "x", "type": "temporal"},
+                "y": {"field": "y", "type": "quantitative"},
                 "text": {
                     "value": f"{overflow_count} items above the cap "
                              f"(>{y_cap:.0f}d) — see slowest table",
