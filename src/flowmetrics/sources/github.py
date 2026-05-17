@@ -224,7 +224,7 @@ def _is_bot(author: dict[str, Any] | None) -> bool:
     return login.endswith("[bot]")
 
 
-def _pr_url(repo: str, number: int) -> str:
+def _item_url(repo: str, number: int) -> str:
     """Canonical GitHub PR URL. Set on every WorkItem the source
     emits so downstream code can navigate to the issue without
     pattern-matching the item_id."""
@@ -243,7 +243,7 @@ def _pr_node_to_events(repo: str, node: dict[str, Any]) -> WorkItem | None:
         activity=extract_activity(node),
         is_bot=_is_bot(author),
         author_login=(author or {}).get("login"),
-        url=_pr_url(repo, node["number"]),
+        url=_item_url(repo, node["number"]),
     )
 
 
@@ -350,7 +350,7 @@ def fetch_open_prs(
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
                     status_intervals=[StatusInterval(created, end, phase)],
-                    url=_pr_url(repo, node["number"]),
+                    url=_item_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -431,7 +431,7 @@ def fetch_prs_for_cycle_times(
                     activity=[],
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
-                    url=_pr_url(repo, node["number"]),
+                    url=_item_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -527,7 +527,7 @@ def fetch_open_prs_with_label_snapshot(
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
                     status_intervals=[StatusInterval(created, end, status)],
-                    url=_pr_url(repo, node["number"]),
+                    url=_item_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
@@ -673,7 +673,7 @@ def fetch_open_prs_with_labels(
                     is_bot=_is_bot(author),
                     author_login=(author or {}).get("login"),
                     status_intervals=status_intervals,
-                    url=_pr_url(repo, node["number"]),
+                    url=_item_url(repo, node["number"]),
                 )
             )
         page_info = search["pageInfo"]
