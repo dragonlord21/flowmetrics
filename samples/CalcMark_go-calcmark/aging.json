@@ -1,8 +1,8 @@
 {
   "schema": "flowmetrics.aging.v1",
   "command": "aging",
-  "generated_at": "2026-05-16T23:16:16.563478-06:00",
-  "headline": "WIP Aging for CalcMark/go-calcmark as of May 17, 2026: 2 in-flight items, 2 already past P85 (0.9d), 2 past P95 (1.0d).",
+  "generated_at": "2026-05-17T06:40:56.789755-06:00",
+  "headline": "WIP Aging for CalcMark/go-calcmark as of May 17, 2026: 2 in-flight items, 2 already past P85 (14.8d), 2 past P95 (34.8d).",
   "definition": "Each dot is one in-flight item, placed in the column of its current workflow state at a height equal to its Age (days since entering the workflow). Percentile lines come from the cycle times of recently completed items \u2014 read horizontally as risk thresholds: an item aging past P85 likely misses its forecast.",
   "summary": {
     "in_flight_count": 2,
@@ -14,44 +14,44 @@
       "Awaiting Review": 1
     },
     "cycle_time_percentiles_days": {
-      "50": 0.0010763888888888889,
-      "70": 0.023541666666666666,
-      "85": 0.8535648148148148,
-      "95": 1.0318287037037037
+      "50": 0.023541666666666666,
+      "70": 1.1613888888888888,
+      "85": 14.847905092592592,
+      "95": 34.79913194444445
     },
-    "completed_count_for_percentiles": 18,
+    "completed_count_for_percentiles": 26,
     "aging_distribution": [
       {
         "label": "Below P50",
         "lower": null,
-        "upper": 0.0010763888888888889,
-        "count": 0,
-        "share": 0.0
-      },
-      {
-        "label": "P50\u2013P70",
-        "lower": 0.0010763888888888889,
         "upper": 0.023541666666666666,
         "count": 0,
         "share": 0.0
       },
       {
-        "label": "P70\u2013P85",
+        "label": "P50\u2013P70",
         "lower": 0.023541666666666666,
-        "upper": 0.8535648148148148,
+        "upper": 1.1613888888888888,
+        "count": 0,
+        "share": 0.0
+      },
+      {
+        "label": "P70\u2013P85",
+        "lower": 1.1613888888888888,
+        "upper": 14.847905092592592,
         "count": 0,
         "share": 0.0
       },
       {
         "label": "P85\u2013P95",
-        "lower": 0.8535648148148148,
-        "upper": 1.0318287037037037,
+        "lower": 14.847905092592592,
+        "upper": 34.79913194444445,
         "count": 0,
         "share": 0.0
       },
       {
         "label": "Above P95",
-        "lower": 1.0318287037037037,
+        "lower": 34.79913194444445,
         "upper": null,
         "count": 2,
         "share": 1.0
@@ -112,15 +112,15 @@
       }
     ]
   },
-  "key_insight": "2 item(s) have aged past the P85 cycle time (0.9d) \u2014 items in this band have a high chance of missing the 85% forecast. Oldest: #115, #120. Concentrate decision-making here.",
+  "key_insight": "2 item(s) have aged past the P85 cycle time (14.8d) \u2014 items in this band have a high chance of missing the 85% forecast. Oldest: #115, #120. Concentrate decision-making here.",
   "next_actions": [
-    "2 item(s) past P95 (1.0d): decide explicitly to expedite, split, or drop. They are now outliers in your own historical distribution.",
+    "2 item(s) past P95 (34.8d): decide explicitly to expedite, split, or drop. They are now outliers in your own historical distribution.",
     "Biggest WIP column is 'Draft' with 1 item(s). Investigate this stage \u2014 either work is arriving faster than it can leave, or items are waiting on a downstream resource (reviewers, environments, decisions).",
     "Re-check daily; Aging is a leading indicator of forecast slip."
   ],
   "caveats": [
     "Aging is a snapshot as of May 17, 2026 \u2014 not a trend over time.",
-    "Percentile lines reflect the completed-item distribution from Apr 17, 2026 \u2192 May 16, 2026 (18 items). If recent throughput has changed, those checkpoints may have drifted.",
+    "Percentile lines reflect the completed-item distribution from Apr 17, 2026 \u2192 May 16, 2026 (26 items). If recent throughput has changed, those checkpoints may have drifted.",
     "Items in early workflow states (Open, To Do) often age longest in open-source repos because they're sitting in an intake queue, not being actively worked. An aged item in 'Open' usually means no maintainer has picked it up; an aged item in 'In Progress' or 'In Review' is more likely a real bottleneck.",
     "100% of in-flight items are past P95 of recent completers \u2014 much higher than the ~5% you'd expect if today's WIP looked like recent history. The P85/P95 thresholds are derived only from items that have already finished, so long-running items still in flight aren't in that sample. The thresholds therefore diverge from \u2014 and likely under-represent \u2014 true cycle time for this WIP."
   ],

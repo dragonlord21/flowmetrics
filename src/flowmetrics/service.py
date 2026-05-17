@@ -75,10 +75,12 @@ class _GitHubSourceAdapter:
         read_only: bool = False,
         *,
         wip_labels: WipLabels | None = None,
+        include_issues: bool = False,
     ):
         self._repo = repo
         self._client = GitHubClient(cache, read_only=read_only)
         self._wip_labels = wip_labels
+        self._include_issues = include_issues
 
     @property
     def label(self) -> str:
@@ -86,7 +88,13 @@ class _GitHubSourceAdapter:
 
     def fetch_completed_in_window(self, start: date, stop: date):
         try:
-            return fetch_prs_merged_in_window(self._client, self._repo, start, stop)
+            items = fetch_prs_merged_in_window(self._client, self._repo, start, stop)
+            if self._include_issues:
+                from .sources.github_issues import fetch_issues_closed_as_workitems
+                items = items + fetch_issues_closed_as_workitems(
+                    self._repo, start, stop, client=self._client
+                )
+            return items
         finally:
             self._client.close()
 
@@ -94,7 +102,16 @@ class _GitHubSourceAdapter:
         """Lightweight fetch for Aging's percentile lines — no timeline
         events. Saves ~95% of payload on high-volume repos."""
         try:
-            return fetch_prs_for_cycle_times(self._client, self._repo, start, stop)
+            items = fetch_prs_for_cycle_times(self._client, self._repo, start, stop)
+            if self._include_issues:
+                # For percentile training we want cycle times only —
+                # the Issue fetcher returns the same WorkItem shape so
+                # the consumer doesn't notice it's a mixed population.
+                from .sources.github_issues import fetch_issues_closed_as_workitems
+                items = items + fetch_issues_closed_as_workitems(
+                    self._repo, start, stop, client=self._client
+                )
+            return items
         finally:
             self._client.close()
 
@@ -129,9 +146,14 @@ def make_github_source(
     cache_dir: Path | str = DEFAULT_CACHE_DIR,
     read_only: bool = False,
     wip_labels: WipLabels | None = None,
+    include_issues: bool = False,
 ) -> Source:
     return _GitHubSourceAdapter(
-        repo, FileCache(cache_dir), read_only=read_only, wip_labels=wip_labels
+        repo,
+        FileCache(cache_dir),
+        read_only=read_only,
+        wip_labels=wip_labels,
+        include_issues=include_issues,
     )
 
 

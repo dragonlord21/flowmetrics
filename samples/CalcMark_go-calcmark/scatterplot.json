@@ -1,7 +1,7 @@
 {
   "schema": "flowmetrics.scatterplot.v1",
   "command": "scatterplot",
-  "generated_at": "2026-05-16T23:16:15.778583-06:00",
+  "generated_at": "2026-05-17T06:40:56.027861-06:00",
   "headline": "26 items completed in 30 days; 85% finished within 14.8 days (Apr 17, 2026 -> May 16, 2026).",
   "definition": "Each dot is one completed item: x = completion date, y = cycle time (days from creation to completion). Horizontal percentile lines mark probability thresholds \u2014 a new item entering the system has an 85% chance of finishing in P85 days or less, by definition of the percentile.",
   "summary": {
@@ -162,56 +162,56 @@
         "url": "https://github.com/CalcMark/go-calcmark/pull/138"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:160",
+        "item_id": "I#160",
         "title": "compound: rate diagnostic does not hint at the % typo",
         "completed_at": "2026-05-14",
         "cycle_time_days": 3.1165162037037035,
         "url": "https://github.com/CalcMark/go-calcmark/issues/160"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:146",
+        "item_id": "I#146",
         "title": "feat: Period conversion expressions (in/as)",
         "completed_at": "2026-05-14",
         "cycle_time_days": 14.847905092592592,
         "url": "https://github.com/CalcMark/go-calcmark/issues/146"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:144",
+        "item_id": "I#144",
         "title": "Period arithmetic semantics \u2014 define Period \u2212 Period, Period + Duration, equality",
         "completed_at": "2026-04-30",
         "cycle_time_days": 1.1613888888888888,
         "url": "https://github.com/CalcMark/go-calcmark/issues/144"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:143",
+        "item_id": "I#143",
         "title": "Period vs Duration in function arguments \u2014 should `over Q1` reject or coerce?",
         "completed_at": "2026-04-30",
         "cycle_time_days": 1.161736111111111,
         "url": "https://github.com/CalcMark/go-calcmark/issues/143"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:140",
+        "item_id": "I#140",
         "title": "Period literals (Q/FQ/FY/CY) + first-class `end of`/`start of` operators",
         "completed_at": "2026-04-30",
         "cycle_time_days": 1.2606828703703703,
         "url": "https://github.com/CalcMark/go-calcmark/issues/140"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:130",
+        "item_id": "I#130",
         "title": "fix: convert_rate completion snippet uses wrong parameter examples",
         "completed_at": "2026-05-14",
         "cycle_time_days": 34.79913194444445,
         "url": "https://github.com/CalcMark/go-calcmark/issues/130"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:129",
+        "item_id": "I#129",
         "title": "Footnote references don't resolve across text/calculation block boundaries",
         "completed_at": "2026-05-14",
         "cycle_time_days": 35.66494212962963,
         "url": "https://github.com/CalcMark/go-calcmark/issues/129"
       },
       {
-        "item_id": "github:CalcMark/go-calcmark:issue:126",
+        "item_id": "I#126",
         "title": "feat: DateSpan type \u2014 period membership, as fiscal/calendar conversion",
         "completed_at": "2026-04-30",
         "cycle_time_days": 23.14412037037037,

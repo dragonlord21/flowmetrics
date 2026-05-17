@@ -24,6 +24,7 @@ from typing import Any
 
 from .. import signals
 from ..canonical import StageTransition, WorkflowDef
+from ..compute import StatusInterval, WorkItem
 from ..stream import Stream, StreamItem
 
 ISSUE_SEARCH_QUERY = """
@@ -194,6 +195,66 @@ def parse_search_result(
         response.get("data", {}).get("search", {}).get("nodes") or []
     )
     return [parse_issue_node(n, repo=repo) for n in nodes if n.get("number")]
+
+
+def issue_to_workitem(
+    item: StreamItem, txs: list[StageTransition], *, number: int,
+) -> WorkItem:
+    """Convert a parsed Issue (canonical types) into the WorkItem
+    shape the existing pipeline (compute / aging / report) consumes.
+
+    `item_id` is rendered as `I#<number>` to disambiguate from PRs
+    (which use `#<number>`). The URL field carries the real GitHub
+    issue link for renderers.
+
+    `status_intervals` are built from consecutive transitions:
+    each transition starts a new interval, the previous one closes
+    at the new transition's `entered_at`. The terminal interval
+    closes at `item.completed_at` (or stays open).
+    """
+    intervals: list[StatusInterval] = []
+    for i, t in enumerate(txs):
+        if i + 1 < len(txs):
+            end = txs[i + 1].entered_at
+        elif item.completed_at is not None:
+            end = item.completed_at
+        else:
+            # No further transition and not completed - skip terminal
+            # interval; renderers will use `status_intervals[-1].status`
+            # via the last interval we DO add.
+            continue
+        intervals.append(StatusInterval(t.entered_at, end, t.stage))
+
+    return WorkItem(
+        item_id=f"I#{number}",
+        title=item.title,
+        created_at=item.created_at,
+        completed_at=item.completed_at,
+        activity=[t.entered_at for t in txs],
+        is_bot=False,
+        author_login=None,
+        status_intervals=intervals,
+        url=item.url,
+    )
+
+
+def fetch_issues_closed_as_workitems(
+    repo: str, start: date, stop: date, *, client,
+) -> list[WorkItem]:
+    """Return Issues closed in [start, stop] as WorkItems so they
+    drop into the existing pipeline (compute / scatterplot /
+    forecast / efficiency) without per-command wiring.
+
+    Each Issue's `completed_at` uses the stitched PR-merge time
+    when an Issue was closed by a PR (the causal 'done' instant),
+    so cycle-time math reflects the full Issue→PR lifecycle.
+    """
+    entries = fetch_issues_closed_in_window(repo, start, stop, client=client)
+    out: list[WorkItem] = []
+    for item, txs in entries:
+        number_str = item.item_id.rsplit(":", 1)[1]
+        out.append(issue_to_workitem(item, txs, number=int(number_str)))
+    return out
 
 
 def fetch_issues_closed_in_window(

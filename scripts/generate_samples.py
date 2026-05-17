@@ -55,12 +55,12 @@ class Repo:
     cache_subdir: str = "github"
     cfd_workflow: str | None = None
     aging_workflow: str | None = None
-    # When True, the scatterplot run gets `--include-issues` so closed
-    # Issues are plotted alongside merged PRs. For Issues closed by a
-    # PR-merge, the cycle time uses the PR's mergedAt (stitched 'done'
-    # instant), exposing the Issue-discussion phase that PR-only views
-    # invisibly truncate. GitHub-only.
-    stitch_issues_in_scatterplot: bool = False
+    # When True, all GitHub commands that support it get `--include-issues`
+    # (scatterplot, cfd, forecast when-done/how-many, efficiency, aging).
+    # Issues are folded into the pipeline as WorkItems; for Issues closed
+    # by a PR-merge, cycle time uses the PR's mergedAt (the causal 'done').
+    # GitHub-only.
+    stitch_issues: bool = False
 
 
 # Default GitHub PR aging workflow — driven by `isDraft` + `reviewDecision`,
@@ -111,10 +111,10 @@ REPOS: list[Repo] = [
         aging_workflow=GITHUB_AGING_WORKFLOW,
         # The Issue+PR stitched demo. This repo's workflow uses an Issue
         # for the work request and a PR for the implementation; with
-        # --include-issues the scatterplot surfaces both populations and
-        # uses the PR-merge timestamp for stitched cycle times (so the
-        # discussion phase is included, not silently truncated).
-        stitch_issues_in_scatterplot=True,
+        # --include-issues every chart command surfaces both populations
+        # and uses the PR-merge timestamp for stitched cycle times (so
+        # the discussion phase is included, not silently truncated).
+        stitch_issues=True,
     ),
     Repo(
         slug="ASF/CASSANDRA",
@@ -451,12 +451,16 @@ def _produce_one_repo(
     common_cache = ["--cache-dir", str(cache_dir)]
     if offline:
         common_cache.append("--offline")
+    # GitHub-only; Issues are a GitHub concept. The CLI rejects
+    # --include-issues with Jira sources, so guard at script level.
+    stitch_args = ["--include-issues"] if repo.stitch_issues else []
 
     common_efficiency = [
         "efficiency",
         *source_args,
         "--start", week_start, "--stop", week_stop,
         *common_cache,
+        *stitch_args,
     ]
     history_start = (
         datetime.strptime(history_end, "%Y-%m-%d").replace(tzinfo=UTC).date() - timedelta(days=29)
@@ -469,6 +473,7 @@ def _produce_one_repo(
         "--start-date", today,
         "--runs", "10000", "--seed", "42",
         *common_cache,
+        *stitch_args,
     ]
     common_how_many = [
         "forecast", "how-many",
@@ -478,6 +483,7 @@ def _produce_one_repo(
         "--start-date", today,
         "--runs", "10000", "--seed", "42",
         *common_cache,
+        *stitch_args,
     ]
 
     common_scatterplot = [
@@ -485,9 +491,8 @@ def _produce_one_repo(
         *source_args,
         "--start", history_start, "--stop", history_end,
         *common_cache,
+        *stitch_args,
     ]
-    if repo.stitch_issues_in_scatterplot:
-        common_scatterplot.append("--include-issues")
     commands: list[tuple[list[str], str]] = [
         (common_efficiency, "efficiency"),
         (common_when_done, "forecast-when-done"),
@@ -506,6 +511,7 @@ def _produce_one_repo(
                     "--start", history_start, "--stop", history_end,
                     "--workflow", repo.cfd_workflow,
                     *common_cache,
+                    *stitch_args,
                 ],
                 "cfd",
             )
@@ -521,6 +527,7 @@ def _produce_one_repo(
                     "--history-start", history_start,
                     "--history-end", history_end,
                     *common_cache,
+                    *stitch_args,
                 ],
                 "aging",
             )

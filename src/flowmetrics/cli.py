@@ -136,6 +136,7 @@ def _build_source(
     cache_dir: Path,
     offline: bool,
     wip_labels: WipLabels | None = None,
+    include_issues: bool = False,
 ) -> Source:
     """Pick the source backend from whichever flag set the user provided.
 
@@ -156,9 +157,17 @@ def _build_source(
             "--wip-labels is GitHub-only. Jira workflows come from issue changelogs; "
             "use --workflow instead."
         )
+    if include_issues and not have_github:
+        raise click.UsageError(
+            "--include-issues is GitHub-only (Issues are a GitHub concept)."
+        )
     if have_github:
         return make_github_source(
-            repo, cache_dir=cache_dir, read_only=offline, wip_labels=wip_labels
+            repo,
+            cache_dir=cache_dir,
+            read_only=offline,
+            wip_labels=wip_labels,
+            include_issues=include_issues,
         )
     if have_jira:
         if not (jira_url and jira_project):
@@ -286,6 +295,12 @@ def cli() -> None:
     help="Jira only: comma-separated workflow statuses counted as active. "
     "Ignored for GitHub (which infers activity from event timestamps).",
 )
+@click.option(
+    "--include-issues/--no-include-issues",
+    default=False,
+    help="GitHub-only. Also include Issues closed in the window. For "
+    "Issues closed by a PR-merge, cycle time uses the PR's mergedAt.",
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -300,6 +315,7 @@ def efficiency(
     gap_hours: float,
     min_cluster_minutes: float,
     active_statuses: str,
+    include_issues: bool,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -319,6 +335,7 @@ def efficiency(
         repo=repo,
         jira_url=jira_url, jira_project=jira_project,
         cache_dir=cache_dir, offline=offline,
+        include_issues=include_issues,
     )
 
     active_set = frozenset(
@@ -375,6 +392,13 @@ def efficiency(
     "--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR, show_default=True
 )
 @click.option("--offline/--online", default=False)
+@click.option(
+    "--include-issues/--no-include-issues",
+    default=False,
+    help="GitHub-only. Include Issues (closed in window + in-flight) "
+    "alongside PRs. Issue stages come from labels; the closing PR's "
+    "merge moves an Issue to Done.",
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -388,6 +412,7 @@ def cfd(
     interval_days: int,
     cache_dir: Path,
     offline: bool,
+    include_issues: bool,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -412,6 +437,7 @@ def cfd(
         jira_project=jira_project,
         cache_dir=cache_dir,
         offline=offline,
+        include_issues=include_issues,
     )
 
     def build() -> CfdReport:
@@ -521,12 +547,8 @@ def scatterplot(
         jira_project=jira_project,
         cache_dir=cache_dir,
         offline=offline,
+        include_issues=include_issues,
     )
-
-    if include_issues and not repo:
-        raise click.UsageError(
-            "--include-issues is GitHub-only (Issues are a GitHub concept)."
-        )
 
     def build() -> ScatterplotReport:
         from .percentiles import chart_percentiles
@@ -548,38 +570,6 @@ def scatterplot(
                 url=it.url,
             ))
             cycle_days.append(cycle)
-
-        if include_issues:
-            # Layer in Issues closed in window. Cycle time uses the
-            # stitched PR-merge timestamp when an Issue was closed by
-            # a PR (the causal "done" instant), per github_issues parser.
-            from .cache import FileCache
-            from .sources.github import GitHubClient, resolve_token
-            from .sources.github_issues import fetch_issues_closed_in_window
-            client = GitHubClient(
-                cache=FileCache(cache_dir),
-                read_only=offline,
-                token=resolve_token() if not offline else None,
-            )
-            try:
-                entries = fetch_issues_closed_in_window(repo, start_d, stop_d, client=client)
-            finally:
-                client.close()
-            for stream_item, _txs in entries:
-                if stream_item.completed_at is None:
-                    continue
-                cycle = (
-                    (stream_item.completed_at - stream_item.created_at).total_seconds()
-                    / 86400
-                )
-                points.append(ScatterplotPoint(
-                    item_id=stream_item.item_id,
-                    title=stream_item.title,
-                    completed_at=stream_item.completed_at.date(),
-                    cycle_time_days=cycle,
-                    url=stream_item.url,
-                ))
-                cycle_days.append(cycle)
 
         percentiles = chart_percentiles(cycle_days) if cycle_days else {
             50: 0.0, 70: 0.0, 85: 0.0, 95: 0.0
@@ -666,6 +656,13 @@ def scatterplot(
     "--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR, show_default=True
 )
 @click.option("--offline/--online", default=False)
+@click.option(
+    "--include-issues/--no-include-issues",
+    default=False,
+    help="GitHub-only. Include open Issues alongside open PRs. Issue "
+    "stages come from labels; an Issue closed by a PR-merge is treated "
+    "as Done at the PR's mergedAt for percentile-line training.",
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -681,6 +678,7 @@ def aging(
     history_end: str | None,
     cache_dir: Path,
     offline: bool,
+    include_issues: bool,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -730,6 +728,7 @@ def aging(
         cache_dir=cache_dir,
         offline=offline,
         wip_labels=wip,
+        include_issues=include_issues,
     )
 
     def build() -> AgingReport:
@@ -864,6 +863,12 @@ def _resolve_history(
 )
 @click.option("--start-date", type=str, default=None)
 @_apply_history_options
+@click.option(
+    "--include-issues/--no-include-issues",
+    default=False,
+    help="GitHub-only. Include Issues closed in the training window "
+    "(with stitched PR-merge cycle times where applicable).",
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -880,6 +885,7 @@ def forecast_when_done(
     offline: bool,
     runs: int,
     seed: int | None,
+    include_issues: bool,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -894,6 +900,7 @@ def forecast_when_done(
         repo=repo,
         jira_url=jira_url, jira_project=jira_project,
         cache_dir=cache_dir, offline=offline,
+        include_issues=include_issues,
     )
 
     def build() -> WhenDoneReport:
@@ -935,6 +942,12 @@ def forecast_when_done(
 @click.option("--target-date", type=str, required=True)
 @click.option("--start-date", type=str, default=None)
 @_apply_history_options
+@click.option(
+    "--include-issues/--no-include-issues",
+    default=False,
+    help="GitHub-only. Include Issues closed in the training window "
+    "(with stitched PR-merge cycle times where applicable).",
+)
 @_FORMAT_OPTION
 @_OUTPUT_OPTION
 @_VERBOSE_OPTION
@@ -951,6 +964,7 @@ def forecast_how_many(
     offline: bool,
     runs: int,
     seed: int | None,
+    include_issues: bool,
     fmt: str,
     output: Path | None,
     verbose: bool,
@@ -965,6 +979,7 @@ def forecast_how_many(
         repo=repo,
         jira_url=jira_url, jira_project=jira_project,
         cache_dir=cache_dir, offline=offline,
+        include_issues=include_issues,
     )
 
     def build() -> HowManyReport:
