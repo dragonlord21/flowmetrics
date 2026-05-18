@@ -26,6 +26,68 @@ This tool measures flow efficiency at the **pull request level**. It does not
 measure feature-level or issue-level flow. See the limitations section for
 what that means in practice.
 
+## 1.5 Measurement vs inference: the Vacanti contract
+
+Vacanti's framing assumes the team has *designed the workflow to expose
+wait time*. His original Kanban formulation pairs each WIP column with a
+Done sub-column:
+
+```
+Backlog │ Design ─ Doing │ Done │ Build ─ Doing │ Done │ Test ─ Doing │ Done │ Released
+```
+
+A card moves into `Design - Done` the moment design work finishes. It sits
+there — observably — until Build pulls it. The time spent in `Design - Done`
+*is* the wait time. No inference required. The bottleneck is whichever Done
+column is consistently widest. (Reinertsen calls this "making queues visible";
+Vacanti operationalises it as a chart you can read at standup.)
+
+This design contract is hard-coded into Vacanti's own product. ActionableAgile
+requires the user to designate Jira statuses as either active or **Queueing
+Stages**, and refuses to compute flow efficiency without that designation —
+its docs are explicit: *"You must have either Blocked Days or Queueing Stages
+checked in order to calculate flow efficiency — without this, there is no
+idle/waiting time designated so the chart cannot calculate a flow efficiency."*
+The algorithm itself is sub-trivial — sum status durations per category. The
+intelligence sits entirely in the workflow design and the team's discipline
+in keeping it accurate.
+
+That's why FE works on Apache Cassandra's Jira (`Patch Available` /
+`Review In Progress` / `Needs Committer` are explicit queue states) but
+collapses on a typical GitHub repository (PRs have only `open` / `closed` /
+`draft` natively — no observable queues between phases).
+
+The industry has converged on three responses to this gap for GitHub-only
+data:
+
+- **Don't report FE.** [LinearB] and [gh-velocity] report **phase durations**
+  instead — pickup time (PR open → first non-author review), review time
+  (first review → merge), deploy time — and let the reader read active-vs-
+  wait from the breakdown. Phase durations are observed, not inferred.
+- **Require labels.** Tools like [gh-velocity] treat label-applied timestamps
+  as stage transitions and let teams scope by `repo:X label:team-Y`. This
+  converts a GitHub repo into Jira-shape: labels become the doing/done
+  signal, and the same status-duration algorithm applies.
+- **Infer from event timing.** This tool's `efficiency` command, when no
+  WIP labels are configured, falls back to **event clustering** (section 4
+  below). This is the outlier approach. It produces a number when nothing
+  else would, at the cost of artifacts like false 100% FE on small same-day
+  PRs whose events all fall inside one `--gap-hours` window. It is a
+  fallback, not the recommended path.
+
+**The recommended path** when the team's GitHub workflow has labels
+(`team-X/in-review`, `s-waiting-on-review`, or Vacanti-style `phase:doing`
+/ `phase:done` pairs) is to pass them via `--wip-labels`. The efficiency
+command then routes through the same status-duration path Jira uses, and
+FE becomes a measurement rather than an inference. When the team has
+neither labels nor a Jira workflow, treat per-PR FE numbers as a screening
+signal — useful for "which PRs are worth investigating," not for "how
+efficient is this individual PR." The portfolio number is the headline;
+per-PR bars are diagnostic.
+
+[LinearB]: https://linearb.helpdocs.io/article/0vif1ihmgc-how-is-cycle-time-calculated
+[gh-velocity]: https://gh-velocity.org/concepts/terminology/
+
 ## 2. The formula, end to end
 
 For one pull request:
@@ -288,6 +350,30 @@ duration, no more.
 This means a sneaky "ping?" comment can inflate active time. In aggregate
 across many PRs this averages out; for any single PR, treat the per-PR FE
 as a directional indicator, not a precise measurement.
+
+### 6.3.1 Single-event PRs score 100% — and that's the inference's price
+
+A PR whose first and last events fall within one `gap-hours` window
+collapses to a single cluster whose span ≈ cycle time, producing FE ≈
+100%. Typo fixes, version bumps, single-commit auto-merged PRs all
+exhibit this. Mathematically the number is correct (there was no
+observable wait), but it's also uninformative: the PR was too small to
+have a queue.
+
+This is not a bug; it's the fundamental cost of inferring active time
+from event timing. Vacanti's status-duration model would also score
+these PRs as 100% active if every status transition happened within
+seconds. The difference is that under Vacanti's contract the user
+*chose* to track that workflow at this granularity. Under event
+clustering we get the same answer for repos that never opted into the
+contract.
+
+The portfolio-FE weighting (section 5.1) is what makes this tractable in
+aggregate: a 30-minute typo PR contributes 30 minutes of cycle time at
+100% efficiency, while a 14-day stuck PR contributes 14 days of cycle
+time at near-zero — and the second dominates. Per-PR FE bars at 100%
+are a visual artifact of the floor + clustering, not a claim about team
+performance.
 
 ### 6.4 Author and reviewer activity are not distinguished
 

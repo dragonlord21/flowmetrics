@@ -127,6 +127,33 @@ class TestInterpretEfficiency:
         i = interpret_efficiency(_eff_input(), _window_result(prs))
         assert any("#1" in a for a in i.next_actions)
 
+    def test_stitched_issues_use_item_not_pr_in_narrative(self):
+        """When item_ids carry the `I#` Issue prefix (Issue+PR stitched
+        repos like CalcMark), the narrative should say 'item' rather
+        than 'PR'. The portfolio still measures the same thing, but
+        calling I#129 a 'PR' is wrong and confuses readers."""
+        # Build a slow long-runner with an Issue id to trigger the
+        # 'slowest' callout in key_insight + next_actions.
+        issue = FlowEfficiency(
+            item_id="I#129",
+            title="Footnote references don't resolve across text/calculation block boundaries",
+            created_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC),
+            completed_at=datetime(2026, 6, 9, 9, 0, tzinfo=UTC),
+            cycle_time=timedelta(hours=400),
+            active_time=timedelta(hours=4),
+            efficiency=0.01,
+        )
+        prs = [issue, _pr(2, cycle_hours=1.0, eff=1.0), _pr(3, cycle_hours=1.0, eff=1.0)]
+        i = interpret_efficiency(_eff_input(), _window_result(prs))
+        # The slowest-callout in key_insight should NOT call I#129 a PR.
+        text = (i.key_insight + " " + " ".join(i.next_actions)).lower()
+        # When stitched issues are present, prefer 'item' framing.
+        assert "slowest pr (i#" not in text, (
+            f"narrative called an issue a PR; got key_insight={i.key_insight!r}"
+        )
+        # The slowest item should still be named.
+        assert "i#129" in text
+
     def test_caveats_always_present(self):
         prs = [_pr(1, cycle_hours=10, eff=0.3)]
         i = interpret_efficiency(_eff_input(), _window_result(prs))

@@ -160,7 +160,11 @@ def _render_efficiency(report: EfficiencyReport, console: Console) -> None:
         return
 
     # ── Slowest-first breakdown — the actionable data ───────────
-    pr_table = Table(title=f"Per-PR breakdown — portfolio FE {r.portfolio_efficiency * 100:.1f}%")
+    has_issue_items = any(p.item_id.startswith("I#") for p in r.per_pr)
+    item_noun = "item" if has_issue_items else "PR"
+    pr_table = Table(
+        title=f"Per-{item_noun} breakdown — portfolio FE {r.portfolio_efficiency * 100:.1f}%"
+    )
     pr_table.add_column("#")
     pr_table.add_column("Cycle", justify="right")
     pr_table.add_column("Active", justify="right")
@@ -180,10 +184,11 @@ def _render_efficiency(report: EfficiencyReport, console: Console) -> None:
     _detail_divider(console)
 
     # ── Compact context ─────────────────────────────────────────
+    merged_label = "Items completed" if has_issue_items else "PRs merged"
     rows = [
         ("Repo", report.input.repo),
         ("Window", f"{report.input.start} → {report.input.stop}"),
-        ("PRs merged", str(r.pr_count)),
+        (merged_label, str(r.pr_count)),
         ("Total cycle time", _fmt_duration(r.total_cycle)),
         ("Total active time", _fmt_duration(r.total_active)),
     ]

@@ -79,11 +79,17 @@ def interpret_efficiency(input: EfficiencyInput, result: WindowResult) -> Interp
     )
 
     slowest = max(result.per_pr, key=lambda p: p.cycle_time)
+    # Issue+PR stitched repos carry Issue ids like "I#129"; calling an
+    # Issue a "PR" in narrative is misleading. When ANY item is an
+    # Issue, fall back to the generic 'item' framing.
+    has_issue_items = any(p.item_id.startswith("I#") for p in result.per_pr)
+    noun = "item" if has_issue_items else "PR"
+    noun_plural = "items" if has_issue_items else "PRs"
 
     if portfolio < 0.10:
         key_insight = (
             f"This is in the typical 5-15% range for knowledge work — most clock time "
-            f"is wait, not active. Slowest PR ({slowest.item_id})  ran "
+            f"is wait, not active. Slowest {noun} ({slowest.item_id})  ran "
             f"{slowest.cycle_time.total_seconds() / 86400:.1f}d and dominates the ratio."
         )
     elif portfolio < 0.25:
@@ -108,8 +114,13 @@ def interpret_efficiency(input: EfficiencyInput, result: WindowResult) -> Interp
     )[:3]
     if long_runners:
         ids = ", ".join(f"{p.item_id}" for p in long_runners)
+        queue_phrase = (
+            "they likely sat in triage or review queue"
+            if has_issue_items
+            else "they likely sat in review queue"
+        )
         next_actions.append(
-            f"Inspect the three slowest PRs ({ids}) — they likely sat in review queue."
+            f"Inspect the three slowest {noun_plural} ({ids}) — {queue_phrase}."
         )
     next_actions.append("Compare to the previous 2-4 weeks to spot a trend.")
     next_actions.append(
@@ -579,15 +590,20 @@ def interpret_scatterplot(
     p85 = percentiles.get(85, 0.0)
     p95 = percentiles.get(95, 0.0)
     # When P85 is >5x the median, the deep tail is dominating the
-    # percentile — usually a sign of backlog cleanup (year-old tickets
-    # finally resolved) mixed in with normal recent work. Surface BOTH
-    # numbers in the headline so the reader doesn't take the P85 at face
-    # value as 'normal team flow.'
+    # percentile. Surface BOTH numbers so the reader doesn't take the
+    # P85 at face value as 'normal team flow.' Only call the tail a
+    # "backlog cleanup" when P85 is absolutely large (≥90d) — for short
+    # P85 the spread is just a long tail, not year-old tickets.
     if p50 > 0 and p85 > 5 * p50:
+        tail_phrase = (
+            "deep tail of backlog cleanups skews P85"
+            if p85 >= 90.0
+            else "long tail skews P85"
+        )
         headline = (
             f"{len(points)} items completed in {window_days} {day_word}; "
             f"median {p50:.1f}d, P85 {p85:.1f}d "
-            f"(wide spread — deep tail of backlog cleanups skews P85)."
+            f"(wide spread — {tail_phrase})."
         )
     else:
         headline = (

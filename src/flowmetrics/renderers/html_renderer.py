@@ -127,6 +127,11 @@ def _render_efficiency(report: EfficiencyReport) -> str:
         report.result.per_pr, key=lambda p: p.cycle_time, reverse=True
     )
     repo_url = _repo_url(report.input.repo)
+    # Issue+PR stitched repos carry Issue ids like "I#129"; calling
+    # those PRs in narrative is wrong. Switch to the generic 'item'
+    # framing whenever any Issue id is present.
+    has_issue_items = any(p.item_id.startswith("I#") for p in report.result.per_pr)
+    item_noun_plural = "items" if has_issue_items else "PRs"
     return template.render(
         title=report_title(report),
         repo_url=repo_url,
@@ -138,6 +143,7 @@ def _render_efficiency(report: EfficiencyReport) -> str:
         report=report,
         per_pr_sorted=sorted(report.result.per_pr, key=lambda p: p.efficiency),
         per_pr_by_cycle=per_pr_by_cycle,
+        item_noun_plural=item_noun_plural,
         vega_spec_json=(
             _safe_json_for_script_tag(vega_specs.efficiency_spec(report))
             if report.result.pr_count else ""

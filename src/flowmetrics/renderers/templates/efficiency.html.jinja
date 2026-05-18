@@ -36,11 +36,11 @@
   it's estimated</a> below before treating the number as precise.
 </p>
 
-{# Top slowest PRs — the system bottleneck. #}
-<h2>Top slowest PRs</h2>
+{# Top slowest items — the system bottleneck. #}
+<h2>Top slowest {{ item_noun_plural }}</h2>
 <p class="footnote-wider">
-These PRs drove the portfolio's cycle-time tail. Improving any one of
-them moves the portfolio number more than improving a typical PR.
+These {{ item_noun_plural }} drove the portfolio's cycle-time tail. Improving any one of
+them moves the portfolio number more than improving a typical {{ item_noun_plural[:-1] }}.
 </p>
 <div>
 {% for p in per_pr_by_cycle[:5] %}
@@ -88,7 +88,7 @@ up the way they drag this bar's count up.
 {% block detail %}
 {% if report.result.pr_count > 0 %}
 <details>
-<summary>Show all {{ per_pr_sorted|length }} PRs (slowest first)</summary>
+<summary>Show all {{ per_pr_sorted|length }} {{ item_noun_plural }} (slowest first)</summary>
 <table>
 <thead><tr><th>#</th><th>Cycle</th><th>Active</th><th>FE</th><th>Title</th></tr></thead>
 <tbody>
@@ -114,6 +114,25 @@ up the way they drag this bar's count up.
 
 <details id="how-active-time-is-estimated" open>
 <summary>How active time is estimated</summary>
+
+<p><strong>When this number is trustworthy.</strong> The canonical way
+to measure flow efficiency assumes the team has designed its workflow
+to expose wait time — typically with paired <em>Doing</em>/<em>Done</em>
+sub-columns per stage (Design&nbsp;Doing → Design&nbsp;Done →
+Build&nbsp;Doing → Build&nbsp;Done), where time in a <em>Done</em>
+column is observed wait time, not inferred. Tools that compute FE on
+Jira (ActionableAgile, Nave) sum durations in user-designated queue
+statuses and refuse to report a number without that designation.
+LinearB and gh-velocity report phase durations on GitHub instead, and
+do not compute FE at all. This tool falls back to <strong>inferring</strong>
+active time from event timing when no WIP labels are configured — a
+useful screening signal, but per-PR numbers near 100% on small same-day
+PRs are an artifact of inference, not a measurement. See
+<a href="https://github.com/dvhthomas/flowmetrics/blob/main/docs/METRICS.md#15-measurement-vs-inference-the-vacanti-contract">METRICS.md §1.5</a>
+for the full reasoning, and pass <code>--wip-labels</code> with your
+team's stage labels to route through the measured (status-duration)
+path.</p>
+
 <p>GitHub does not record when a PR is being worked on versus waiting
 in review. We infer it from the timing of each PR's events
 (commits, reviews, comments, push events). A concrete walk-through:</p>

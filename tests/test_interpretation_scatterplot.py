@@ -66,6 +66,25 @@ class TestScatterplotHeadline:
         text = result.headline.lower()
         assert "wide spread" in text or "deep tail" in text or "backlog" in text
 
+    def test_wide_spread_short_p85_avoids_backlog_phrasing(self):
+        """huggingface-style: P50=1.8d, P85=13.3d — ratio 7.4x triggers
+        wide-spread reframe, but P85 is only 2 weeks. Calling that a
+        'backlog cleanup' is misleading; the phrasing should acknowledge
+        the spread without claiming the tail is year-old tickets."""
+        points = _points([1.0] * 50 + [10.0] * 20 + [13.0, 15.0, 18.0])
+        percentiles = {50: 1.8, 70: 5.8, 85: 13.3, 95: 18.0}
+        result = interpret_scatterplot(_input(), points, percentiles)
+        # Both numbers still surfaced.
+        assert "1.8" in result.headline
+        assert "13.3" in result.headline
+        # But no "backlog cleanup" — P85 is only ~2 weeks, not year-old work.
+        assert "backlog cleanup" not in result.headline.lower(), (
+            f"P85=13.3d is not a backlog cleanup; got {result.headline!r}"
+        )
+        # Still a wide-spread acknowledgement.
+        text = result.headline.lower()
+        assert "wide spread" in text or "long tail" in text
+
     def test_zero_median_does_not_trigger_reframe(self):
         """Edge case: P50 = 0 (every item finished same-day) — don't
         divide by zero in the ratio check."""
