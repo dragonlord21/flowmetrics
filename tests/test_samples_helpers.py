@@ -54,29 +54,40 @@ class TestRepoConfig:
 
 
 def _sample_set(
-    slug: str, *, with_cfd: bool = False, with_aging: bool = False
+    slug: str,
+    *,
+    with_cfd: bool = False,
+    with_aging: bool = False,
+    with_efficiency: bool = True,
+    with_when_done: bool = True,
+    with_how_many: bool = True,
+    with_scatterplot: bool = True,
 ) -> SampleSet:
     d = slug.replace("/", "_")
+
+    def _p(name: str, ext: str, present: bool) -> Path | None:
+        return Path(f"samples/{d}/{name}.{ext}") if present else None
+
     return SampleSet(
         repo=Repo(slug=slug, archetype="test", cli_args=["--repo", slug]),
-        efficiency_html=Path(f"samples/{d}/efficiency.html"),
-        efficiency_json=Path(f"samples/{d}/efficiency.json"),
-        efficiency_text=Path(f"samples/{d}/efficiency.txt"),
-        when_done_html=Path(f"samples/{d}/forecast-when-done.html"),
-        when_done_json=Path(f"samples/{d}/forecast-when-done.json"),
-        when_done_text=Path(f"samples/{d}/forecast-when-done.txt"),
-        how_many_html=Path(f"samples/{d}/forecast-how-many.html"),
-        how_many_json=Path(f"samples/{d}/forecast-how-many.json"),
-        how_many_text=Path(f"samples/{d}/forecast-how-many.txt"),
-        scatterplot_html=Path(f"samples/{d}/scatterplot.html"),
-        scatterplot_json=Path(f"samples/{d}/scatterplot.json"),
-        scatterplot_text=Path(f"samples/{d}/scatterplot.txt"),
-        cfd_html=Path(f"samples/{d}/cfd.html") if with_cfd else None,
-        cfd_json=Path(f"samples/{d}/cfd.json") if with_cfd else None,
-        cfd_text=Path(f"samples/{d}/cfd.txt") if with_cfd else None,
-        aging_html=Path(f"samples/{d}/aging.html") if with_aging else None,
-        aging_json=Path(f"samples/{d}/aging.json") if with_aging else None,
-        aging_text=Path(f"samples/{d}/aging.txt") if with_aging else None,
+        efficiency_html=_p("efficiency", "html", with_efficiency),
+        efficiency_json=_p("efficiency", "json", with_efficiency),
+        efficiency_text=_p("efficiency", "txt", with_efficiency),
+        when_done_html=_p("forecast-when-done", "html", with_when_done),
+        when_done_json=_p("forecast-when-done", "json", with_when_done),
+        when_done_text=_p("forecast-when-done", "txt", with_when_done),
+        how_many_html=_p("forecast-how-many", "html", with_how_many),
+        how_many_json=_p("forecast-how-many", "json", with_how_many),
+        how_many_text=_p("forecast-how-many", "txt", with_how_many),
+        scatterplot_html=_p("scatterplot", "html", with_scatterplot),
+        scatterplot_json=_p("scatterplot", "json", with_scatterplot),
+        scatterplot_text=_p("scatterplot", "txt", with_scatterplot),
+        cfd_html=_p("cfd", "html", with_cfd),
+        cfd_json=_p("cfd", "json", with_cfd),
+        cfd_text=_p("cfd", "txt", with_cfd),
+        aging_html=_p("aging", "html", with_aging),
+        aging_json=_p("aging", "json", with_aging),
+        aging_text=_p("aging", "txt", with_aging),
     )
 
 
@@ -127,6 +138,29 @@ class TestBuildIndexHtml:
         sets = [_sample_set("repo/no-aging", with_cfd=False, with_aging=False)]
         out = build_index_html(sets, datetime(2026, 5, 12, 14, 30, tzinfo=UTC))
         assert out.count("n/a") >= 2  # both CFD and Aging cells
+
+    def test_no_broken_links_when_a_report_failed_to_generate(self):
+        """Real-world scenario: rust-lang/rust's efficiency + forecast
+        commands time out (504), so those files never get written. The
+        index must NOT emit links to files that don't exist on disk —
+        it should render `n/a` for those cells, matching the existing
+        CFD-absent behavior."""
+        sets = [_sample_set(
+            "rust-lang/rust",
+            with_efficiency=False,
+            with_when_done=False,
+            with_how_many=False,
+            with_aging=True,
+            with_scatterplot=True,
+        )]
+        out = build_index_html(sets, datetime(2026, 5, 12, 14, 30, tzinfo=UTC))
+        # No href should point to a known-missing file.
+        assert 'href="rust-lang_rust/efficiency.html"' not in out
+        assert 'href="rust-lang_rust/forecast-when-done.html"' not in out
+        assert 'href="rust-lang_rust/forecast-how-many.html"' not in out
+        # Aging + scatterplot DID generate — those links should be present.
+        assert 'href="rust-lang_rust/aging.html"' in out
+        assert 'href="rust-lang_rust/scatterplot.html"' in out
 
     def test_includes_decisions_pointer_for_na_explanation(self):
         """The reader needs to know why some cells are blank."""

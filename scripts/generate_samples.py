@@ -257,20 +257,24 @@ REPOS: list[Repo] = [
 @dataclass(frozen=True)
 class SampleSet:
     repo: Repo
-    efficiency_html: Path
-    efficiency_json: Path
-    efficiency_text: Path
-    when_done_html: Path
-    when_done_json: Path
-    when_done_text: Path
-    how_many_html: Path
-    how_many_json: Path
-    how_many_text: Path
-    scatterplot_html: Path
-    scatterplot_json: Path
-    scatterplot_text: Path
-    # CFD/Aging are conditional on the repo carrying a workflow.
-    # GitHub repos skip CFD (degenerate; see docs/DECISIONS.md #9).
+    # All report paths are `Path | None`. None means the command failed
+    # to produce that format — usually a 504 on a heavyweight repo
+    # (rust-lang/rust's efficiency + forecast pipelines time out). The
+    # index/SAMPLES.md must render `n/a` rather than emit a broken link.
+    # CFD/Aging additionally None on repos that don't carry a workflow
+    # (GitHub PR-only — see docs/DECISIONS.md #9).
+    efficiency_html: Path | None = None
+    efficiency_json: Path | None = None
+    efficiency_text: Path | None = None
+    when_done_html: Path | None = None
+    when_done_json: Path | None = None
+    when_done_text: Path | None = None
+    how_many_html: Path | None = None
+    how_many_json: Path | None = None
+    how_many_text: Path | None = None
+    scatterplot_html: Path | None = None
+    scatterplot_json: Path | None = None
+    scatterplot_text: Path | None = None
     cfd_html: Path | None = None
     cfd_json: Path | None = None
     cfd_text: Path | None = None
@@ -346,17 +350,17 @@ def build_samples_md(sets: list[SampleSet], generated_at: datetime) -> str:
 
     for s in sets:
         slug = s.repo.slug
-        d = s.efficiency_html.parent.name
+        d = slug.replace("/", "_")
         lines.append(f"## {slug}")
         lines.append("")
         lines.append(f"_{s.repo.archetype}_")
         lines.append("")
         lines.append("| Report | Formats |")
         lines.append("| --- | --- |")
-        lines.append(f"| Efficiency | {_link(d, 'efficiency', True)} |")
-        lines.append(f"| WWIBD: Date | {_link(d, 'forecast-when-done', True)} |")
-        lines.append(f"| WWIBD: How Many | {_link(d, 'forecast-how-many', True)} |")
-        lines.append(f"| Cycle-time scatterplot | {_link(d, 'scatterplot', True)} |")
+        lines.append(f"| Efficiency | {_link(d, 'efficiency', s.efficiency_html is not None)} |")
+        lines.append(f"| WWIBD: Date | {_link(d, 'forecast-when-done', s.when_done_html is not None)} |")
+        lines.append(f"| WWIBD: How Many | {_link(d, 'forecast-how-many', s.how_many_html is not None)} |")
+        lines.append(f"| Cycle-time scatterplot | {_link(d, 'scatterplot', s.scatterplot_html is not None)} |")
         lines.append(f"| CFD | {_link(d, 'cfd', s.cfd_html is not None)} |")
         lines.append(f"| Aging WIP | {_link(d, 'aging', s.aging_html is not None)} |")
         lines.append("")
@@ -375,15 +379,18 @@ def build_index_html(sets: list[SampleSet], generated_at: datetime) -> str:
     rows = []
     for s in sets:
         slug = s.repo.slug
-        d = s.efficiency_html.parent.name
+        # Derive directory from slug, not from an optional report path —
+        # any report can be None when a command timed out or wasn't
+        # produced for this source.
+        d = slug.replace("/", "_")
         rows.append(
             "\n        <tr>\n"
             f'          <td><strong>{html.escape(slug)}</strong><br>'
             f'<span class="archetype">{html.escape(s.repo.archetype)}</span></td>\n'
-            f"          {_cell(d, 'efficiency', True)}\n"
-            f"          {_cell(d, 'forecast-when-done', True)}\n"
-            f"          {_cell(d, 'forecast-how-many', True)}\n"
-            f"          {_cell(d, 'scatterplot', True)}\n"
+            f"          {_cell(d, 'efficiency', s.efficiency_html is not None)}\n"
+            f"          {_cell(d, 'forecast-when-done', s.when_done_html is not None)}\n"
+            f"          {_cell(d, 'forecast-how-many', s.how_many_html is not None)}\n"
+            f"          {_cell(d, 'scatterplot', s.scatterplot_html is not None)}\n"
             f"          {_cell(d, 'cfd', s.cfd_html is not None)}\n"
             f"          {_cell(d, 'aging', s.aging_html is not None)}\n"
             "        </tr>"
@@ -689,18 +696,18 @@ def _produce_one_repo(
 
     return SampleSet(
         repo=repo,
-        efficiency_html=out_dir / "efficiency.html",
-        efficiency_json=out_dir / "efficiency.json",
-        efficiency_text=out_dir / "efficiency.txt",
-        when_done_html=out_dir / "forecast-when-done.html",
-        when_done_json=out_dir / "forecast-when-done.json",
-        when_done_text=out_dir / "forecast-when-done.txt",
-        how_many_html=out_dir / "forecast-how-many.html",
-        how_many_json=out_dir / "forecast-how-many.json",
-        how_many_text=out_dir / "forecast-how-many.txt",
-        scatterplot_html=out_dir / "scatterplot.html",
-        scatterplot_json=out_dir / "scatterplot.json",
-        scatterplot_text=out_dir / "scatterplot.txt",
+        efficiency_html=_opt("efficiency", "html"),
+        efficiency_json=_opt("efficiency", "json"),
+        efficiency_text=_opt("efficiency", "txt"),
+        when_done_html=_opt("forecast-when-done", "html"),
+        when_done_json=_opt("forecast-when-done", "json"),
+        when_done_text=_opt("forecast-when-done", "txt"),
+        how_many_html=_opt("forecast-how-many", "html"),
+        how_many_json=_opt("forecast-how-many", "json"),
+        how_many_text=_opt("forecast-how-many", "txt"),
+        scatterplot_html=_opt("scatterplot", "html"),
+        scatterplot_json=_opt("scatterplot", "json"),
+        scatterplot_text=_opt("scatterplot", "txt"),
         cfd_html=_opt("cfd", "html"),
         cfd_json=_opt("cfd", "json"),
         cfd_text=_opt("cfd", "txt"),
