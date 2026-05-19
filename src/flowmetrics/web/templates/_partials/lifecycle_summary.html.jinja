@@ -1,0 +1,21 @@
+{# Compact summary card — used when a chart would be noise.
+
+   The trivial case: an item with one stage (two events — created
+   and finished). A gantt with a single bar adds no information the
+   text doesn't already convey, so we render a summary instead.
+
+   Required context:
+     data — LifecycleData. Uses data.stages[0] + data.terminal_stage.
+#}
+{%- set s = data.stages[0] -%}
+<div class="lifecycle-summary">
+  <div class="lifecycle-summary-duration">
+    <span class="lifecycle-summary-duration-value">{{ s.duration_display }}</span>
+    <span class="lifecycle-summary-duration-label">in {{ s.stage }}</span>
+  </div>
+  <div class="lifecycle-summary-flow">
+    <span class="lifecycle-summary-from">{{ s.entered_at_display }}</span>
+    <span class="lifecycle-summary-arrow" aria-hidden="true">→</span>
+    <span class="lifecycle-summary-to">{{ data.terminal_stage }} · {{ s.exited_at_display }}</span>
+  </div>
+</div>

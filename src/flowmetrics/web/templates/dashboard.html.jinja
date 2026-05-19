@@ -1,0 +1,14 @@
+{% extends "_base.html.jinja" %}
+
+{% block content %}
+  {% with summary = {"title": "Cycle time", "headline": cycle_time.headline} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+  {% with mode = 'tile', data = cycle_time %}
+    {% include "_partials/cycle_time_tile.html.jinja" %}
+  {% endwith %}
+
+  {% with data = work_items %}
+    {% include "_partials/work_items_table.html.jinja" %}
+  {% endwith %}
+{% endblock %}

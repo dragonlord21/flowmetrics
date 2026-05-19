@@ -1,0 +1,26 @@
+{# Chart-only fragment: the chart container div + its Vega-Lite
+   embed script. Used both inside the tile partial AND returned
+   from `/api/internal/cycle-time` as the HTMX swap payload.
+
+   Required context:
+     data           — CycleTimeData (provides vega_spec_json())
+     chart_height   — int pixels (default ~320 for tile, ~480 for detail)
+#}
+{%- set chart_container_id = "cycle-time-chart" -%}
+{%- set _h = chart_height|default(320) -%}
+
+<div id="{{ chart_container_id }}" class="metric-chart"
+     data-chart-height="{{ _h }}"></div>
+<script>
+  (function () {
+    const spec = {{ data.vega_spec_json() | safe }};
+    spec.height = {{ _h }};
+    vegaEmbed("#{{ chart_container_id }}", spec, {
+      actions: false,
+      renderer: "svg"
+    }).catch(function (err) {
+      const el = document.getElementById("{{ chart_container_id }}");
+      el.innerText = "Chart render failed: " + err;
+    });
+  })();
+</script>

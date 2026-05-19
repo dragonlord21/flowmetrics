@@ -189,10 +189,36 @@ CREATE TEMPORARY TABLE transitions (
 """
 
 
+def cycle_time_days(
+    created_at: datetime, completed_at: datetime | None
+) -> float | None:
+    """Cycle time in days, with Vacanti's "+1" applied to the
+    floating-point duration.
+
+        CT = (completed_at - created_at) + 1 day
+
+    Vacanti's argument for the "+1": you'd never say a same-day
+    PBI took zero days to complete (Actionable Agile Metrics for
+    Predictability, 10th Anniversary Edition, p. 59). We add a
+    day on top of the actual duration rather than rounding to a
+    calendar grid — sub-day precision survives, and the minimum
+    legal value is exactly 1.0d (zero-duration work).
+
+    Returns None for in-flight items. Negative durations (when a
+    source-data bug delivers completed < created) produce values
+    below 1.0, which is the "impossible" zone for valid data —
+    downstream code can flag sub-1.0 values as suspect.
+
+    See tests/test_calendar_cycle_time.py for the contract.
+    """
+    if completed_at is None:
+        return None
+    duration_days = (completed_at - created_at).total_seconds() / 86400.0
+    return duration_days + 1.0
+
+
 def _work_item_row(item, contract: Contract, run_id: str, materialised_at: datetime):
-    cycle_days = None
-    if item.completed_at is not None:
-        cycle_days = (item.completed_at - item.created_at).total_seconds() / 86400.0
+    cycle_days = cycle_time_days(item.created_at, item.completed_at)
     return (
         contract.source,
         contract.repo,

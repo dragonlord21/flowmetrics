@@ -1111,3 +1111,78 @@ def materialise(
         f"{manifest.items_fetched} items in "
         f"{(manifest.completed_at - manifest.started_at).total_seconds():.1f}s"
     )
+
+
+# ---------------------------------------------------------------------------
+# Warehouse: `flow serve` — Slice 2.
+# ---------------------------------------------------------------------------
+
+
+@cli.command(short_help="Serve the warehouse-backed web UI")
+@click.option(
+    "--port",
+    type=int,
+    default=8000,
+    show_default=True,
+)
+@click.option(
+    "--host",
+    type=str,
+    default="127.0.0.1",
+    show_default=True,
+    help="Bind address. Defaults to localhost; any other value requires --password.",
+)
+@click.option(
+    "--data-dir",
+    type=click.Path(path_type=Path),
+    default=Path("./data"),
+    show_default=True,
+)
+@click.option(
+    "--contracts-dir",
+    type=click.Path(path_type=Path),
+    default=Path("./contracts"),
+    show_default=True,
+)
+@click.option(
+    "--password",
+    type=str,
+    envvar="FLOW_PASSWORD",
+    default=None,
+    help=(
+        "HTTP Basic password. Required when --host is anything other "
+        "than 127.0.0.1. Also readable from $FLOW_PASSWORD."
+    ),
+)
+def serve(
+    port: int,
+    host: str,
+    data_dir: Path,
+    contracts_dir: Path,
+    password: str | None,
+) -> None:
+    """Serve the dashboard + per-metric detail pages.
+
+    Reads from the local Parquet store under --data-dir (populated by
+    `flow materialise`). Never touches GitHub or Jira during a request.
+    """
+    import uvicorn
+
+    from .app import create_app
+
+    # Off-localhost binds are network-exposed; require a password.
+    if host != "127.0.0.1" and not password:
+        click.echo(
+            f"error: --host {host} is network-exposed and requires --password "
+            "(or $FLOW_PASSWORD). Use --host 127.0.0.1 for local-only access.",
+            err=True,
+        )
+        sys.exit(2)
+
+    app = create_app(
+        data_dir=data_dir,
+        contracts_dir=contracts_dir,
+        password=password,
+    )
+    click.echo(f"flow serve listening on http://{host}:{port}/")
+    uvicorn.run(app, host=host, port=port, log_level="info")

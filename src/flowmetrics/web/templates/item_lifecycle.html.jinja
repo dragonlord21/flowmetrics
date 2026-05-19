@@ -1,0 +1,45 @@
+{% extends "_base.html.jinja" %}
+
+{% block content %}
+  {% set _headline -%}
+    {{ data.events|length }} stage event{% if data.events|length != 1 %}s{% endif %}
+    {%- if data.url %} · <a href="{{ data.url }}" target="_blank" rel="noopener">open {{ data.source }}</a>{% endif %}
+  {%- endset %}
+  {% with summary = {"title": data.title or data.item_id, "headline": _headline} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+
+  {% if data.is_chartable %}
+    <div class="metric">
+      {% include "_partials/lifecycle_chart.html.jinja" %}
+    </div>
+  {% else %}
+    {% include "_partials/lifecycle_summary.html.jinja" %}
+  {% endif %}
+
+  <section class="detail-extras">
+    <h2>Events</h2>
+    <table class="work-items-grid">
+      <thead>
+        <tr>
+          <th>Stage</th>
+          <th>Entered (UTC)</th>
+          <th style="text-align:right;">Dwell (d)</th>
+          <th>Signal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in data.events %}
+        <tr>
+          <td>{{ e.stage }}</td>
+          <td>{{ e.entered_at_display }}</td>
+          <td class="num">{% if e.dwell_days is not none %}{{ "%.2f"|format(e.dwell_days) }}{% else %}—{% endif %}</td>
+          <td><code>{{ e.signal }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <a class="back-link" href="/contracts/{{ contract.name }}/">← Back to dashboard</a>
+{% endblock %}

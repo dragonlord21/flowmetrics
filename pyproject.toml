@@ -10,11 +10,13 @@ requires-python = ">=3.13"
 dependencies = [
     "click>=8.3.3",
     "duckdb>=1.5.2",
+    "fastapi>=0.136.1",
     "httpx>=0.28.1",
     "jinja2>=3.1.6",
     "python-dateutil>=2.9.0.post0",
     "pyyaml>=6.0.3",
     "rich>=15.0.0",
+    "uvicorn>=0.47.0",
 ]
 
 [tool.ruff]
@@ -47,10 +49,11 @@ root = ["./src"]
 # Default run excludes the `integration` marker. Use `uv run pytest -m integration`
 # to opt into live-API tests (which require `gh auth login` or $GITHUB_TOKEN).
 # Unit tests must NEVER hit the network — conftest.py asserts that.
-addopts = "-m 'not integration and not browser'"
+addopts = "-m 'not integration and not browser and not e2e'"
 markers = [
     "integration: live GitHub API calls; opt-in only, default pytest run skips these.",
     "browser: chromium-driven UI tests; opt-in only, default pytest run skips these. Requires `uv run playwright install chromium`.",
+    "e2e: slice-acceptance tests (real Playwright + real FastAPI server). Opt-in via `-m e2e`. Requires `uv run playwright install chromium`.",
 ]
 
 [project.scripts]
@@ -63,8 +66,10 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "playwright>=1.60.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
+    "pytest-playwright>=0.8.0",
     "ruff>=0.15.12",
     "ty>=0.0.35",
 ]

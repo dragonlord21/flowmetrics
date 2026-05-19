@@ -1,0 +1,30 @@
+{# Work-items table — sortable, filterable.
+
+   The outer wrapper renders ONCE per page load. The search input and
+   the sort controls live above the swap target so they keep their
+   DOM identity (focus, IME composition, caret position) across HTMX
+   filter/sort round-trips. Only `#work-items-body` is swapped.
+
+   Required context:
+     data            — WorkItemsTableData
+     contract.name   — for building per-item links
+#}
+<div id="work-items" class="work-items">
+  <div class="work-items-controls">
+    <input id="work-items-search"
+           class="work-items-search"
+           type="search"
+           name="q"
+           value="{{ data.q }}"
+           placeholder="Filter by title…"
+           autocomplete="off"
+           hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}"
+           hx-target="#work-items-body"
+           hx-swap="innerHTML"
+           hx-trigger="keyup changed delay:200ms, search">
+  </div>
+
+  <div id="work-items-body">
+    {% include "_partials/work_items_table_body.html.jinja" %}
+  </div>
+</div>

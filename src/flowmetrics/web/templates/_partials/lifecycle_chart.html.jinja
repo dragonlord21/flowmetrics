@@ -1,0 +1,160 @@
+{# Per-item lifecycle, gantt-style.
+
+   One bar per stage; stages on the y-axis, time on the x-axis.
+   Labels live on the y-axis (categorical) so they can't overlap —
+   the previous event-point timeline put stage names on top of each
+   mark and they collided whenever events were close in time.
+
+   Required context:
+     data           — LifecycleData (provides stages_json + terminal_stage)
+     chart_height   — int pixels (defaults to ~28px per stage + margin)
+
+   Knox palette: stages get tertiary slate-blue and secondary
+   berry as the two distinct colors (categorical scheme), with
+   any further stages cycling through. The terminal-state marker
+   is a primary-plum rule + label — that's the one moment the
+   brand color earns its keep: "the item arrived here".
+#}
+{%- set chart_container_id = "lifecycle-chart" -%}
+{%- set _per_row = 36 -%}
+{%- set _padding = 80 -%}
+{%- set _h = chart_height|default((data.stages|length * _per_row) + _padding) -%}
+
+<div id="{{ chart_container_id }}" class="metric-chart"
+     data-chart-height="{{ _h }}"></div>
+<script>
+  (function () {
+    const stages = {{ data.stages_json | safe }};
+    const terminalStage = {{ data.terminal_stage|tojson|safe }};
+    // The terminal marker uses the exited_at of the last stage —
+    // that's when the item "arrived" at its terminal state.
+    const terminalAt = stages.length
+      ? stages[stages.length - 1].exited_at_iso
+      : null;
+    const terminalDisplay = stages.length
+      ? stages[stages.length - 1].exited_at_display
+      : "";
+
+    const spec = {
+      "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+      "background": "transparent",
+      "padding": 12,
+      "height": {{ _h }},
+      "width": "container",
+      "layer": [
+        {
+          "data": {"values": stages},
+          "mark": {
+            "type": "bar",
+            "cornerRadius": 3,
+            "height": {"band": 0.6}
+          },
+          "encoding": {
+            "y": {
+              "field": "stage",
+              "type": "nominal",
+              "sort": stages.map(function (s) { return s.stage; }),
+              "axis": {
+                "title": null,
+                "labelFontSize": 13,
+                "labelPadding": 6
+              }
+            },
+            "x": {
+              "field": "entered_at_iso",
+              "type": "temporal",
+              "axis": {
+                "title": "Time (UTC)",
+                "format": "%b %d %H:%M",
+                "labelAngle": 0,
+                "grid": true,
+                "gridOpacity": 0.4
+              }
+            },
+            "x2": {"field": "exited_at_iso"},
+            "color": {
+              "field": "stage",
+              "type": "nominal",
+              "scale": {
+                "domain": stages.map(function (s) { return s.stage; }),
+                "range": [
+                  "hsl(230, 32%, 54%)",  // --t-500 tertiary slate
+                  "hsl(350, 44%, 56%)",  // --s-500 secondary berry
+                  "hsl(230, 38%, 32%)",  // --t-700 deep slate
+                  "hsl(350, 50%, 34%)",  // --s-700 deep berry
+                  "hsl(230, 32%, 74%)",  // --t-500 lightened
+                  "hsl(350, 44%, 76%)"   // --s-500 lightened
+                ]
+              },
+              "legend": null
+            },
+            "tooltip": [
+              {"field": "stage", "type": "nominal", "title": "Stage"},
+              {"field": "entered_at_display", "type": "nominal", "title": "Entered"},
+              {"field": "exited_at_display", "type": "nominal", "title": "Exited"},
+              {"field": "duration_display", "type": "nominal", "title": "Duration"}
+            ]
+          }
+        },
+        {
+          "data": {"values": stages},
+          "mark": {
+            "type": "text",
+            "align": "center",
+            "baseline": "middle",
+            "fontSize": 11,
+            "color": "white",
+            "fontWeight": 500
+          },
+          "encoding": {
+            "y": {"field": "stage", "type": "nominal"},
+            "x": {"aggregate": "mean", "field": "entered_at_iso", "type": "temporal"},
+            "x2": {"aggregate": "mean", "field": "exited_at_iso"},
+            "text": {"field": "duration_display", "type": "nominal"}
+          }
+        }
+      ].concat(terminalAt && terminalStage ? [
+        {
+          "data": {"values": [{"t": terminalAt, "label": terminalStage}]},
+          "mark": {"type": "rule", "color": "hsl(290, 46%, 48%)", "size": 2, "strokeDash": [4, 3]},
+          "encoding": {
+            "x": {"field": "t", "type": "temporal"}
+          }
+        },
+        {
+          "data": {"values": [{"t": terminalAt, "label": terminalStage + ' · ' + terminalDisplay}]},
+          "mark": {
+            "type": "text",
+            "align": "right",
+            "baseline": "top",
+            "dx": -6,
+            "dy": 4,
+            "fontSize": 12,
+            "fontWeight": 600,
+            "color": "hsl(290, 52%, 30%)"
+          },
+          "encoding": {
+            "x": {"field": "t", "type": "temporal"},
+            "text": {"field": "label", "type": "nominal"}
+          }
+        }
+      ] : []),
+      "config": {
+        "view": {"stroke": null},
+        "axis": {
+          "labelFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
+          "titleFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
+          "labelColor": "hsl(290, 28%, 13%)",
+          "titleColor": "hsl(290, 12%, 46%)"
+        }
+      }
+    };
+    vegaEmbed("#{{ chart_container_id }}", spec, {
+      actions: false,
+      renderer: "svg"
+    }).catch(function (err) {
+      const el = document.getElementById("{{ chart_container_id }}");
+      el.innerText = "Chart render failed: " + err;
+    });
+  })();
+</script>

@@ -1,0 +1,36 @@
+{# Cycle-time chart tile.
+
+   Renders in two modes:
+     - mode='tile'    → dashboard cell with "Details →" link
+     - mode='detail'  → standalone page (no Details link)
+
+   The percentile/count headline is NOT in this partial — it lives
+   in `metric_summary.html.jinja` above the tile.
+
+   The reset button uses HTMX to re-fetch just the chart fragment
+   (chart container + script) via `/api/internal/cycle-time`,
+   targeting `#cycle-time-chart` for outerHTML swap. Re-runs Vega's
+   random() so jitter re-shuffles; would also pick up new data
+   after an ETL run.
+#}
+{%- set chart_container_id = "cycle-time-chart" -%}
+{%- set chart_height = 480 if mode == 'detail' else 320 -%}
+
+<section id="cycle-time-tile" class="metric">
+  <header class="metric-header">
+    <div class="metric-header-controls">
+      <button class="reset-btn"
+              type="button"
+              hx-get="/api/internal/cycle-time?contract={{ contract.name }}"
+              hx-target="#{{ chart_container_id }}"
+              hx-swap="outerHTML"
+              title="Re-load this chart">↻ Reset</button>
+      {% if mode == 'tile' %}
+        <a class="details-link"
+           href="/contracts/{{ contract.name }}/metrics/cycle-time">Details →</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% include "_partials/cycle_time_chart_fragment.html.jinja" %}
+</section>

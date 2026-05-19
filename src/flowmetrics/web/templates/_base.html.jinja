@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title|default("flowmetrics") }}</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    /* Knox design system — single-hue derivation.
+       See ~/projects/awm/kno/docs/design-system.md */
+    :root {
+      --hue: 290; /* plum-violet — locked */
+
+      --p-50:  hsla(var(--hue), 32%, 96%, 1);
+      --p-100: hsla(var(--hue), 34%, 88%, 1);
+      --p-200: hsla(var(--hue), 38%, 78%, 1);
+      --p-400: hsla(var(--hue), 42%, 58%, 1);
+      --p-500: hsla(var(--hue), 46%, 48%, 1);
+      --p-700: hsla(var(--hue), 52%, 30%, 1);
+      --p-900: hsla(var(--hue), 58%, 14%, 1);
+
+      --s-100: hsla(calc(var(--hue) + 60), 36%, 90%, 1);
+      --s-500: hsla(calc(var(--hue) + 60), 44%, 56%, 1);
+      --s-700: hsla(calc(var(--hue) + 60), 50%, 34%, 1);
+
+      --t-100: hsla(calc(var(--hue) - 60), 30%, 90%, 1);
+      --t-500: hsla(calc(var(--hue) - 60), 32%, 54%, 1);
+      --t-700: hsla(calc(var(--hue) - 60), 38%, 32%, 1);
+
+      --bg:      hsla(var(--hue), 24%, 97%, 1);
+      --surface: hsla(var(--hue), 16%, 94%, 1);
+      --border:  hsla(var(--hue), 18%, 84%, 1);
+      --fg:      hsla(var(--hue), 28%, 13%, 1);
+      --muted:   hsla(var(--hue), 12%, 46%, 1);
+
+      --white: #ffffff;
+      --black: #111111;
+
+      --head-font: "Rubik", sans-serif;
+      --body-font: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Helvetica, Arial, sans-serif;
+      --mono-font: ui-monospace, SFMono-Regular, "SF Mono",
+                   Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: var(--body-font);
+      font-size: 16px;
+      line-height: 1.6;
+      background: var(--white);
+      color: var(--fg);
+      margin: 0;
+    }
+
+    h1, h2, h3 { font-family: var(--head-font); font-weight: 600; }
+    h1 { font-size: 36px; line-height: 1.15; letter-spacing: -0.02em; color: var(--fg); margin: 0; }
+    h2 {
+      /* Section eyebrow — UPPERCASE, muted */
+      font-size: 13px;
+      line-height: 1.4;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 1.4rem 0 0.4rem 0;
+    }
+    h3 {
+      font-size: 17px;
+      line-height: 1.3;
+      letter-spacing: -0.005em;
+      color: var(--fg);
+      margin: 0;
+    }
+
+    a { color: var(--p-500); text-decoration: none; }
+    a:hover { color: var(--p-700); text-decoration: underline; }
+
+    code, .mono { font-family: var(--mono-font); font-size: 13.5px; }
+    code {
+      background: var(--surface);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem;
+    }
+
+    /* ─────── Site header ─────── */
+    header.site-header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+    }
+    header.site-header .container {
+      display: flex;
+      align-items: baseline;
+      gap: 0.7rem;
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+    header.site-header .brand {
+      font-family: var(--head-font);
+      font-weight: 600;
+      font-size: 20px;
+      letter-spacing: -0.01em;
+      color: var(--p-700);
+      text-decoration: none;
+    }
+    header.site-header .brand:hover {
+      color: var(--p-900);
+      text-decoration: none;
+    }
+    header.site-header .stamp {
+      font-family: var(--mono-font);
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--surface);
+      padding: 3px 7px;
+      border-radius: 4px;
+    }
+    header.site-header .header-sep {
+      color: var(--border);
+      font-size: 14px;
+      user-select: none;
+    }
+    header.site-header .header-metric-name {
+      font-family: var(--head-font);
+      font-weight: 600;
+      font-size: 17px;
+      letter-spacing: -0.005em;
+      color: var(--fg);
+    }
+
+    /* ─────── Filter bar ─────── */
+    .filter-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-bar .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+      align-items: center;
+      padding-top: 0.7rem;
+      padding-bottom: 0.7rem;
+      font-size: 14px;
+    }
+    .filter-bar label {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      color: var(--muted);
+    }
+    .filter-bar input,
+    .filter-bar select {
+      font-size: 14px;
+      padding: 0.2rem 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--white);
+      font-family: inherit;
+      color: var(--fg);
+    }
+    .filter-bar input:focus,
+    .filter-bar select:focus {
+      outline: 2px solid var(--p-200);
+      outline-offset: -1px;
+      border-color: var(--p-500);
+    }
+    .filter-bar .note {
+      color: var(--muted);
+      font-style: italic;
+      margin-left: auto;
+      font-size: 12px;
+    }
+
+    /* ─────── Metric summary (above charts) ─────── */
+    .metric-summary {
+      margin: 1.2rem 0 0.6rem 0;
+      padding: 0 0.2rem;
+    }
+    .metric-summary-title {
+      /* H3 with larger treatment for top-of-section presence.
+         Explicit text-transform: none to defeat any cascade. */
+      font-family: var(--head-font);
+      font-weight: 600;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: -0.015em;
+      color: var(--fg);
+      margin: 0;
+      text-transform: none;
+    }
+    .metric-summary-headline {
+      margin: 0.25rem 0 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ─────── Chart tile ─────── */
+    .metric {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.2rem 1.1rem 1.2rem;
+      margin: 0.6rem 0 1.4rem 0;
+    }
+    .metric-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      margin-bottom: 0.4rem;
+      min-height: 1.6rem;
+    }
+    .metric-header-controls {
+      display: flex;
+      gap: 0.55rem;
+      align-items: center;
+    }
+    .metric-chart {
+      width: 100%;
+    }
+
+    /* ─────── Buttons ─────── */
+    .reset-btn,
+    button.btn {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 0.22rem 0.6rem;
+      background: var(--white);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .reset-btn:hover,
+    button.btn:hover {
+      color: var(--p-700);
+      border-color: var(--p-500);
+    }
+    .reset-btn.htmx-request,
+    button.btn.htmx-request {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    /* ─────── Links inside metric tiles ─────── */
+    .details-link {
+      font-size: 13px;
+      color: var(--p-500);
+    }
+
+    /* ─────── Detail page extras ─────── */
+    .detail-extras h2 {
+      /* Use the eyebrow style for in-page section headers */
+      margin: 1.8rem 0 0.5rem 0;
+    }
+    .detail-extras p,
+    .detail-extras ul {
+      color: var(--fg);
+      font-size: 15px;
+      margin: 0.5rem 0;
+    }
+    .detail-extras p em {
+      color: var(--muted);
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 1.6rem;
+      color: var(--p-500);
+      font-size: 13px;
+    }
+
+    /* ─────── Work-items table ─────── */
+    .work-items {
+      margin: 0.6rem 0 1.4rem 0;
+    }
+    .work-items-controls {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+    .work-items-search {
+      flex: 0 1 320px;
+      font-size: 14px;
+      padding: 0.3rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--white);
+      font-family: inherit;
+      color: var(--fg);
+    }
+    .work-items-search:focus {
+      outline: 2px solid var(--p-200);
+      outline-offset: -1px;
+      border-color: var(--p-500);
+    }
+    .work-items-count {
+      color: var(--muted);
+      font-size: 12px;
+      margin-left: auto;
+    }
+    table.work-items-grid {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 14px;
+    }
+    table.work-items-grid th {
+      text-align: left;
+      padding: 0.55rem 0.8rem;
+      background: var(--surface);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    table.work-items-grid th a {
+      color: inherit;
+      text-decoration: none;
+      display: inline-flex;
+      gap: 0.25rem;
+      align-items: center;
+      cursor: pointer;
+    }
+    table.work-items-grid th a:hover {
+      color: var(--p-700);
+    }
+    table.work-items-grid th.sorted a {
+      /* Active-sort column: stronger neutral, plus the arrow indicator
+         carries the small accent. Avoid coloring the whole header in
+         primary — the table should read as data, not decoration. */
+      color: var(--fg);
+    }
+    table.work-items-grid th .sort-indicator {
+      font-size: 10px;
+      color: var(--p-500);
+    }
+    table.work-items-grid td {
+      padding: 0.5rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table.work-items-grid tr:last-child td {
+      border-bottom: none;
+    }
+    table.work-items-grid td.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-family: var(--mono-font);
+    }
+    table.work-items-grid td.id {
+      font-family: var(--mono-font);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    table.work-items-grid td.id a {
+      /* The item-id cell is the navigational hot-spot (links to the
+         lifecycle page) — primary color is intentional here. */
+      color: var(--p-500);
+    }
+    table.work-items-grid td.title a {
+      color: var(--fg);
+    }
+    table.work-items-grid td.title a:hover {
+      color: var(--p-700);
+    }
+    table.work-items-grid tr:hover td {
+      /* Neutral surface for hover — the table is data, not chrome,
+         so the hover affordance should not tint rows toward the
+         brand color. */
+      background: var(--surface);
+    }
+    /* ─────── Lifecycle summary (trivial-case alternative to chart) ─────── */
+    .lifecycle-summary {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+      margin: 0.6rem 0 1.4rem 0;
+    }
+    .lifecycle-summary-duration {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+    }
+    .lifecycle-summary-duration-value {
+      font-family: var(--head-font);
+      font-weight: 600;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: -0.015em;
+      color: var(--fg);
+      font-variant-numeric: tabular-nums;
+    }
+    .lifecycle-summary-duration-label {
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .lifecycle-summary-flow {
+      margin-top: 0.8rem;
+      padding-top: 0.7rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13.5px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.8rem;
+      align-items: baseline;
+    }
+    .lifecycle-summary-arrow {
+      color: var(--p-500);
+    }
+    .lifecycle-summary-to {
+      color: var(--fg);
+    }
+
+    .work-items-empty {
+      padding: 1.5rem;
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/">flowmetrics</a>
+      {% if contract %}
+        <span class="header-sep" aria-hidden="true">·</span>
+        <span class="stamp">{{ contract.name }}</span>
+      {% endif %}
+      {% if metric_name %}
+        <span class="header-sep" aria-hidden="true">·</span>
+        <span class="header-metric-name">{{ metric_name }}</span>
+      {% endif %}
+    </div>
+  </header>
+
+  {% block filter_bar %}
+  <nav class="filter-bar" aria-label="Filters">
+    <div class="container">
+      <label>Contract
+        <select name="contract" disabled>
+          {% for c in available_contracts %}
+            <option value="{{ c }}"{% if c == contract.name %} selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Since <input type="date" name="since" value="{{ view.since|default('') }}" disabled></label>
+      <label>Until <input type="date" name="until" value="{{ view.until|default('') }}" disabled></label>
+      <span class="note">filters are decorative in this slice — wiring lands in Slice 3</span>
+    </div>
+  </nav>
+  {% endblock %}
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
