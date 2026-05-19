@@ -9,8 +9,15 @@
      data            — WorkItemsTableData
      contract.name   — for building per-item links
 #}
-<div id="work-items" class="work-items">
+<div id="work-items" class="work-items"
+     data-contract="{{ contract.name }}">
   <div class="work-items-controls">
+    {# The date filter survives sort/search swaps by being included
+       as a hidden form input that HTMX auto-attaches via `hx-include`.
+       Throughput-chart clicks update this input + re-fire the
+       fragment; the Clear link sets it back to empty. #}
+    <input id="work-items-completed-on" type="hidden" name="completed_on"
+           value="{{ data.completed_on }}">
     <input id="work-items-search"
            class="work-items-search"
            type="search"
@@ -21,6 +28,7 @@
            hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}"
            hx-target="#work-items-body"
            hx-swap="innerHTML"
+           hx-include="#work-items-completed-on"
            hx-trigger="keyup changed delay:200ms, search">
   </div>
 

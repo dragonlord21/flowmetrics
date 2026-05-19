@@ -198,6 +198,19 @@ class TestLifecycleShape:
         expected = (_parse(e1.entered_at_iso) - _parse(e0.entered_at_iso)).total_seconds()
         assert abs(s.duration_seconds - expected) < 0.5
 
+    def test_stage_y_label_combines_stage_and_duration(self, warehouse):
+        """The gantt chart's y-axis label shows `<stage> · <duration>`
+        so the duration sits ALWAYS-VISIBLE on the y-axis (not as an
+        in-bar text overlay which gets cut off for narrow bars and
+        overflows the chart for short stages). Test the canonical
+        form."""
+        data = render(warehouse, "astral-uv-week", "github", "#19342")
+        for s in data.stages:
+            assert s.y_label == f"{s.stage} · {s.duration_display}", (
+                f"y_label must combine stage and duration as "
+                f"'<stage> · <duration>'; got {s.y_label!r}"
+            )
+
     def test_duration_display_is_human_readable(self, warehouse):
         """Stage durations render as `Xh Ym Zs` (or shorter for sub-hour),
         not raw seconds."""
@@ -251,6 +264,48 @@ class TestLifecycleShape:
         assert required <= set(parsed[0]), (
             f"stage dict missing required keys; got keys: "
             f"{sorted(parsed[0])}"
+        )
+
+    def test_payload_carries_cycle_time_days_matching_work_items(
+        self, warehouse
+    ):
+        """The lifecycle page must surface the SAME cycle-time
+        number the work-items table reports — Vacanti's
+        `elapsed + 1 day`, not just the chart's wall-clock span.
+        Otherwise a viewer compares "1.41 in the table" with
+        "~1/3 day on the chart" and reasonably asks which is real.
+
+        Both must agree. Test by querying work_items directly for
+        the canonical value and asserting the lifecycle payload
+        matches."""
+        item_id = "#19330"
+        data = render(warehouse, "astral-uv-week", "github", item_id)
+        canonical = warehouse.execute(
+            "SELECT cycle_time_days FROM work_items "
+            "WHERE contract_id = ? AND source = ? AND item_id = ? "
+            "LIMIT 1",
+            ["astral-uv-week", "github", item_id],
+        ).fetchone()[0]
+        assert data.cycle_time_days == canonical, (
+            f"lifecycle.cycle_time_days must equal the work_items "
+            f"row's cycle_time_days; got {data.cycle_time_days!r} "
+            f"vs {canonical!r}"
+        )
+
+    def test_payload_carries_human_readable_elapsed(self, warehouse):
+        """Two views of duration on the lifecycle page:
+          - `cycle_time_days` — the Vacanti metric (elapsed + 1)
+          - `elapsed_display` — the actual wall-clock span ("9h 53m")
+        Surfacing both lets the viewer reconcile the chart's time
+        axis with the metric used everywhere else."""
+        data = render(warehouse, "astral-uv-week", "github", "#19330")
+        # #19330's wall-clock span is 9h 53m (see fixture).
+        # The display string follows the lifecycle component's
+        # `_duration_display` formatting.
+        assert data.elapsed_display, "elapsed_display must be set"
+        assert "h" in data.elapsed_display or "m" in data.elapsed_display, (
+            f"elapsed_display should be `Xh Ym`-style; got "
+            f"{data.elapsed_display!r}"
         )
 
     def test_payload_is_jsonable_for_vega_lite(self, warehouse, known_item):

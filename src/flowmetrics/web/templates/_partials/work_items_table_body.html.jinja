@@ -13,15 +13,29 @@
   {%- set next_dir = 'asc' if (is_active and data.direction == 'desc') else ('desc' if is_active else 'desc') -%}
   {%- set arrow = '↓' if (is_active and data.direction == 'desc') else ('↑' if is_active else '') -%}
   <a href="#"
-     hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ key }}&direction={{ next_dir }}&q={{ data.q|urlencode }}"
+     hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ key }}&direction={{ next_dir }}&q={{ data.q|urlencode }}&completed_on={{ data.completed_on|urlencode }}"
      hx-target="#work-items-body"
      hx-swap="innerHTML">
     {{ label }}{% if arrow %} <span class="sort-indicator">{{ arrow }}</span>{% endif %}
   </a>
 {%- endmacro -%}
 
+{% if data.completed_on %}
+<div class="work-items-active-filter">
+  <span class="work-items-active-filter-label">Filtered to</span>
+  <span class="work-items-active-filter-value">{{ data.completed_on_display }}</span>
+  <a href="#"
+     class="work-items-clear-filter"
+     hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}&q={{ data.q|urlencode }}"
+     hx-target="#work-items-body"
+     hx-swap="innerHTML"
+     hx-on::after-request="document.getElementById('work-items-completed-on').value = ''"
+     title="Show all items">clear</a>
+</div>
+{% endif %}
+
 <div class="work-items-count">
-  {{ data.count }} item{{ '' if data.count == 1 else 's' }}{% if data.q %} matching “{{ data.q }}”{% endif %}
+  {{ data.count }} item{{ '' if data.count == 1 else 's' }}{% if data.q %} matching “{{ data.q }}”{% endif %}{% if data.completed_on %} on {{ data.completed_on_display }}{% endif %}
 </div>
 
 {% if data.rows %}
@@ -30,6 +44,7 @@
     <tr>
       <th{% if data.sort == 'item_id' %} class="sorted"{% endif %}>{{ sort_link('#', 'item_id') }}</th>
       <th{% if data.sort == 'title' %} class="sorted"{% endif %}>{{ sort_link('Title', 'title') }}</th>
+      <th{% if data.sort == 'created_at' %} class="sorted"{% endif %}>{{ sort_link('Started', 'created_at') }}</th>
       <th{% if data.sort == 'completed_at' %} class="sorted"{% endif %}>{{ sort_link('Completed', 'completed_at') }}</th>
       <th{% if data.sort == 'cycle_time_days' %} class="sorted"{% endif %} style="text-align:right;">{{ sort_link('Cycle (d)', 'cycle_time_days') }}</th>
     </tr>
@@ -38,7 +53,11 @@
     {% for r in data.rows %}
     <tr>
       <td class="id">
-        <a href="/contracts/{{ contract.name }}/items/{{ r.source }}/{{ r.item_id|urlencode }}">{{ r.item_id }}</a>
+        {# Strip the GitHub `#` prefix from the URL path — `#` is
+           the canonical id form in the warehouse, but in a URL it
+           would render as `%23` and that's ugly. The route accepts
+           both forms; the display cell still shows `#19291`. #}
+        <a href="/contracts/{{ contract.name }}/items/{{ r.item_id|replace('#', '')|urlencode }}">{{ r.item_id }}</a>
       </td>
       <td class="title">
         {% if r.url %}
@@ -47,6 +66,7 @@
           {{ r.title }}
         {% endif %}
       </td>
+      <td>{{ r.created_at_display }}</td>
       <td>{{ r.completed_at_display }}</td>
       <td class="num">{{ "%.2f"|format(r.cycle_time_days) }}</td>
     </tr>

@@ -1,0 +1,29 @@
+{# Throughput chart tile.
+
+   mode='tile'   → dashboard cell with "Details →" link
+   mode='detail' → standalone page (no Details link)
+
+   The headline (count + window + avg/day) lives in
+   metric_summary.html.jinja above the tile, not inside it.
+#}
+{%- set chart_container_id = "throughput-chart" -%}
+{%- set chart_height = 440 if mode == 'detail' else 280 -%}
+
+<section id="throughput-tile" class="metric">
+  <header class="metric-header">
+    <div class="metric-header-controls">
+      <button class="reset-btn"
+              type="button"
+              hx-get="/api/internal/throughput?contract={{ contract.name }}"
+              hx-target="#{{ chart_container_id }}"
+              hx-swap="outerHTML"
+              title="Re-load this chart">↻ Reset</button>
+      {% if mode == 'tile' %}
+        <a class="details-link"
+           href="/contracts/{{ contract.name }}/metrics/throughput">Details →</a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% include "_partials/throughput_chart_fragment.html.jinja" %}
+</section>

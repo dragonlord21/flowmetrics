@@ -31,6 +31,7 @@ from .web.components.lifecycle import (
     ItemNotFound,
     render as render_lifecycle,
 )
+from .web.components.throughput import render as render_throughput
 from .web.components.work_items_table import (
     SortDir,
     SortKey,
@@ -170,9 +171,12 @@ def create_app(
     )
     def dashboard(request: Request, contract_id: str) -> HTMLResponse:
         _ensure_contract_exists(contract_id)
+        # The dashboard is metric-overview only; the per-item table
+        # belongs to the metric detail pages. Don't pay the cost of
+        # building it here.
         with _open_warehouse() as con:
             cycle_time = render_cycle_time(con, contract_id)
-            work_items = render_work_items_table(con, contract_id)
+            throughput = render_throughput(con, contract_id)
         return templates.TemplateResponse(
             request,
             "dashboard.html.jinja",
@@ -182,7 +186,7 @@ def create_app(
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "cycle_time": cycle_time,
-                "work_items": work_items,
+                "throughput": throughput,
             },
         )
 
@@ -239,26 +243,88 @@ def create_app(
         )
 
     @app.get(
-        "/contracts/{contract_id}/items/{source}/{item_id:path}",
+        "/contracts/{contract_id}/metrics/throughput",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def throughput_detail(request: Request, contract_id: str) -> HTMLResponse:
+        _ensure_contract_exists(contract_id)
+        with _open_warehouse() as con:
+            throughput = render_throughput(con, contract_id)
+            work_items = render_work_items_table(con, contract_id)
+        return templates.TemplateResponse(
+            request,
+            "throughput_detail.html.jinja",
+            {
+                "title": f"Throughput — {contract_id}",
+                "metric_name": "Throughput",
+                "contract": {"name": contract_id},
+                "available_contracts": _available_contracts(),
+                "view": {"since": None, "until": None},
+                "throughput": throughput,
+                "work_items": work_items,
+            },
+        )
+
+    @app.get(
+        "/api/internal/throughput",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def throughput_fragment(request: Request, contract: str) -> HTMLResponse:
+        _ensure_contract_exists(contract)
+        with _open_warehouse() as con:
+            throughput = render_throughput(con, contract)
+        return templates.TemplateResponse(
+            request,
+            "_partials/throughput_chart_fragment.html.jinja",
+            {
+                "data": throughput,
+                "chart_height": 280,
+                "contract": {"name": contract},
+            },
+        )
+
+    @app.get(
+        "/contracts/{contract_id}/items/{item_id:path}",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
     def item_lifecycle(
         request: Request,
         contract_id: str,
-        source: str,
         item_id: str,
     ) -> HTMLResponse:
         """Per-item lifecycle: timeline of stage transitions for one
         work item, plus a tabular event list below.
 
-        `item_id` uses `:path` so GitHub ids like `#19342` (URL-encoded
-        as `%23…`) and Jira keys like `ABC-123` both pass through
-        cleanly without further matching tricks."""
+        The contract specifies the source (github / jira) — we don't
+        repeat it in the URL since it's an implementation detail of
+        where the data came from, not part of the resource identity.
+
+        `item_id` uses `:path` so GitHub ids like `#19342` (URL-
+        encoded as `%23…`) and Jira keys like `ABC-123` both pass
+        through cleanly without further matching tricks. We strip
+        the GitHub-specific `#` if the caller omits it — the
+        warehouse stores items with `#` for GitHub PR numbers
+        per the source adapter convention, but the URL accepts
+        either form.
+        """
         _ensure_contract_exists(contract_id)
+        from .contract import load_contract
+
+        contract = load_contract(contract_id, contracts_dir)
+        # Accept ids with or without the leading `#` for GitHub
+        # PR numbers — both `12345` and `#12345` route to the
+        # canonical warehouse id (`#12345`).
+        resolved_id = item_id
+        if contract.source == "github" and not item_id.startswith("#"):
+            resolved_id = "#" + item_id
         try:
             with _open_warehouse() as con:
-                data = render_lifecycle(con, contract_id, source, item_id)
+                data = render_lifecycle(
+                    con, contract_id, contract.source, resolved_id
+                )
         except ItemNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return templates.TemplateResponse(
@@ -285,16 +351,23 @@ def create_app(
         request: Request,
         contract: str,
         q: str | None = None,
+        completed_on: str | None = None,
         sort: str = "completed_at",
         direction: str = "desc",
     ) -> HTMLResponse:
         """HTMX swap target for the work-items table: sort+filter
-        round-trip to the server, return only the partial."""
+        round-trip to the server, return only the partial.
+
+        `completed_on` is a YYYY-MM-DD date (UTC) that drills the
+        table to a single day — used when the viewer clicks a bar
+        on the throughput chart.
+        """
         _ensure_contract_exists(contract)
         # Normalise sort/direction via the component's whitelist —
         # invalid values fall back to defaults inside render().
         sort_key: SortKey = sort if sort in (
-            "item_id", "title", "completed_at", "cycle_time_days"
+            "item_id", "title", "created_at",
+            "completed_at", "cycle_time_days"
         ) else "completed_at"
         direction_key: SortDir = direction if direction in (
             "asc", "desc"
@@ -304,6 +377,7 @@ def create_app(
                 con,
                 contract,
                 q=q,
+                completed_on=completed_on,
                 sort=sort_key,
                 direction=direction_key,
             )

@@ -102,6 +102,41 @@ class TestCycleTimeDays:
         assert result is not None
         assert abs(result - 2.125) < 1e-9
 
+    def test_cycle_time_function_is_defined_exactly_once(self):
+        """Single source of truth: `cycle_time_days` is defined in
+        `materialise.py` only. Every UI consumer reads the
+        pre-computed `cycle_time_days` column from Parquet — no
+        component re-derives the value. Drift between definitions
+        has caused past metric-mismatch bugs (e.g. lifecycle showing
+        ~10h while the table reports 1.41d).
+
+        This guards against the regression by scanning the codebase
+        for a `def cycle_time_days(` outside materialise.py. The
+        formula's specific `+ 1 day` Vacanti adjustment is too easy
+        to "helpfully" re-implement; the test forbids that.
+        """
+        from pathlib import Path
+
+        src_root = (
+            Path(__file__).parent.parent / "src" / "flowmetrics"
+        )
+        offenders: list[tuple[str, int, str]] = []
+        for path in src_root.rglob("*.py"):
+            if "__pycache__" in path.parts:
+                continue
+            for lineno, line in enumerate(path.read_text().splitlines(), 1):
+                if "def cycle_time_days(" in line:
+                    rel = str(path.relative_to(src_root))
+                    if rel != "materialise.py":
+                        offenders.append((rel, lineno, line.strip()))
+        assert not offenders, (
+            "`def cycle_time_days(` defined OUTSIDE materialise.py — "
+            "the function must exist in exactly one place. UI "
+            "consumers read the stored column instead. "
+            "Offenders:\n"
+            + "\n".join(f"  {p}:{ln}: {ll}" for p, ln, ll in offenders)
+        )
+
     def test_completion_before_creation_surfaces_bad_data(self):
         """If a source-data bug delivers completed < created, the
         +1 still gets applied, but the negative duration term

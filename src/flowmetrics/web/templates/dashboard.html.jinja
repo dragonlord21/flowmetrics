@@ -1,6 +1,9 @@
 {% extends "_base.html.jinja" %}
 
 {% block content %}
+  {# Landing page is metric-overview only. Per-item drill-down
+     (work-items table, lifecycle pages) lives behind the
+     "Details →" link on each tile. #}
   {% with summary = {"title": "Cycle time", "headline": cycle_time.headline} %}
     {% include "_partials/metric_summary.html.jinja" %}
   {% endwith %}
@@ -8,7 +11,10 @@
     {% include "_partials/cycle_time_tile.html.jinja" %}
   {% endwith %}
 
-  {% with data = work_items %}
-    {% include "_partials/work_items_table.html.jinja" %}
+  {% with summary = {"title": "Throughput", "headline": throughput.headline} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+  {% with mode = 'tile', data = throughput %}
+    {% include "_partials/throughput_tile.html.jinja" %}
   {% endwith %}
 {% endblock %}

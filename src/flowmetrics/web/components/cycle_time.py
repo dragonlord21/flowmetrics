@@ -13,42 +13,30 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, date, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import duckdb
 
-from ...utc_dates import to_utc_display_date, to_utc_iso_date
+from ...utc_dates import attach_utc, to_utc_display_date, to_utc_iso_date
 
-# Knox design-system colors, resolved values for --hue: 290.
-# Vega-Lite specs need literal CSS color strings (the calc()-based
-# CSS variables aren't visible to Vega), so we mirror the tokens
-# here. If --hue ever changes, recompute these values:
-#   --p-500  hsl(<hue>, 46%, 48%)   primary plum
-#   --s-500  hsl(<hue+60>, 44%, 56%) warm berry
-#   --s-700  hsl(<hue+60>, 50%, 34%) deep berry (high-stakes)
-#   --t-500  hsl(<hue-60>, 32%, 54%) cool slate (info / median)
-#   --muted  hsl(<hue>, 12%, 46%)
-_P_500 = "hsl(290, 46%, 48%)"
-_S_500 = "hsl(350, 44%, 56%)"
-_S_700 = "hsl(350, 50%, 34%)"
-_T_500 = "hsl(230, 32%, 54%)"
-_T_700 = "hsl(230, 38%, 32%)"
-_MUTED = "hsl(290, 12%, 46%)"
-
-# Per-percentile assignment.
-#   P50 — cool tone (info / "typical")        → --t-500
-#   P85 — primary (commitment threshold)      → --p-500
-#   P95 — warm deep (high-stakes commitment)  → --s-700
-_PCT_COLOR_P50 = _T_500
-_PCT_COLOR_P85 = _P_500
-_PCT_COLOR_P95 = _S_700
-# Scatter dots — neutral. The data cloud is supporting visual, not
-# the hero; the percentile lines (in primary + secondary + tertiary)
-# are what should pop against it. A muted gray dot lets all three
-# percentile colors register without fighting 43 plum points for
-# attention.
-_SCATTER_COLOR = _MUTED
+# Chart colors are NOT defined in Python — they live as CSS tokens
+# on `:root` (see `_base.html.jinja`) and are substituted into the
+# spec at embed time by `window.applyTheme`. Python emits
+# `__theme:<token>__` placeholders; the browser resolves them from
+# the current CSS values. One theme change in CSS flows everywhere
+# without touching Python.
+#
+# Per-percentile assignment — three intensities of the brand hue:
+#   P50 — light plum  (typical / soft signal)      → --p-200
+#   P85 — primary plum (Vacanti commitment line)   → --p-500
+#   P95 — deep plum   (high-stakes commitment)     → --p-700
+_PCT_COLOR_P50 = "__theme:p-200__"
+_PCT_COLOR_P85 = "__theme:p-500__"
+_PCT_COLOR_P95 = "__theme:p-700__"
+# Scatter dots — neutral. The data cloud is supporting visual; the
+# percentile lines are the hero.
+_SCATTER_COLOR = "__theme:muted__"
 
 
 @dataclass(frozen=True)
@@ -124,18 +112,6 @@ def render(con: duckdb.DuckDBPyConnection, contract_name: str) -> CycleTimeData:
         [contract_name],
     ).fetchall()
 
-    def _aware(d):
-        """Attach UTC tzinfo at the warehouse-read boundary.
-
-        DuckDB strips timezone info when reading Parquet TIMESTAMP
-        columns, returning naive datetimes. The warehouse's
-        materialise contract (see docs/SPEC-warehouse-app.md §4.1)
-        guarantees `completed_at` is stored as UTC, so attaching
-        UTC here is asserting that contract — it's not the silent-
-        local-time fallthrough the utc_dates utility forbids.
-        """
-        return d.replace(tzinfo=UTC) if (d and d.tzinfo is None) else d
-
     points = tuple(
         CycleTimePoint(
             item_id=str(item_id),
@@ -145,9 +121,9 @@ def render(con: duckdb.DuckDBPyConnection, contract_name: str) -> CycleTimeData:
             # only sanctioned UTC-anchored date-formatter. Naive
             # datetimes raise; aware datetimes are UTC-truncated;
             # the tooltip never sees browser-local time.
-            completed_at=to_utc_iso_date(_aware(completed_at)) if completed_at else "",
+            completed_at=to_utc_iso_date(attach_utc(completed_at)) if completed_at else "",
             completed_at_display=(
-                to_utc_display_date(_aware(completed_at)) if completed_at else ""
+                to_utc_display_date(attach_utc(completed_at)) if completed_at else ""
             ),
             cycle_time_days=float(cycle_time_days) if cycle_time_days is not None else 0.0,
         )

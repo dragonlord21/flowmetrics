@@ -51,13 +51,14 @@
           },
           "encoding": {
             "y": {
-              "field": "stage",
+              "field": "y_label",
               "type": "nominal",
-              "sort": stages.map(function (s) { return s.stage; }),
+              "sort": stages.map(function (s) { return s.y_label; }),
               "axis": {
                 "title": null,
                 "labelFontSize": 13,
-                "labelPadding": 6
+                "labelPadding": 8,
+                "labelLimit": 240
               }
             },
             "x": {
@@ -73,17 +74,17 @@
             },
             "x2": {"field": "exited_at_iso"},
             "color": {
-              "field": "stage",
+              "field": "y_label",
               "type": "nominal",
               "scale": {
-                "domain": stages.map(function (s) { return s.stage; }),
+                "domain": stages.map(function (s) { return s.y_label; }),
                 "range": [
-                  "hsl(230, 32%, 54%)",  // --t-500 tertiary slate
-                  "hsl(350, 44%, 56%)",  // --s-500 secondary berry
-                  "hsl(230, 38%, 32%)",  // --t-700 deep slate
-                  "hsl(350, 50%, 34%)",  // --s-700 deep berry
-                  "hsl(230, 32%, 74%)",  // --t-500 lightened
-                  "hsl(350, 44%, 76%)"   // --s-500 lightened
+                  "__theme:p-200__",
+                  "__theme:p-500__",
+                  "__theme:p-700__",
+                  "__theme:p-200__",
+                  "__theme:p-500__",
+                  "__theme:p-700__"
                 ]
               },
               "legend": null
@@ -96,27 +97,10 @@
             ]
           }
         },
-        {
-          "data": {"values": stages},
-          "mark": {
-            "type": "text",
-            "align": "center",
-            "baseline": "middle",
-            "fontSize": 11,
-            "color": "white",
-            "fontWeight": 500
-          },
-          "encoding": {
-            "y": {"field": "stage", "type": "nominal"},
-            "x": {"aggregate": "mean", "field": "entered_at_iso", "type": "temporal"},
-            "x2": {"aggregate": "mean", "field": "exited_at_iso"},
-            "text": {"field": "duration_display", "type": "nominal"}
-          }
-        }
       ].concat(terminalAt && terminalStage ? [
         {
           "data": {"values": [{"t": terminalAt, "label": terminalStage}]},
-          "mark": {"type": "rule", "color": "hsl(290, 46%, 48%)", "size": 2, "strokeDash": [4, 3]},
+          "mark": {"type": "rule", "color": "__theme:p-500__", "size": 2, "strokeDash": [4, 3]},
           "encoding": {
             "x": {"field": "t", "type": "temporal"}
           }
@@ -131,7 +115,7 @@
             "dy": 4,
             "fontSize": 12,
             "fontWeight": 600,
-            "color": "hsl(290, 52%, 30%)"
+            "color": "__theme:p-700__"
           },
           "encoding": {
             "x": {"field": "t", "type": "temporal"},
@@ -144,12 +128,12 @@
         "axis": {
           "labelFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
           "titleFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
-          "labelColor": "hsl(290, 28%, 13%)",
-          "titleColor": "hsl(290, 12%, 46%)"
+          "labelColor": "__theme:fg__",
+          "titleColor": "__theme:muted__"
         }
       }
     };
-    vegaEmbed("#{{ chart_container_id }}", spec, {
+    vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
       actions: false,
       renderer: "svg"
     }).catch(function (err) {

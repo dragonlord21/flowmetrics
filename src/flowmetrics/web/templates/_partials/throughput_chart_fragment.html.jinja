@@ -1,0 +1,73 @@
+{# Throughput chart fragment: chart container + Vega-Lite embed.
+   Used inside the tile partial AND returned from
+   `/api/internal/throughput` as the HTMX swap payload.
+
+   Click-through: clicking a bar tells the work-items table on the
+   same page to filter to that completion date. The handler is
+   defensive — if there's no table on the page, the click is a
+   no-op (so this fragment is safe to embed on any page).
+
+   Required context:
+     data           — ThroughputData (provides vega_spec_json())
+     chart_height   — int pixels (~280 for tile, ~440 for detail)
+     contract.name  — used to build the work-items endpoint URL
+#}
+{%- set chart_container_id = "throughput-chart" -%}
+{%- set _h = chart_height|default(280) -%}
+
+<div id="{{ chart_container_id }}" class="metric-chart"
+     data-chart-height="{{ _h }}"></div>
+<script>
+  (function () {
+    // HTMX outerHTML-swaps this whole fragment on Reset. Vega
+    // doesn't tear down the prior View when its container DOM is
+    // replaced — its click listener (with the htmx.ajax closure)
+    // stays alive in memory and would fire on subsequent clicks
+    // against the stale view. Finalize the previous instance
+    // before re-embedding so listeners don't accumulate across
+    // reset cycles.
+    if (window.__flowmetricsThroughputView) {
+      try { window.__flowmetricsThroughputView.finalize(); }
+      catch (e) { /* finalize is best-effort */ }
+      window.__flowmetricsThroughputView = null;
+    }
+
+    const spec = {{ data.vega_spec_json() | safe }};
+    spec.height = {{ _h }};
+    vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
+      actions: false,
+      renderer: "svg"
+    }).then(function (res) {
+      window.__flowmetricsThroughputView = res.view;
+      // Click-through: a bar carries `datum.date_iso`. Set the
+      // hidden filter input on the work-items table and ask HTMX
+      // to re-render that fragment. If there is no work-items
+      // table on the current page, do nothing.
+      // TODO(cross-component coupling): refactor to a custom event
+      // (e.g. `flowmetrics:filter-by-date`) when a second chart
+      // needs to drive the same filter. Single-consumer today.
+      res.view.addEventListener("click", function (_event, item) {
+        if (!item || !item.datum || !item.datum.date_iso) return;
+        const filterInput = document.getElementById(
+          "work-items-completed-on"
+        );
+        const body = document.getElementById("work-items-body");
+        const wrap = document.getElementById("work-items");
+        if (!filterInput || !body || !wrap) return;
+        filterInput.value = item.datum.date_iso;
+        const contract = wrap.dataset.contract || "{{ contract.name }}";
+        const url = (
+          "/api/internal/work-items?contract=" +
+          encodeURIComponent(contract) +
+          "&completed_on=" + encodeURIComponent(item.datum.date_iso)
+        );
+        if (typeof htmx !== "undefined") {
+          htmx.ajax("GET", url, {target: "#work-items-body", swap: "innerHTML"});
+        }
+      });
+    }).catch(function (err) {
+      const el = document.getElementById("{{ chart_container_id }}");
+      el.innerText = "Chart render failed: " + err;
+    });
+  })();
+</script>

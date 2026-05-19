@@ -70,3 +70,34 @@ def to_utc_display_date(d: date | datetime) -> str:
     raw `strftime` on a date from outside this module.
     """
     return _ensure_utc_date(d).strftime("%b %d, %Y")
+
+
+def attach_utc(d: datetime | None) -> datetime | None:
+    """Re-attach `tzinfo=UTC` to a naive datetime that we know came
+    from a UTC source.
+
+    DuckDB strips timezone info when reading aware-UTC TIMESTAMP
+    columns from Parquet — the value is still UTC, we've just lost
+    the marker. This helper is the canonical place that handles
+    that warehouse-read boundary; every component renderer used to
+    inline its own private `_aware()` doing exactly this.
+
+    Contract:
+      - `None`          → `None`   (passthrough)
+      - naive datetime  → aware UTC (re-attach the dropped marker)
+      - aware datetime  → returned unchanged (do not convert; if
+                          the upstream value carries a non-UTC tz,
+                          that's a different bug and shouldn't be
+                          silently rewritten here)
+
+    Distinct from `to_utc_iso_date` / `to_utc_display_date`, which
+    REJECT naive datetimes — those are user-facing formatters where
+    silent local-time interpretation is the silent-bug vector. This
+    helper is the opposite path: "I know this is UTC because the
+    warehouse stores UTC; restore the marker."
+    """
+    if d is None:
+        return None
+    if d.tzinfo is None:
+        return d.replace(tzinfo=UTC)
+    return d

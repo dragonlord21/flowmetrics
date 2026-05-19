@@ -87,13 +87,102 @@ class TestWorkItemsTableShape:
         assert first.item_id
         assert first.title
         assert first.source in ("github", "jira")
-        # Lifecycle
+        # Lifecycle — both endpoints. Start date is the column the
+        # table will surface alongside the completion date.
+        assert re.match(r"^\d{4}-\d{2}-\d{2}$", first.created_at)
+        assert first.created_at_display
         assert re.match(r"^\d{4}-\d{2}-\d{2}$", first.completed_at)
-        assert first.completed_at_display  # pre-formatted UTC display
+        assert first.completed_at_display
         assert isinstance(first.cycle_time_days, float)
         # Optional: source URL for "open on GitHub/Jira"
         # (None acceptable; field present)
         assert first.url is None or first.url.startswith("http")
+
+    def test_created_at_display_is_utc_anchored(self, warehouse):
+        """Same TZ-safety contract as completed_at: the Started
+        column must show the same UTC date regardless of viewer
+        timezone."""
+        data = render(warehouse, "astral-uv-week")
+        for r in data.rows:
+            assert re.match(
+                r"^[A-Z][a-z]{2}\s+\d{1,2},\s+\d{4}$", r.created_at_display
+            ), (
+                f"created_at_display must be '%b %d, %Y'; got "
+                f"{r.created_at_display!r} on item {r.item_id!r}"
+            )
+
+    def test_created_at_is_never_after_completed_at(self, warehouse):
+        """Internal-data invariant: start ≤ end. Catches a class of
+        source-data corruption where the events table delivers a
+        completion before the creation."""
+        data = render(warehouse, "astral-uv-week")
+        for r in data.rows:
+            assert r.created_at <= r.completed_at, (
+                f"item {r.item_id!r}: created_at {r.created_at!r} "
+                f"is after completed_at {r.completed_at!r}"
+            )
+
+    def test_completed_on_filter_narrows_to_one_calendar_date(self, warehouse):
+        """The throughput chart's click-handler will pass a single
+        UTC date here to filter the table to items that completed on
+        that exact date. The fixture's May 04 has 19 completions —
+        passing completed_on='2026-05-04' must return exactly those."""
+        data = render(
+            warehouse, "astral-uv-week", completed_on="2026-05-04"
+        )
+        assert data.count == 19, (
+            f"completed_on='2026-05-04' should return the 19 items "
+            f"completed on May 4; got {data.count}"
+        )
+        for r in data.rows:
+            assert r.completed_at == "2026-05-04", (
+                f"every row's completed_at must match the filter; "
+                f"got {r.completed_at!r} for {r.item_id!r}"
+            )
+
+    def test_completed_on_filter_with_no_matches_returns_zero_rows(
+        self, warehouse
+    ):
+        data = render(
+            warehouse, "astral-uv-week", completed_on="2099-12-31"
+        )
+        assert data.rows == ()
+        assert data.count == 0
+
+    def test_completed_on_filter_combines_with_q_filter(self, warehouse):
+        """Filters compose: title contains 'q' AND completion date
+        equals X. Used when a viewer drills into a specific day and
+        then types a substring in the search box."""
+        # Find a (date, substring) pair from the fixture that
+        # narrows to ≥1 row but ≠ the full set.
+        all_may4 = render(warehouse, "astral-uv-week", completed_on="2026-05-04")
+        if not all_may4.rows:
+            return  # defensive — fixture changed
+        sample_title = all_may4.rows[0].title
+        if len(sample_title) < 4:
+            return  # defensive — pick a longer needle
+        needle = sample_title[:4].lower()
+        filtered = render(
+            warehouse,
+            "astral-uv-week",
+            q=needle,
+            completed_on="2026-05-04",
+        )
+        for r in filtered.rows:
+            assert r.completed_at == "2026-05-04"
+            assert needle in r.title.lower()
+
+    def test_sort_by_created_at_orders_by_start_date(self, warehouse):
+        """The new column needs a sort affordance. Pass
+        sort='created_at' and the rows come back ordered by start
+        date — defaults to descending (most-recently-started first)
+        like the other date column."""
+        data = render(warehouse, "astral-uv-week", sort="created_at")
+        starts = [r.created_at for r in data.rows]
+        assert starts == sorted(starts, reverse=True), (
+            f"sort=created_at must order rows by start date desc; "
+            f"got {starts}"
+        )
 
     def test_completed_at_display_is_utc_anchored(self, warehouse):
         """Same TZ-safety contract as the cycle-time chart: the

@@ -526,12 +526,19 @@ class TestMetricSummaryAboveChart:
     ):
         """Two assertions: the headline text exists on the page,
         AND its position in the DOM is BEFORE the chart-tile
-        section. 'Above' is structural, not just visual."""
+        section. 'Above' is structural, not just visual.
+
+        The dashboard now hosts multiple metric tiles (cycle time,
+        throughput, …) each with its own summary block. Scope to
+        the cycle-time summary by header text."""
         page.goto(server_url + "/contracts/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
-        summary = page.locator(".metric-summary")
+        # Cycle-time summary: the .metric-summary block whose title
+        # text contains "Cycle time".
+        summary = page.locator(
+            ".metric-summary", has_text="Cycle time"
+        ).first
         expect(summary).to_be_visible()
-        # The summary's headline text is the count+percentiles.
         text = summary.inner_text()
         assert "43 items completed" in text, (
             f"summary must show the item count; got {text!r}"
@@ -539,13 +546,18 @@ class TestMetricSummaryAboveChart:
         assert "P50" in text and "P85" in text and "P95" in text, (
             f"summary must show P50/P85/P95; got {text!r}"
         )
-        # Structural position: summary precedes the chart tile.
+        # Structural position: this summary precedes the cycle-time
+        # chart tile.
         ordering = page.evaluate(
             """() => {
-                const summ = document.querySelector('.metric-summary');
+                const summaries = Array.from(
+                    document.querySelectorAll('.metric-summary')
+                );
+                const summ = summaries.find(s => s.innerText.includes('Cycle time'));
                 const tile = document.querySelector('#cycle-time-tile');
                 if (!summ || !tile) return null;
-                return summ.compareDocumentPosition(tile) & Node.DOCUMENT_POSITION_FOLLOWING ? 'summary-first' : 'tile-first';
+                return (summ.compareDocumentPosition(tile) & Node.DOCUMENT_POSITION_FOLLOWING)
+                    ? 'summary-first' : 'tile-first';
             }"""
         )
         assert ordering == "summary-first", (
@@ -623,6 +635,250 @@ class TestDetailPageHeader:
             f"dashboard site header must NOT carry a metric name "
             f"(the dashboard is multi-metric); got {header_text!r}"
         )
+
+
+class TestThroughputOnDashboard:
+    """Slice 3: throughput renders as a second tile on the dashboard,
+    plus its own detail page. Daily bar chart, one bar per enumerated
+    UTC date in the window (zeros included for slow days).
+    """
+
+    def test_dashboard_renders_throughput_tile_with_bars(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        page.wait_for_timeout(400)
+        # Vega-Lite renders bar marks under the `.mark-rect` class
+        # (bar is a rect-mark variant). One path per enumerated date.
+        n_bars = page.evaluate(
+            """() => document.querySelectorAll(
+                '#throughput-tile svg .mark-rect path'
+            ).length"""
+        )
+        # Fixture window has completions every day across 7 days;
+        # expect ≥ 5 bars (defensive against fixture changes).
+        assert n_bars >= 5, (
+            f"throughput chart drew {n_bars} bars; expected ≥ 5 "
+            f"daily bars for the fixture window"
+        )
+
+    def test_dashboard_throughput_summary_appears_above_tile(
+        self, server_url: str, page: Page
+    ):
+        """Same composable pattern as cycle time: the headline lives
+        in `.metric-summary` ABOVE the chart tile in DOM order."""
+        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        # There are two metric-summary blocks on the dashboard now
+        # (cycle time + throughput); find the one near the
+        # throughput tile by walking previousSibling chain.
+        ordering = page.evaluate(
+            """() => {
+                const tile = document.getElementById('throughput-tile');
+                if (!tile) return null;
+                // The throughput tile's preceding sibling group is
+                // the throughput metric-summary. The summary text
+                // must mention "Throughput".
+                let prev = tile.previousElementSibling;
+                while (prev) {
+                    if (prev.classList.contains('metric-summary')
+                        && prev.innerText.toLowerCase().includes('throughput')) {
+                        return 'summary-precedes-tile';
+                    }
+                    prev = prev.previousElementSibling;
+                }
+                return 'no-summary-found';
+            }"""
+        )
+        assert ordering == "summary-precedes-tile", (
+            f"throughput metric-summary must precede the tile in DOM "
+            f"order with title 'Throughput'; got {ordering!r}"
+        )
+
+    def test_throughput_detail_page_renders_chart_full_size(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        expect(page.locator("#throughput-tile svg")).to_be_visible()
+
+    def test_throughput_detail_page_header_carries_metric_name(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        header_text = page.locator(".site-header").inner_text()
+        assert "Throughput" in header_text, (
+            f"detail page site header must include the metric name; "
+            f"got {header_text!r}"
+        )
+
+    def test_throughput_tile_details_link_uses_contract_scoped_url(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        link = page.locator("#throughput-tile a:has-text('Details')")
+        href = link.get_attribute("href")
+        assert href and href.startswith(
+            "/contracts/astral-uv-week/metrics/throughput"
+        ), (
+            f"throughput Details → must link to the contract-scoped "
+            f"URL; got {href!r}"
+        )
+
+    def test_throughput_reset_button_swaps_chart_via_htmx(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        page.wait_for_timeout(400)
+        n_before = page.locator("#throughput-tile svg .mark-rect path").count()
+        page.locator("#throughput-tile button.reset-btn").first.click()
+        page.wait_for_timeout(700)
+        page.wait_for_selector("#throughput-tile svg", timeout=5000)
+        n_after = page.locator("#throughput-tile svg .mark-rect path").count()
+        assert n_after == n_before, (
+            f"after reset, throughput should re-render with the same "
+            f"data: before={n_before}, after={n_after}"
+        )
+        assert page.locator("#throughput-chart").count() == 1, (
+            "reset swap produced duplicate throughput chart containers"
+        )
+
+    def test_clicking_a_bar_filters_the_work_items_table(
+        self, server_url: str, page: Page
+    ):
+        """Click-through: clicking a throughput bar tells the
+        work-items table to filter to that completion date. The
+        rendered row count must drop to the bar's count value, and
+        the table must show a "filtered to <date>" chip with a
+        clear link.
+
+        The work-items table lives on the THROUGHPUT DETAIL page
+        (not the dashboard) — both pieces co-located, so the click
+        affects the table on the same page. The dashboard chart's
+        click handler is a no-op there (no table to filter), which
+        is intentional.
+
+        The throughput chart is layered: a `g.mark-rect` group for
+        the weekend shading and another for the bars. The bars
+        layer paints AFTER the shading, so we scope the locator to
+        the LAST `.mark-rect` group (the bars). Among those bars
+        the tallest is May 04 — 19 completions in the fixture.
+        """
+        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        page.wait_for_selector("#work-items", timeout=10000)
+        page.wait_for_timeout(500)
+
+        # Identify the tallest bar in the bar layer (last
+        # `g.mark-rect` group) and dispatch a synthetic MouseEvent
+        # with bubbling so Vega's SVG-level click delegation
+        # resolves the datum. Playwright's `mouse.click` was hitting
+        # the wrong layer on this layered chart.
+        clicked = page.evaluate(
+            """() => {
+                const groups = document.querySelectorAll(
+                    '#throughput-tile svg g.mark-rect'
+                );
+                if (!groups.length) return false;
+                const barLayer = groups[groups.length - 1];
+                const paths = barLayer.querySelectorAll('path');
+                let tallest = null;
+                let h = 0;
+                for (const p of paths) {
+                    const r = p.getBoundingClientRect();
+                    if (r.height > h) { h = r.height; tallest = p; }
+                }
+                if (!tallest) return false;
+                const r = tallest.getBoundingClientRect();
+                const ev = new MouseEvent('click', {
+                    bubbles: true, cancelable: true,
+                    clientX: r.x + r.width / 2,
+                    clientY: r.y + r.height / 2,
+                    view: window,
+                });
+                tallest.dispatchEvent(ev);
+                return true;
+            }"""
+        )
+        assert clicked, "could not locate or dispatch click on a bar"
+        page.wait_for_timeout(800)
+
+        # The chip must appear, naming the date.
+        chip = page.locator(".work-items-active-filter")
+        expect(chip).to_be_visible()
+        chip_text = chip.inner_text()
+        assert "May" in chip_text, (
+            f"chip must show the clicked date; got {chip_text!r}"
+        )
+
+        # Row count must drop to the bar's count (single day).
+        rows = page.locator("table.work-items-grid tbody tr")
+        n_rows = rows.count()
+        assert 1 <= n_rows <= 25, (
+            f"after click, row count should reflect a single day; "
+            f"got {n_rows} rows"
+        )
+
+    def test_clear_filter_link_restores_all_rows(
+        self, server_url: str, page: Page
+    ):
+        """The "clear" affordance on the active-filter chip removes
+        the date filter and the table re-renders with all rows."""
+        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        page.wait_for_selector("#work-items", timeout=10000)
+        page.wait_for_timeout(500)
+
+        clicked = page.evaluate(
+            """() => {
+                const groups = document.querySelectorAll(
+                    '#throughput-tile svg g.mark-rect'
+                );
+                if (!groups.length) return false;
+                const barLayer = groups[groups.length - 1];
+                const path = barLayer.querySelector('path');
+                if (!path) return false;
+                const r = path.getBoundingClientRect();
+                const ev = new MouseEvent('click', {
+                    bubbles: true, cancelable: true,
+                    clientX: r.x + r.width / 2,
+                    clientY: r.y + r.height / 2,
+                    view: window,
+                });
+                path.dispatchEvent(ev);
+                return true;
+            }"""
+        )
+        assert clicked
+        page.wait_for_timeout(700)
+        expect(page.locator(".work-items-active-filter")).to_be_visible()
+        # Click clear.
+        page.locator(".work-items-clear-filter").click()
+        page.wait_for_timeout(700)
+        assert page.locator(".work-items-active-filter").count() == 0, (
+            "clear link should remove the active-filter chip"
+        )
+        n_rows = page.locator("table.work-items-grid tbody tr").count()
+        assert n_rows == 43, (
+            f"clear should restore all 43 rows; got {n_rows}"
+        )
+
+    def test_throughput_fragment_endpoint_returns_chart_only(
+        self, server_url: str, page: Page
+    ):
+        response = page.request.get(
+            server_url + "/api/internal/throughput?contract=astral-uv-week"
+        )
+        assert response.status == 200
+        html = response.text()
+        assert "throughput-chart" in html
+        assert "vegaEmbed" in html
+        for forbidden in ("<!doctype html", "site-header", "filter-bar"):
+            assert forbidden not in html.lower()
 
 
 class TestSiteBrandLink:
@@ -736,34 +992,39 @@ class TestResetButton:
         )
 
 
-class TestWorkItemsTableOnDashboard:
-    """The work-items table is a composable component included on the
-    dashboard (below the cycle-time tile) and on detail pages. It's a
-    sortable, filterable per-item view backed by an HTMX fragment
-    endpoint at `/api/internal/work-items`.
+class TestWorkItemsTableOnDetailPages:
+    """The work-items table belongs on metric-specific pages, not on
+    the dashboard. The dashboard is a metric overview — its job is
+    "what's the shape of the data?" — and the per-item table fits
+    on the detail pages, where the viewer has already chosen which
+    metric they want to drill into.
+
+    These tests load the cycle-time detail page (the canonical
+    detail page in slice 2). The table behavior is identical on the
+    throughput detail page; only the surrounding chart differs.
     """
 
-    def test_dashboard_renders_work_items_table_with_all_rows(
+    _DETAIL = "/contracts/astral-uv-week/metrics/cycle-time"
+
+    def test_detail_page_renders_work_items_table_with_all_rows(
         self, server_url: str, page: Page
     ):
-        """The dashboard shows all 43 completed items in the fixture
-        window, one row each. The container has id="work-items" so HTMX
-        can swap it on filter/sort interactions."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         rows = page.locator("table.work-items-grid tbody tr")
         assert rows.count() == 43, (
-            f"expected 43 work-item rows on dashboard; got {rows.count()}"
+            f"expected 43 work-item rows on detail page; "
+            f"got {rows.count()}"
         )
 
-    def test_table_columns_show_id_title_completed_cycle(
+    def test_table_columns_show_id_title_started_completed_cycle(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         headers = page.locator("table.work-items-grid thead th").all_inner_texts()
         joined = " ".join(h.lower() for h in headers)
-        for expected in ("#", "title", "completed", "cycle"):
+        for expected in ("#", "title", "started", "completed", "cycle"):
             assert expected in joined, (
                 f"missing column header {expected!r}; headers were {headers}"
             )
@@ -773,7 +1034,7 @@ class TestWorkItemsTableOnDashboard:
     ):
         """Typing into the search input narrows the row count via
         HTMX (the wrapper swaps in place)."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         before = page.locator("table.work-items-grid tbody tr").count()
         assert before == 43
@@ -799,7 +1060,7 @@ class TestWorkItemsTableOnDashboard:
         """Clicking the 'Cycle (d)' column header asks the server to
         re-sort by cycle_time. Clicking it again toggles direction.
         Server-side sort via HTMX — no client JS."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
 
         def _cycle_values() -> list[float]:
@@ -813,10 +1074,7 @@ class TestWorkItemsTableOnDashboard:
         # monotonic in cycle_time. Sanity: we have 43 entries.
         assert len(default_order) == 43
 
-        # Click the Cycle (d) sort header. The header text is
-        # "Cycle (d)". After click + HTMX swap, rows should be
-        # sorted by cycle_time descending (first toggle defaults
-        # to desc per the component contract).
+        # Click the Cycle (d) sort header.
         page.locator("table.work-items-grid thead a:has-text('Cycle')").click()
         page.wait_for_timeout(500)
         sorted_desc = _cycle_values()
@@ -839,21 +1097,17 @@ class TestWorkItemsTableOnDashboard:
         """User-reported bug: typing in the search box scrolls the
         page. Root cause: the HTMX swap recreates the entire
         wrapper, so the `<input>` is a fresh DOM node after each
-        keystroke. The browser's restore-scroll / restore-focus
-        machinery then yanks the viewport around (and silently
-        drops anything the user might have set on the element —
-        IME composition, native selection, etc.).
+        keystroke.
 
         Fix is structural: the input must NOT be inside the swap
         target. This test pins that invariant via a marker the
         test plants on the input before filtering — if the element
         survived the swap, the marker is still there.
         """
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
 
         search = page.locator("#work-items-search")
-        # Plant a unique marker on the live element.
         marker = page.evaluate(
             """() => {
                 const el = document.getElementById('work-items-search');
@@ -866,35 +1120,50 @@ class TestWorkItemsTableOnDashboard:
 
         search.focus()
         search.press_sequentially("url", delay=20)
-        page.wait_for_timeout(800)  # debounce + HTMX round-trip
+        page.wait_for_timeout(800)
 
         marker_after = page.evaluate(
             """() => document.getElementById('work-items-search')?.dataset.testMarker || ''"""
         )
         assert marker_after == marker, (
             f"search input was recreated during HTMX swap — marker "
-            f"{marker!r} did not survive (got {marker_after!r}). The "
-            f"input must live OUTSIDE the swap target so it isn't "
-            f"replaced on every keystroke."
+            f"{marker!r} did not survive (got {marker_after!r})."
         )
 
     def test_each_row_links_to_item_lifecycle_page(
         self, server_url: str, page: Page
     ):
         """The leftmost cell (item_id) is a link to the per-item
-        lifecycle page under /contracts/<id>/items/<source>/<item_id>."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        lifecycle page under /contracts/<id>/items/<item_id>."""
+        page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         first_id_link = page.locator(
             "table.work-items-grid tbody tr:first-child td.id a"
         )
         href = first_id_link.get_attribute("href")
-        assert href is not None, "first row's id cell must contain a link"
-        assert href.startswith(
-            "/contracts/astral-uv-week/items/"
-        ), (
-            f"id-cell link must point at the lifecycle page under "
-            f"/contracts/<id>/items/...; got {href!r}"
+        assert href is not None
+        assert href.startswith("/contracts/astral-uv-week/items/"), (
+            f"id-cell link must point at the lifecycle page; got {href!r}"
+        )
+
+    def test_dashboard_does_NOT_show_the_work_items_table(
+        self, server_url: str, page: Page
+    ):
+        """Landing page is metric-overview only. The per-item table
+        belongs to detail pages — including it on the dashboard
+        duplicates information already in the charts and makes the
+        landing page noisy."""
+        page.goto(server_url + "/contracts/astral-uv-week/")
+        # Let charts load so we know the page is fully rendered.
+        page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
+        page.wait_for_selector("#throughput-tile svg", timeout=10000)
+        page.wait_for_timeout(300)
+        assert page.locator("#work-items").count() == 0, (
+            "dashboard must NOT render the work-items table — it "
+            "belongs on the detail pages"
+        )
+        assert page.locator("table.work-items-grid").count() == 0, (
+            "dashboard must NOT render any .work-items-grid table"
         )
 
 
@@ -978,6 +1247,26 @@ class TestWorkItemsFragmentEndpoint:
             f"300 chars: {html[:300]!r}"
         )
 
+    def test_endpoint_supports_completed_on_filter(
+        self, server_url: str, page: Page
+    ):
+        """`completed_on=YYYY-MM-DD` narrows the table to items
+        completed on that exact UTC date — used by the throughput
+        chart's bar-click handler."""
+        response = page.request.get(
+            server_url
+            + "/api/internal/work-items"
+            "?contract=astral-uv-week&completed_on=2026-05-04"
+        )
+        assert response.status == 200
+        html = response.text()
+        # The "Filtered to" chip should render in the body partial
+        # since the filter is active.
+        assert "work-items-active-filter" in html, (
+            f"endpoint must render the active-filter chip when "
+            f"completed_on is set; got first 400 chars: {html[:400]!r}"
+        )
+
     def test_endpoint_404s_for_unknown_contract(
         self, server_url: str, page: Page
     ):
@@ -1011,11 +1300,19 @@ class TestLifecyclePage:
 
     @staticmethod
     def _url(item_id: str) -> str:
+        """URL builder for the lifecycle page.
+
+        The data-source (github / jira) is implicit in the contract,
+        not in the URL. The GitHub `#` is stripped from the URL path
+        since `%23` reads as junk to humans; the route accepts both
+        forms and resolves to the canonical `#…` id internally.
+        """
         from urllib.parse import quote
 
+        clean = item_id.lstrip("#")
         return (
-            f"/contracts/astral-uv-week/items/github/"
-            f"{quote(item_id, safe='')}"
+            f"/contracts/astral-uv-week/items/"
+            f"{quote(clean, safe='')}"
         )
 
     def test_chartable_lifecycle_renders_gantt_bars(
@@ -1036,12 +1333,13 @@ class TestLifecyclePage:
             f"{self._CHARTABLE!r}; got {n_bars}"
         )
 
-    def test_chartable_lifecycle_yaxis_carries_stage_names(
+    def test_chartable_lifecycle_yaxis_carries_stage_names_and_duration(
         self, server_url: str, page: Page
     ):
-        """Stage names belong on the y-axis (not as overlap-prone
-        text labels above points). For #19342 the axis should
-        contain 'Draft' and 'Awaiting Review'."""
+        """The y-axis carries `<stage> · <duration>` for each band.
+        Replaces the earlier in-bar text overlay, which got cut off
+        for narrow bars near the chart's left edge (per the user's
+        bug report on #19291)."""
         page.goto(server_url + self._url(self._CHARTABLE))
         page.wait_for_selector("#lifecycle-chart svg", timeout=10000)
         page.wait_for_timeout(400)
@@ -1050,12 +1348,16 @@ class TestLifecyclePage:
                 '#lifecycle-chart svg .role-axis-label text'
             )).map(t => t.textContent)"""
         )
-        assert "Draft" in labels, (
-            f"y-axis must list 'Draft' as a stage; labels were {labels}"
+        # Each label has the form "<stage> · <duration>".
+        assert any(label.startswith("Draft · ") for label in labels), (
+            f"y-axis must include a 'Draft · <duration>' label; "
+            f"got {labels}"
         )
-        assert "Awaiting Review" in labels, (
-            f"y-axis must list 'Awaiting Review' as a stage; "
-            f"labels were {labels}"
+        assert any(
+            label.startswith("Awaiting Review · ") for label in labels
+        ), (
+            f"y-axis must include an 'Awaiting Review · <duration>' "
+            f"label; got {labels}"
         )
 
     def test_lifecycle_header_shows_item_identity(
@@ -1113,10 +1415,40 @@ class TestLifecyclePage:
             f"{self._NON_CHARTABLE!r}; got {n_event_rows}"
         )
 
+    def test_lifecycle_page_surfaces_cycle_time_metric(
+        self, server_url: str, page: Page
+    ):
+        """User-reported confusion: the gantt's time axis shows
+        wall-clock elapsed time (e.g. ~10 hours for #19330) but
+        the work-items table shows 1.41d for the same PR. Both
+        are correct — the gantt shows elapsed; the table shows
+        Vacanti's (elapsed + 1 day) metric. The lifecycle page
+        must surface BOTH numbers so the reconciliation is
+        visible without reading the source."""
+        page.goto(server_url + "/contracts/astral-uv-week/items/19330")
+        page.wait_for_selector(".lifecycle-metric-strip", timeout=10000)
+        strip = page.locator(".lifecycle-metric-strip").inner_text()
+        # Cycle time value (Vacanti metric) — same as the table.
+        assert "1.41d" in strip, (
+            f"strip must show the same cycle_time the table does "
+            f"(1.41d for #19330); got {strip!r}"
+        )
+        # Elapsed wall-clock (what the gantt's time axis shows).
+        # #19330's events span 9h 53m — assert the strip names it.
+        assert "9h" in strip, (
+            f"strip must show the wall-clock elapsed ('9h Mm' for "
+            f"#19330); got {strip!r}"
+        )
+        # The "+1 day" annotation makes the Vacanti adjustment visible.
+        assert "+ 1 day" in strip or "+1 day" in strip, (
+            f"strip should explain the +1 day Vacanti adjustment; "
+            f"got {strip!r}"
+        )
+
     def test_unknown_item_returns_404(self, server_url: str, page: Page):
         response = page.request.get(
             server_url
-            + "/contracts/astral-uv-week/items/github/%23does-not-exist"
+            + "/contracts/astral-uv-week/items/does-not-exist"
         )
         assert response.status == 404
 
@@ -1124,10 +1456,25 @@ class TestLifecyclePage:
         self, server_url: str, page: Page
     ):
         response = page.request.get(
-            server_url
-            + "/contracts/does-not-exist/items/github/%231"
+            server_url + "/contracts/does-not-exist/items/1"
         )
         assert response.status == 404
+
+    def test_url_accepts_id_without_github_hash_prefix(
+        self, server_url: str, page: Page
+    ):
+        """The URL path strips the GitHub `#` so the URL doesn't
+        contain `%23`. The route resolves `/items/19342` to the
+        warehouse id `#19342` for a GitHub-source contract."""
+        # The bare numeric form (no `#`, no `%23`) must work.
+        response = page.request.get(
+            server_url
+            + "/contracts/astral-uv-week/items/19342"
+        )
+        assert response.status == 200, (
+            f"bare numeric id should route to the canonical `#19342` "
+            f"for a github-source contract; got {response.status}"
+        )
 
 
 class TestPasswordGate:

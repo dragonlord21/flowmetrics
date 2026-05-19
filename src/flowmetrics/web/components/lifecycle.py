@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import UTC
+from datetime import datetime
 from typing import Literal
 
 import duckdb
 
-from ...utc_dates import to_utc_display_date
+from ...utc_dates import attach_utc, to_utc_display_date
 
 
 class ItemNotFound(Exception):
@@ -57,6 +57,12 @@ class LifecycleStage:
     exited_at_display: str
     duration_seconds: float
     duration_display: str  # "37m 39s" — pre-formatted for the chart
+    # Y-axis label for the gantt: "Draft · 11m 8s". Combines the
+    # stage name and its duration so the gantt's y-axis carries the
+    # duration too — replaces an earlier in-bar text overlay that
+    # was overflowing narrow bars and getting clipped near the left
+    # chart edge.
+    y_label: str
 
 
 SourceLiteral = Literal["github", "jira"]
@@ -84,13 +90,15 @@ class LifecycleData:
     # finished") get a compact summary card instead. The chart only
     # adds insight when there are at least 2 stages to compare.
     is_chartable: bool
-
-
-def _aware(d):
-    """DuckDB strips TZ on Parquet read; re-attach UTC at the
-    warehouse boundary so downstream code stays TZ-strict. Same
-    idiom as the other component renderers."""
-    return d.replace(tzinfo=UTC) if (d and d.tzinfo is None) else d
+    # Canonical cycle time, copied from the work_items row so the
+    # lifecycle page reports the SAME number the work-items table
+    # does (Vacanti's elapsed-plus-one-day).
+    cycle_time_days: float
+    # Wall-clock elapsed time between the first and last event,
+    # formatted as a human-readable string ("9h 53m"). Distinct
+    # from cycle_time_days because the chart's time axis shows
+    # this span, not the Vacanti metric.
+    elapsed_display: str
 
 
 def _display_datetime(d) -> str:
@@ -98,7 +106,7 @@ def _display_datetime(d) -> str:
     time and 'UTC' tag appended for hour-level resolution. The date
     is what `to_utc_display_date` would print; we add HH:MM here
     rather than in the utility because most callers only want dates."""
-    aware = _aware(d)
+    aware = attach_utc(d)
     date_part = to_utc_display_date(aware)
     return f"{date_part} {aware.strftime('%H:%M')} UTC"
 
@@ -107,7 +115,7 @@ def _iso_z(d) -> str:
     """ISO-8601 with a trailing Z. The Python default `isoformat()`
     emits '+00:00'; Vega-Lite is happier with the literal 'Z' for
     time scales, and it's the standard JSON shape."""
-    aware = _aware(d)
+    aware = attach_utc(d)
     return aware.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -143,7 +151,8 @@ def render(
     Raises ItemNotFound if the (contract, source, item_id) tuple
     doesn't match any work_items row."""
     header_row = con.execute(
-        "SELECT title, url FROM work_items "
+        "SELECT title, url, created_at, completed_at, cycle_time_days "
+        "FROM work_items "
         "WHERE contract_id = ? AND source = ? AND item_id = ? "
         "LIMIT 1",
         [contract_name, source, item_id],
@@ -153,7 +162,9 @@ def render(
             f"no work item found for contract={contract_name!r} "
             f"source={source!r} item_id={item_id!r}"
         )
-    title, url = header_row
+    title, url, header_created_at, header_completed_at, cycle_time_days = (
+        header_row
+    )
 
     rows = con.execute(
         "SELECT entered_at, stage, signal FROM transitions "
@@ -165,7 +176,7 @@ def render(
     events: list[LifecycleEvent] = []
     prev_dt = None
     for entered_at, stage, signal in rows:
-        aware = _aware(entered_at)
+        aware = attach_utc(entered_at)
         dwell: float | None = None
         if prev_dt is not None:
             dwell = (aware - prev_dt).total_seconds() / 86400.0
@@ -193,14 +204,13 @@ def render(
         # Re-parse the ISO strings to compute duration so the source
         # of truth is the already-formatted iso (avoids any drift
         # between the iso strings and the seconds value).
-        from datetime import datetime
-
         dur = (
             datetime.fromisoformat(nxt.entered_at_iso.replace("Z", "+00:00"))
             - datetime.fromisoformat(cur.entered_at_iso.replace("Z", "+00:00"))
         ).total_seconds()
         if dur < 0:
             dur = 0.0
+        dur_display = _duration_display(dur)
         stages.append(
             LifecycleStage(
                 stage=cur.stage,
@@ -209,7 +219,8 @@ def render(
                 exited_at_iso=nxt.entered_at_iso,
                 exited_at_display=nxt.entered_at_display,
                 duration_seconds=dur,
-                duration_display=_duration_display(dur),
+                duration_display=dur_display,
+                y_label=f"{cur.stage} · {dur_display}",
             )
         )
 
@@ -239,10 +250,29 @@ def render(
                 "exited_at_display": s.exited_at_display,
                 "duration_seconds": s.duration_seconds,
                 "duration_display": s.duration_display,
+                "y_label": s.y_label,
             }
             for s in stages
         ]
     )
+
+    # Wall-clock elapsed time between item start and finish.
+    # Derived from the SAME (created_at, completed_at) timestamps
+    # the materialise step uses to compute cycle_time_days — that
+    # way the relationship "cycle_time = elapsed + 1 day" holds
+    # exactly, not approximately. If we derived from the events
+    # list instead, a missing/duplicate event would silently
+    # break the reconciliation.
+    if header_created_at is not None and header_completed_at is not None:
+        created_aware = attach_utc(header_created_at)
+        completed_aware = attach_utc(header_completed_at)
+        elapsed_seconds = max(
+            0.0,
+            (completed_aware - created_aware).total_seconds(),
+        )
+        elapsed_display = _duration_display(elapsed_seconds)
+    else:
+        elapsed_display = "0s"
 
     return LifecycleData(
         item_id=item_id,
@@ -259,4 +289,8 @@ def render(
         # into review, then merged) gets a compact summary card on
         # the view side instead — the chart would just show one bar.
         is_chartable=len(stages) >= 2,
+        cycle_time_days=(
+            float(cycle_time_days) if cycle_time_days is not None else 0.0
+        ),
+        elapsed_display=elapsed_display,
     )

@@ -1,0 +1,48 @@
+{% extends "_base.html.jinja" %}
+
+{% block content %}
+  {% with summary = {"title": "Throughput", "headline": throughput.headline} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+
+  {% with mode = 'detail', data = throughput %}
+    {% include "_partials/throughput_tile.html.jinja" %}
+  {% endwith %}
+
+  {% with data = work_items %}
+    {% include "_partials/work_items_table.html.jinja" %}
+  {% endwith %}
+
+  <section class="detail-extras">
+    <h2>How to read this</h2>
+    <p>
+      Each bar is one calendar day. The bar's height is the count of
+      items that finished on that exact UTC date. Days with zero
+      completions are included as zero bars — they are real
+      observations of capacity, not missing data.
+    </p>
+
+    <h2>Caveats</h2>
+    <ul>
+      <li>Window endpoints are derived from the data itself: the
+        first and last completion in this contract.</li>
+      <li>Throughput counts only items with both a created date and
+        a completion date — partial-lifecycle rows are excluded.</li>
+    </ul>
+
+    <h2>Methodology</h2>
+    <p>
+      Per Vacanti, <em>Actionable Agile Metrics for Predictability</em>,
+      10th Anniversary Edition, pp. 61–63: enumerate every date from
+      first to last completion, count items finishing on each date,
+      keep zero-count days. The empirical distribution feeds Monte
+      Carlo forecasting in a later slice.
+    </p>
+
+    <h2>Actions</h2>
+    <p><em>Reserved for future "now what?" suggestions — filter by
+       team / tag, run a forecast against this distribution. Empty in v1.</em></p>
+  </section>
+
+  <a class="back-link" href="/contracts/{{ contract.name }}/">← Back to dashboard</a>
+{% endblock %}

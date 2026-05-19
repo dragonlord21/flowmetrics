@@ -16,7 +16,11 @@ from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
-from flowmetrics.utc_dates import to_utc_display_date, to_utc_iso_date
+from flowmetrics.utc_dates import (
+    attach_utc,
+    to_utc_display_date,
+    to_utc_iso_date,
+)
 
 _PT = timezone(timedelta(hours=-7))  # UTC-7 (Pacific Daylight Time)
 _TOKYO = timezone(timedelta(hours=9))  # UTC+9
@@ -82,3 +86,43 @@ class TestToUtcDisplayDate:
         column-matching assertion the chart relies on."""
         assert to_utc_display_date(date(2026, 5, 4)) == "May 04, 2026"
         assert to_utc_display_date(date(2026, 5, 9)) == "May 09, 2026"
+
+
+class TestAttachUtc:
+    """`attach_utc` is the warehouse-boundary helper: DuckDB strips
+    `tzinfo` when reading aware-UTC values from Parquet, returning
+    naive datetimes that *we know* are UTC. The component renderers
+    each had a private `_aware()` copy doing exactly this — one
+    canonical helper here, no copies.
+
+    Distinct from `to_utc_iso_date` / `to_utc_display_date`: those
+    refuse naive datetimes loudly because they're user-facing
+    formatters where silent local-time interpretation is the bug.
+    `attach_utc` is the explicit "I know this is UTC, re-attach
+    the tzinfo" path — used only at the Parquet-read boundary.
+    """
+
+    def test_none_passes_through(self):
+        assert attach_utc(None) is None
+
+    def test_naive_datetime_becomes_aware_utc(self):
+        naive = datetime(2026, 5, 4, 12, 0)
+        result = attach_utc(naive)
+        assert result is not None
+        assert result.tzinfo is UTC
+        # Wall-clock components unchanged (we only attach tzinfo).
+        assert result.replace(tzinfo=None) == naive
+
+    def test_aware_utc_datetime_is_unchanged(self):
+        d = datetime(2026, 5, 4, 12, 0, tzinfo=UTC)
+        assert attach_utc(d) is d
+
+    def test_aware_non_utc_datetime_passes_through_unchanged(self):
+        """Non-UTC aware values shouldn't reach this helper in
+        practice (DuckDB-from-Parquet always returns naive), but if
+        they do we don't silently rewrite their timezone — the value
+        is returned as-is so downstream code can detect or convert."""
+        d = datetime(2026, 5, 4, 12, 0, tzinfo=_PT)
+        result = attach_utc(d)
+        assert result is d  # same object, same tzinfo
+        assert result.tzinfo is _PT
