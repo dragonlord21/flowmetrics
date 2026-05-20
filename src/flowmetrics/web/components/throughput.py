@@ -97,23 +97,32 @@ class ThroughputData:
         # forces ascending order regardless of layer-scan order.
         date_order = [d.date_iso for d in self.daily]
 
+        # Pre-thin axis labels for long windows. Vega-Lite's
+        # nominal axis doesn't auto-thin (labelOverlap is a
+        # no-op for nominal scales), so we pick ~10 evenly-
+        # spaced ticks ourselves. Same fix as CFD + forecast.
+        axis_config: dict = {
+            "title": "Completion date (UTC)",
+            "labelAngle": 0,
+            # `utcFormat` (not `timeFormat`) renders the date
+            # ignoring browser TZ — same TZ-safety contract the
+            # tooltip nominal-pre-format idiom enforces, applied
+            # to the axis label. Audited by
+            # `tests/test_chart_tooltip_safety.py`.
+            "labelExpr": (
+                "utcFormat(datetime(datum.value), '%b %d')"
+            ),
+        }
+        if len(date_order) > 10:
+            step = (len(date_order) + 9) // 10  # ceil(n/10)
+            axis_config["values"] = date_order[::step]
+
         # Shared x-axis encoding — referenced by both the weekend
         # shade layer and the bar layer so they line up exactly.
         x_encoding = {
             "field": "date_iso",
             "type": "nominal",
-            "axis": {
-                "title": "Completion date (UTC)",
-                "labelAngle": 0,
-                # `utcFormat` (not `timeFormat`) renders the
-                # date ignoring browser TZ — same TZ-safety
-                # contract the tooltip nominal-pre-format
-                # idiom enforces, applied to the axis label.
-                # Audited by `tests/test_chart_tooltip_safety.py`.
-                "labelExpr": (
-                    "utcFormat(datetime(datum.value), '%b %d')"
-                ),
-            },
+            "axis": axis_config,
             "sort": date_order,
         }
 
