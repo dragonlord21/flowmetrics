@@ -188,11 +188,38 @@
       border: 0.0625rem dashed var(--border);
       border-radius: 0.375rem;
       margin: 0.6rem 0;
+      /* Pulse the placeholder so it doesn't feel inert while
+         the chart request is in flight. */
+      animation: metricLoadingPulse 1.4s ease-in-out infinite;
+    }
+    @keyframes metricLoadingPulse {
+      0%, 100% { opacity: 0.6; }
+      50%      { opacity: 1; }
     }
     .metric-loading-text {
       color: var(--muted);
       font-size: 0.875rem;
       margin: 0;
+    }
+    /* HTMX swap polish: the placeholder fades OUT before the
+       real tile fades IN. `hx-swap="outerHTML transition:true"`
+       on the stub flips on the View Transitions API path; for
+       browsers without it we fall back to the .htmx-* class
+       lifecycle. */
+    .htmx-swapping {
+      opacity: 0;
+      transition: opacity 180ms ease-out;
+    }
+    /* Newly-added tile fragments fade in. HTMX briefly tags
+       new elements with `.htmx-added` after the swap — pinning
+       the animation on that class catches each piece of the
+       fragment (summary + chart) without us enumerating them. */
+    @keyframes metricTileAppear {
+      from { opacity: 0; transform: translateY(0.25rem); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .htmx-added {
+      animation: metricTileAppear 260ms ease-out;
     }
 
     /* ─────── Home page (workflow picker) ─────── */
@@ -227,11 +254,20 @@
       padding: 0.85rem 0.3rem;
       color: var(--fg);
       text-decoration: none;
-      font-family: var(--mono-font);
       font-size: 0.9375rem;
     }
     .home-workflow-link:hover {
       background: var(--surface);
+    }
+    .home-workflow-name {
+      font-family: var(--head-font);
+      font-weight: 600;
+    }
+    .home-workflow-id {
+      color: var(--muted);
+      font-family: var(--mono-font);
+      font-size: 0.8125rem;
+      margin-left: 0.6rem;
     }
     .home-workflow-arrow {
       color: var(--muted);
@@ -1056,13 +1092,15 @@
       <a class="brand" href="/">flowmetrics</a>
       {% if contract %}
         <span class="header-sep" aria-hidden="true">·</span>
-        {# Workflow name is a link to the workflow's dashboard,
+        {# Workflow label is a link to the workflow's dashboard,
            UNLESS we're already on that page (in which case it
-           reads as the current breadcrumb). #}
+           reads as the current breadcrumb). The `label` field
+           is human-friendly prose ("Cassandra"); `name` stays
+           the URL-safe ID ("apache-cassandra-week"). #}
         {% if metric_name %}
-          <a class="stamp" href="/workflows/{{ contract.name }}">{{ contract.name }}</a>
+          <a class="stamp" href="/workflows/{{ contract.name }}">{{ contract.label }}</a>
         {% else %}
-          <span class="stamp stamp--current">{{ contract.name }}</span>
+          <span class="stamp stamp--current">{{ contract.label }}</span>
         {% endif %}
       {% endif %}
       {% if metric_name %}

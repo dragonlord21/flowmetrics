@@ -226,6 +226,10 @@ class WorkflowView:
         anchor = self.view_window.to
         return {
             "name": self.id,
+            # Human-friendly display name. Templates render
+            # `contract.label` in breadcrumbs / home-page lists;
+            # `contract.name` stays the URL-safe routing ID.
+            "label": self.contract.label or self.id,
             "slug": self._slug(),
             # Advanced/legacy form: explicit dates per window.
             "view_from": self.view_window.from_.isoformat(),
@@ -475,15 +479,26 @@ def create_app(
         as a link to its dashboard. The brand link in the header
         always lands here so the operator can pivot between
         workflows without dropping into a specific one first."""
+        # Build (name, label) pairs so the home list shows the
+        # human-friendly label with the routing id as a subtle
+        # subtitle. Fall back to name when label is missing.
+        workflows: list[dict] = []
+        for name in _available_contracts():
+            try:
+                c = load_contract(name, contracts_dir)
+                label = c.label or name
+            except ContractError:
+                label = name
+            workflows.append({"name": name, "label": label})
         return templates.TemplateResponse(
             request,
             "home.html.jinja",
             {
                 "title": "flowmetrics",
-                "available_contracts": _available_contracts(),
-                # Empty contract dict keeps `_base.html.jinja`
-                # header / filter-bar guards happy without
-                # implying a current workflow.
+                "workflows": workflows,
+                # Empty contract keeps `_base.html.jinja` header
+                # / filter-bar guards happy without implying a
+                # current workflow.
                 "contract": None,
             },
         )

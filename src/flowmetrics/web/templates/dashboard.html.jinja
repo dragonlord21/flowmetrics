@@ -22,7 +22,7 @@
     <section class="metric metric-loading"
              hx-get="/api/internal/dashboard-tile/{{ slug }}?workflow={{ contract.name }}{{ qs }}"
              hx-trigger="load"
-             hx-swap="outerHTML">
+             hx-swap="outerHTML swap:180ms">
       <p class="metric-loading-text">Loading {{ label }}…</p>
     </section>
   {% endfor %}

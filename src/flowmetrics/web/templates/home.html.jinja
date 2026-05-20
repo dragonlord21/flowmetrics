@@ -11,12 +11,17 @@
     </p>
   </section>
 
-  {% if available_contracts %}
+  {% if workflows %}
     <ul class="home-workflow-list">
-      {% for name in available_contracts %}
+      {% for w in workflows %}
         <li class="home-workflow-item">
-          <a class="home-workflow-link" href="/workflows/{{ name }}">
-            <span class="home-workflow-name">{{ name }}</span>
+          <a class="home-workflow-link" href="/workflows/{{ w.name }}">
+            <span class="home-workflow-label">
+              <span class="home-workflow-name">{{ w.label }}</span>
+              {% if w.label != w.name %}
+                <span class="home-workflow-id">{{ w.name }}</span>
+              {% endif %}
+            </span>
             <span class="home-workflow-arrow" aria-hidden="true">→</span>
           </a>
         </li>

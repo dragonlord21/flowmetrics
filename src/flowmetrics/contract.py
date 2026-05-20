@@ -71,6 +71,11 @@ class Contract:
     # stage-aware views (CFD, Aging) consult this to filter and
     # order. When unset, views fall back to data-derived ordering.
     states: WorkflowStates | None = None
+    # Optional human-friendly display name. The UI shows this in
+    # breadcrumbs / the home-page workflow list. Falls back to
+    # `name` when omitted. `name` stays the routing ID
+    # (unique, URL-safe) — `label` is just prose.
+    label: str | None = None
 
 
 def load_contract(name: str, contracts_dir: Path) -> Contract:
@@ -117,6 +122,14 @@ def load_contract(name: str, contracts_dir: Path) -> Contract:
             f"contract file is for name={declared_name!r} "
             f"but loaded as {name!r}"
         )
+
+    raw_label = body.get("label")
+    if raw_label is not None and not isinstance(raw_label, str):
+        raise ContractError(
+            f"contract.label must be a string; got "
+            f"{type(raw_label).__name__}"
+        )
+    label = raw_label
 
     source = body.get("source")
     if source not in ("github", "jira"):
@@ -201,4 +214,5 @@ def load_contract(name: str, contracts_dir: Path) -> Contract:
         start=_parse_date("start"),
         stop=_parse_date("stop"),
         states=states_obj,
+        label=label,
     )

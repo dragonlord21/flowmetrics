@@ -39,6 +39,50 @@ def _write(tmp: Path, name: str, body: dict) -> Path:
     return tmp
 
 
+class TestLabelField:
+    """Optional `label:` — human-friendly display name. The
+    canonical `name` field stays the routing ID (must be unique
+    + URL-safe); `label` is the prose the UI shows in
+    breadcrumbs and the home-page workflow list. Falls back
+    to `name` when omitted."""
+
+    def test_label_optional(self, tmp_path):
+        _write(tmp_path, "demo", {
+            "source": "github",
+            "repo": "owner/name",
+            "start": "2026-05-04",
+            "stop": "2026-05-10",
+        })
+        c = load_contract("demo", tmp_path)
+        assert c.label is None, (
+            "label defaults to None when omitted (callers fall "
+            "back to name for display)"
+        )
+
+    def test_label_parses_as_string(self, tmp_path):
+        _write(tmp_path, "apache-cassandra-week", {
+            "label": "Cassandra",
+            "source": "jira",
+            "jira_url": "https://issues.apache.org/jira",
+            "jira_project": "CASSANDRA",
+            "start": "2025-04-01",
+            "stop": "2025-04-07",
+        })
+        c = load_contract("apache-cassandra-week", tmp_path)
+        assert c.label == "Cassandra"
+
+    def test_label_non_string_raises(self, tmp_path):
+        _write(tmp_path, "demo", {
+            "label": 42,
+            "source": "github",
+            "repo": "owner/name",
+            "start": "2026-05-04",
+            "stop": "2026-05-10",
+        })
+        with pytest.raises(ContractError, match=r"label.*string"):
+            load_contract("demo", tmp_path)
+
+
 class TestStatesBlockParsing:
     def test_contract_without_states_block_has_none(self, tmp_path):
         _write(tmp_path, "demo", {
