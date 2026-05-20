@@ -131,9 +131,29 @@ class TestWorkflowSwitcher:
     ):
         """The home page is the workflow picker — lists every
         contract under contracts_dir as a link to its dashboard.
-        The picker dropdown was replaced by this list."""
+        The picker dropdown was replaced by this list.
+
+        Guards two failure modes seen in the wild:
+          1. The empty-state "No workflows yet" copy renders
+             despite contracts existing (template variable
+             mismatch between route and template).
+          2. The list renders with zero <a> elements (typo
+             in the loop, missing href, etc.)."""
         page.goto(server_url + "/")
         page.wait_for_selector("ul.home-workflow-list")
+
+        # Empty-state copy must NOT be present when contracts
+        # exist. The test fixture materialises two contracts;
+        # if the home page falls back to the empty state, this
+        # assertion catches it loudly.
+        body_text = page.locator("body").inner_text()
+        assert "No workflows yet" not in body_text, (
+            f"home page is showing the empty state despite the "
+            f"fixture having two contracts; route is likely "
+            f"passing the wrong context key. Body text:\n"
+            f"{body_text[:1500]}"
+        )
+
         hrefs = page.evaluate(
             "() => Array.from(document.querySelectorAll('a.home-workflow-link'))"
             ".map(a => a.getAttribute('href'))"

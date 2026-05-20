@@ -56,6 +56,16 @@ class ThroughputData:
     # without re-deriving from `daily`.
     first_date_iso: str | None
     last_date_iso: str | None
+    # Warehouse coverage bounds — earliest/latest completion the
+    # warehouse has on hand, independent of the current view
+    # window. The empty-state template uses these to distinguish
+    # "no data in the warehouse at all" from "warehouse has
+    # data, just not in this view" — the second is actionable
+    # (widen the view, or run `flow materialise --since X`).
+    warehouse_earliest_iso: str | None = None
+    warehouse_latest_iso: str | None = None
+    warehouse_earliest_display: str | None = None
+    warehouse_latest_display: str | None = None
 
     def vega_spec_json(self) -> str:
         """Vega-Lite bar chart: one bar per enumerated date, height
