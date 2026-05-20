@@ -54,6 +54,7 @@ import duckdb
 
 from ...contract import WorkflowStates
 from ...utc_dates import to_utc_display_date
+from ...windows import Window
 
 
 # Color tokens — neutral grays with one accent. The terminal
@@ -353,13 +354,18 @@ def _compute_reached_dates(
 def _resolve_window(
     first_entries: list[tuple[str, str, date]],
     *,
+    view: Window | None,
     contract_start: date | None,
     contract_stop: date | None,
     default_window_days: int,
 ) -> tuple[date, date]:
     """Pick the visible (first, last) dates per the resolution
-    table in `render`'s docstring. Cap left edge to data_min so
-    we never extend past data we have."""
+    table in `render`'s docstring. An explicit `view` window
+    wins outright (user-supplied bounds shouldn't be silently
+    overridden). Otherwise contract bounds, then a default
+    `default_window_days` look-back from the data's max."""
+    if view is not None:
+        return view.from_, view.to
     all_dates = [d for _, _, d in first_entries]
     data_min = min(all_dates)
     data_max = max(all_dates)
@@ -380,6 +386,7 @@ def render(
     contract_stop: date | None = None,
     default_window_days: int = DEFAULT_WINDOW_DAYS,
     states: WorkflowStates | None = None,
+    view: Window | None = None,
 ) -> CfdData:
     """Compute the CFD payload for `contract_name`.
 
@@ -431,6 +438,7 @@ def render(
 
     first_date, last_date = _resolve_window(
         first_entries,
+        view=view,
         contract_start=contract_start,
         contract_stop=contract_stop,
         default_window_days=default_window_days,

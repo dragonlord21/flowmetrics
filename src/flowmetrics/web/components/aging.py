@@ -23,6 +23,7 @@ import duckdb
 
 from ...contract import WorkflowStates
 from ...utc_dates import attach_utc, to_utc_display_date
+from ...windows import Window
 
 
 # Chart colors are CSS-theme-driven; see _base.html.jinja's
@@ -371,6 +372,7 @@ def render(
     contract_start: date | None = None,
     contract_stop: date | None = None,
     states: WorkflowStates | None = None,
+    reference: Window | None = None,
 ) -> AgingData:
     """Compute the aging-WIP payload for `contract_name` at `asof`.
 
@@ -448,21 +450,28 @@ def render(
             )
         )
 
-    # Percentile thresholds from completed cycle times — same source
-    # the cycle-time chart's reference lines come from. The aging
-    # check is "this in-flight item is now older than the typical
-    # commitment threshold". `cycle_time_days IS NOT NULL` filters
-    # to completions; in-flight items by definition have null.
+    # Percentile thresholds from completed cycle times — same
+    # source the cycle-time chart's reference lines come from.
+    # When `reference` is supplied, the percentiles draw their
+    # sample from completions inside that inclusive date range
+    # only — the operator's "ptiles over the last X days"
+    # question. Without it, percentiles come from the full
+    # completion history.
+    pct_where = ["contract_id = ?", "cycle_time_days IS NOT NULL"]
+    pct_params: list = [contract_name]
+    if reference is not None:
+        pct_where.append("CAST(completed_at AS DATE) BETWEEN ? AND ?")
+        pct_params.extend([reference.from_, reference.to])
     pct_row = con.execute(
-        "SELECT percentile_cont(0.50) WITHIN GROUP (ORDER BY cycle_time_days), "
-        "       percentile_cont(0.85) WITHIN GROUP (ORDER BY cycle_time_days), "
-        "       percentile_cont(0.95) WITHIN GROUP (ORDER BY cycle_time_days), "
-        "       count(*), "
-        "       min(CAST(completed_at AS DATE)), "
-        "       max(CAST(completed_at AS DATE)) "
-        "FROM work_items "
-        "WHERE contract_id = ? AND cycle_time_days IS NOT NULL",
-        [contract_name],
+        f"SELECT percentile_cont(0.50) WITHIN GROUP (ORDER BY cycle_time_days), "
+        f"       percentile_cont(0.85) WITHIN GROUP (ORDER BY cycle_time_days), "
+        f"       percentile_cont(0.95) WITHIN GROUP (ORDER BY cycle_time_days), "
+        f"       count(*), "
+        f"       min(CAST(completed_at AS DATE)), "
+        f"       max(CAST(completed_at AS DATE)) "
+        f"FROM work_items "
+        f"WHERE {' AND '.join(pct_where)}",
+        pct_params,
     ).fetchone()
     p50 = float(pct_row[0] or 0.0)
     p85 = float(pct_row[1] or 0.0)

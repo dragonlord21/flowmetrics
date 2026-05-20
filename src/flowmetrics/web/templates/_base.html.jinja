@@ -213,6 +213,51 @@
       margin-left: auto;
       font-size: 0.75rem;
     }
+    .filter-bar-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      align-items: center;
+      width: 100%;
+    }
+    .filter-window {
+      border: 0.0625rem solid var(--border);
+      border-radius: 0.3rem;
+      padding: 0.25rem 0.6rem 0.4rem 0.6rem;
+      display: inline-flex;
+      gap: 0.6rem;
+      align-items: center;
+      margin: 0;
+    }
+    .filter-window legend {
+      color: var(--fg);
+      font-weight: 600;
+      font-size: 0.78125rem;
+      padding: 0 0.3rem;
+    }
+    .filter-hint {
+      color: var(--muted);
+      font-weight: 400;
+      font-style: italic;
+    }
+    .filter-apply {
+      background: var(--p-500);
+      color: var(--white);
+      border: 0;
+      border-radius: 0.25rem;
+      padding: 0.35rem 0.85rem;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .filter-apply:hover { background: var(--p-700); }
+    .filter-reset {
+      color: var(--muted);
+      font-size: 0.8125rem;
+      text-decoration: none;
+    }
+    .filter-reset:hover { color: var(--fg); text-decoration: underline; }
 
     /* ─────── Metric summary (above charts) ─────── */
     .metric-summary {
@@ -902,9 +947,20 @@
           {% endfor %}
         </select>
       </label>
-      <label>Since <input type="date" name="since" value="{{ view.since|default('') }}" disabled></label>
-      <label>Until <input type="date" name="until" value="{{ view.until|default('') }}" disabled></label>
-      <span class="note">filters are decorative in this slice — wiring lands in Slice 3</span>
+      <form method="get" class="filter-bar-form" aria-label="Window controls">
+        <fieldset class="filter-window">
+          <legend>View window <span class="filter-hint">— chart x-axes (inclusive)</span></legend>
+          <label>From <input type="date" name="view_from" value="{{ contract.view_from }}"></label>
+          <label>To <input type="date" name="view_to" value="{{ contract.view_to }}"></label>
+        </fieldset>
+        <fieldset class="filter-window">
+          <legend>Reference period <span class="filter-hint">— P-lines + MCS sample (inclusive)</span></legend>
+          <label>From <input type="date" name="ref_from" value="{{ contract.ref_from }}"></label>
+          <label>To <input type="date" name="ref_to" value="{{ contract.ref_to }}"></label>
+        </fieldset>
+        <button type="submit" class="filter-apply">Apply</button>
+        <a class="filter-reset" href="{{ request.url.path }}">Reset to defaults</a>
+      </form>
     </div>
   </nav>
   {% endblock %}

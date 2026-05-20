@@ -39,6 +39,7 @@ from ...forecast import (
     monte_carlo_when_done,
 )
 from ...utc_dates import to_utc_display_date
+from ...windows import Window
 
 # Number of simulations. 10K is the standard Vacanti recommendation —
 # enough for stable P95s, fast enough for interactive sliders.
@@ -53,31 +54,44 @@ _PCT_COLOR_P95 = "__theme:fg__"
 
 
 def _daily_throughput(
-    con: duckdb.DuckDBPyConnection, contract_name: str
+    con: duckdb.DuckDBPyConnection,
+    contract_name: str,
+    *,
+    reference: Window | None = None,
 ) -> list[int]:
     """Read the historical daily throughput as a list of integers.
 
     One entry per calendar date from the earliest to latest
-    completion (inclusive of zero-count days, per the Vacanti rule
-    the throughput component pins). Days are aggregated by UTC
-    calendar date to stay consistent with the rest of the
-    warehouse.
+    completion (inclusive of zero-count days, per the Vacanti
+    rule the throughput component pins). When `reference` is
+    supplied, the window is clamped to that inclusive range —
+    that's the operator's "MCS over a specific period" control
+    (the sample distribution the simulation draws from).
     """
+    where = ["contract_id = ?", "created_at IS NOT NULL", "completed_at IS NOT NULL"]
+    params: list = [contract_name]
+    if reference is not None:
+        where.append("CAST(completed_at AS DATE) BETWEEN ? AND ?")
+        params.extend([reference.from_, reference.to])
     rows = con.execute(
-        "SELECT CAST(completed_at AS DATE) AS d, count(*) AS n "
-        "FROM work_items "
-        "WHERE contract_id = ? "
-        "  AND created_at IS NOT NULL "
-        "  AND completed_at IS NOT NULL "
-        "GROUP BY 1 "
-        "ORDER BY 1 ASC",
-        [contract_name],
+        f"SELECT CAST(completed_at AS DATE) AS d, count(*) AS n "
+        f"FROM work_items "
+        f"WHERE {' AND '.join(where)} "
+        f"GROUP BY 1 ORDER BY 1 ASC",
+        params,
     ).fetchall()
     if not rows:
         return []
     by_date = {d: int(n) for d, n in rows}
-    cur = min(by_date)
-    last = max(by_date)
+    # When the reference window is explicit, walk THAT range so
+    # zero-count days inside the reference window are included
+    # (otherwise we'd implicitly trim leading/trailing zeros).
+    if reference is not None:
+        cur = reference.from_
+        last = reference.to
+    else:
+        cur = min(by_date)
+        last = max(by_date)
     out: list[int] = []
     while cur <= last:
         out.append(by_date.get(cur, 0))
@@ -204,17 +218,18 @@ def render_when_done(
     start_date: date | None = None,
     runs: int = DEFAULT_RUNS,
     seed: int = 0,
+    reference: Window | None = None,
 ) -> WhenDoneData:
     """Run a Monte Carlo simulation: when will `items` be done?
 
-    `start_date` defaults to today (UTC). Returns a payload with
-    the full histogram + the P50/P85/P95 dates. The Vega-Lite spec
-    on the payload renders the histogram as bars with percentile
-    rules layered on top.
+    `start_date` defaults to today (UTC). `reference` clamps
+    the historical-throughput sample to that inclusive window —
+    the "MCS over a specific period" control. Returns a payload
+    with the full histogram + the P50/P85/P95 dates.
     """
     if start_date is None:
         start_date = datetime.now(UTC).date()
-    samples = _daily_throughput(con, contract_name)
+    samples = _daily_throughput(con, contract_name, reference=reference)
     rng = Random(seed)
     if not samples:
         # Defensive: no data yet — surface a degenerate but
@@ -289,6 +304,7 @@ def render_how_many(
     end_date: date,
     runs: int = DEFAULT_RUNS,
     seed: int = 0,
+    reference: Window | None = None,
 ) -> HowManyData:
     """Run a Monte Carlo simulation: how many items will be done
     in [start_date, end_date]?
@@ -296,9 +312,11 @@ def render_how_many(
     For counts the percentile convention is inverted relative to
     dates: P85 is the count you'd hit AT LEAST 85% of the time,
     which is LOWER than P50. Use `backward_percentile` so the
-    "high-confidence-floor" interpretation holds.
+    "high-confidence-floor" interpretation holds. `reference`
+    clamps the historical-throughput sample to that inclusive
+    window.
     """
-    samples = _daily_throughput(con, contract_name)
+    samples = _daily_throughput(con, contract_name, reference=reference)
     rng = Random(seed)
     days = (end_date - start_date).days + 1
     if not samples or days <= 0:

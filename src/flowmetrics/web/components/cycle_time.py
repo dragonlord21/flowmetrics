@@ -19,6 +19,7 @@ from typing import Any
 import duckdb
 
 from ...utc_dates import attach_utc, to_utc_display_date, to_utc_iso_date
+from ...windows import Window
 
 # Chart colors are NOT defined in Python — they live as CSS tokens
 # on `:root` (see `_base.html.jinja`) and are substituted into the
@@ -98,23 +99,36 @@ class CycleTimeData:
         return json.dumps(_build_vega_spec(self), separators=(",", ":"))
 
 
-def render(con: duckdb.DuckDBPyConnection, contract_name: str) -> CycleTimeData:
+def render(
+    con: duckdb.DuckDBPyConnection,
+    contract_name: str,
+    *,
+    view: Window | None = None,
+    reference: Window | None = None,
+) -> CycleTimeData:
     """Read the contract's latest work_items partition and produce the
     typed payload.
 
-    Slice 2 ignores the View / filter params — the dashboard shows
-    "everything in this contract." Filters become functional in
-    Slice 3.
+    `view`: clamps the scatter to items completed inside this
+    inclusive range (display filter).
+    `reference`: drives the P50/P85/P95 threshold lines — they
+    are computed from items completed inside this range only.
+    When either is None the full materialised history is used.
     """
+    where_clauses = ["contract_id = ?", "completed_at IS NOT NULL"]
+    params: list = [contract_name]
+    if view is not None:
+        where_clauses.append("CAST(completed_at AS DATE) BETWEEN ? AND ?")
+        params.extend([view.from_, view.to])
+    where_sql = " AND ".join(where_clauses)
     rows = con.execute(
-        """
+        f"""
         SELECT item_id, title, url, completed_at, cycle_time_days
         FROM work_items
-        WHERE contract_id = ?
-          AND completed_at IS NOT NULL
+        WHERE {where_sql}
         ORDER BY completed_at
         """,
-        [contract_name],
+        params,
     ).fetchall()
 
     points = tuple(
@@ -146,16 +160,25 @@ def render(con: duckdb.DuckDBPyConnection, contract_name: str) -> CycleTimeData:
         )
 
     # Empirical percentiles via DuckDB (single statistical pass).
+    # The reference period — when set — slices the SAMPLE that
+    # feeds P50/P85/P95. The viewer's "ptiles over the last X
+    # days" question is answered by changing this window; the
+    # display (`view`) is independent.
+    pct_where = ["contract_id = ?", "cycle_time_days IS NOT NULL"]
+    pct_params: list = [contract_name]
+    if reference is not None:
+        pct_where.append("CAST(completed_at AS DATE) BETWEEN ? AND ?")
+        pct_params.extend([reference.from_, reference.to])
     p50_row, p85_row, p95_row = con.execute(
-        """
+        f"""
         SELECT
             percentile_cont(0.50) WITHIN GROUP (ORDER BY cycle_time_days) AS p50,
             percentile_cont(0.85) WITHIN GROUP (ORDER BY cycle_time_days) AS p85,
             percentile_cont(0.95) WITHIN GROUP (ORDER BY cycle_time_days) AS p95
         FROM work_items
-        WHERE contract_id = ? AND cycle_time_days IS NOT NULL
+        WHERE {" AND ".join(pct_where)}
         """,
-        [contract_name],
+        pct_params,
     ).fetchone()
     p50 = float(p50_row) if p50_row is not None else 0.0
     p85 = float(p85_row) if p85_row is not None else 0.0

@@ -27,6 +27,7 @@ from datetime import UTC, date, datetime, time, timedelta
 import duckdb
 
 from ...utc_dates import to_utc_display_date, to_utc_iso_date
+from ...windows import Window
 
 
 @dataclass(frozen=True)
@@ -184,28 +185,26 @@ class ThroughputData:
 def render(
     con: duckdb.DuckDBPyConnection,
     contract_name: str,
+    *,
+    view: Window | None = None,
 ) -> ThroughputData:
     """Compute the daily throughput series for `contract_name`.
 
-    Window endpoints are derived from the data itself per Vacanti:
-    first completion → last completion. Once filter wiring lands in
-    a later slice the caller will pass start/stop explicitly.
+    `view`: clamps the x-axis to completions inside this
+    inclusive date range. When None the window is data-derived
+    (first completion → last completion).
     """
-    # Per the throughput definition the user pinned: group by
-    # completion date where BOTH start and end timestamps exist —
-    # an item without a created_at can't have a meaningful
-    # lifecycle and shouldn't be counted toward capacity.
-    # Slicing by tags / team / source is a future hook; for v1 we
-    # just count all completions per day for the contract.
+    where = ["contract_id = ?", "created_at IS NOT NULL", "completed_at IS NOT NULL"]
+    params: list = [contract_name]
+    if view is not None:
+        where.append("CAST(completed_at AS DATE) BETWEEN ? AND ?")
+        params.extend([view.from_, view.to])
     rows = con.execute(
-        "SELECT CAST(completed_at AS DATE) AS d, count(*) AS n "
-        "FROM work_items "
-        "WHERE contract_id = ? "
-        "  AND created_at IS NOT NULL "
-        "  AND completed_at IS NOT NULL "
-        "GROUP BY 1 "
-        "ORDER BY 1 ASC",
-        [contract_name],
+        f"SELECT CAST(completed_at AS DATE) AS d, count(*) AS n "
+        f"FROM work_items "
+        f"WHERE {' AND '.join(where)} "
+        f"GROUP BY 1 ORDER BY 1 ASC",
+        params,
     ).fetchall()
 
     if not rows:

@@ -29,6 +29,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
 from .contract import ContractError, load_contract
+from .windows import Window, parse_windows
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
 from .web.components.cycle_time import render as render_cycle_time
@@ -137,7 +138,7 @@ class WorkflowView:
     per dashboard request.
 
     Routes pattern:
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         with view.warehouse() as con:
             cfd = view.render_cfd(con)
         return templates.TemplateResponse(
@@ -152,6 +153,7 @@ class WorkflowView:
         *,
         contracts_dir: Path,
         data_dir: Path,
+        query: dict | None = None,
     ) -> None:
         self.id = workflow_id
         self._data_dir = data_dir
@@ -161,6 +163,13 @@ class WorkflowView:
         # the old _workflow_slug/_workflow_system_label helpers
         # had.
         self.contract = load_contract(workflow_id, contracts_dir)
+        # Parse the two user-facing windows from the request's
+        # query params. Defaults (30-day view, 14-day reference)
+        # are anchored to today UTC and applied per-request.
+        today_utc = datetime.now(UTC).date()
+        self.view_window, self.reference_period = parse_windows(
+            dict(query or {}), today=today_utc,
+        )
 
     @contextmanager
     def warehouse(self):
@@ -175,11 +184,16 @@ class WorkflowView:
 
     def template_context(self) -> dict:
         """Template-side context for "what workflow is this":
-        id, source-system display name, decorative slug."""
+        id, source-system display name, decorative slug, plus
+        the current view/reference windows for the filter bar."""
         return {
             "name": self.id,
             "system": self._system_label(),
             "slug": self._slug(),
+            "view_from": self.view_window.from_.isoformat(),
+            "view_to": self.view_window.to.isoformat(),
+            "ref_from": self.reference_period.from_.isoformat(),
+            "ref_to": self.reference_period.to.isoformat(),
         }
 
     def _slug(self) -> str:
@@ -200,8 +214,7 @@ class WorkflowView:
     def render_cfd(self, con):
         return render_cfd(
             con, self.id,
-            contract_start=self.contract.start,
-            contract_stop=self.contract.stop,
+            view=self.view_window,
             states=self.contract.states,
         )
 
@@ -212,13 +225,34 @@ class WorkflowView:
             contract_start=self.contract.start,
             contract_stop=self.contract.stop,
             states=self.contract.states,
+            reference=self.reference_period,
         )
 
     def render_cycle_time(self, con):
-        return render_cycle_time(con, self.id)
+        return render_cycle_time(
+            con, self.id,
+            view=self.view_window,
+            reference=self.reference_period,
+        )
 
     def render_throughput(self, con):
-        return render_throughput(con, self.id)
+        return render_throughput(con, self.id, view=self.view_window)
+
+    def render_forecast_when_done(self, con, *, items: int, start_date=None):
+        return render_forecast_when_done(
+            con, self.id,
+            items=items,
+            start_date=start_date,
+            reference=self.reference_period,
+        )
+
+    def render_forecast_how_many(self, con, *, start_date, end_date):
+        return render_forecast_how_many(
+            con, self.id,
+            start_date=start_date,
+            end_date=end_date,
+            reference=self.reference_period,
+        )
 
 
 def create_app(
@@ -276,16 +310,23 @@ def create_app(
     else:
         auth_dep = []
 
-    def _open_view(workflow_id: str) -> WorkflowView:
+    def _open_view(
+        workflow_id: str, request: Request | None = None,
+    ) -> WorkflowView:
         """Factory: 404 if the contract YAML is missing, else
         return a WorkflowView. Centralizes the (exists-check +
         construct + bind to factory data/contracts dirs) shape
-        that every route used to inline."""
+        that every route used to inline. When `request` is
+        passed, the view's window kwargs come from
+        `request.query_params` — caller-supplied view/reference
+        windows override defaults."""
         _ensure_contract_exists(workflow_id)
+        query = dict(request.query_params) if request is not None else None
         return WorkflowView(
             workflow_id,
             contracts_dir=contracts_dir,
             data_dir=data_dir,
+            query=query,
         )
 
     def _parse_asof(value: str | None):
@@ -350,7 +391,7 @@ def create_app(
         dependencies=auth_dep,
     )
     def cfd_detail(request: Request, workflow_id: str) -> HTMLResponse:
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         with view.warehouse() as con:
             cfd = view.render_cfd(con)
         return templates.TemplateResponse(
@@ -372,7 +413,7 @@ def create_app(
         dependencies=auth_dep,
     )
     def cfd_fragment(request: Request, workflow: str) -> HTMLResponse:
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         with view.warehouse() as con:
             cfd = view.render_cfd(con)
         return templates.TemplateResponse(
@@ -388,7 +429,7 @@ def create_app(
     def _dashboard(request: Request, workflow_id: str) -> HTMLResponse:
         # Dashboard is metric-overview only; the per-item table
         # belongs to the metric detail pages.
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(con)
             throughput = view.render_throughput(con)
@@ -437,7 +478,7 @@ def create_app(
         dependencies=auth_dep,
     )
     def cycle_time_detail(request: Request, workflow_id: str) -> HTMLResponse:
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(con)
             work_items = render_work_items_table(con, workflow_id)
@@ -470,7 +511,7 @@ def create_app(
     def cycle_time_fragment(
         request: Request, workflow: str
     ) -> HTMLResponse:
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(con)
         return templates.TemplateResponse(
@@ -491,7 +532,7 @@ def create_app(
         dependencies=auth_dep,
     )
     def throughput_detail(request: Request, workflow_id: str) -> HTMLResponse:
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         with view.warehouse() as con:
             throughput = view.render_throughput(con)
             work_items = render_work_items_table(con, workflow_id)
@@ -517,7 +558,7 @@ def create_app(
     def throughput_fragment(
         request: Request, workflow: str
     ) -> HTMLResponse:
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         with view.warehouse() as con:
             throughput = view.render_throughput(con)
         return templates.TemplateResponse(
@@ -540,7 +581,7 @@ def create_app(
         workflow_id: str,
         asof: str | None = None,
     ) -> HTMLResponse:
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         asof_date = _parse_asof(asof)
         with view.warehouse() as con:
             aging = view.render_aging(con, asof=asof_date)
@@ -584,7 +625,7 @@ def create_app(
         """Forecast page with two MCS panels driven by sliders.
         Initial render uses sane defaults (20 items, 30 days);
         sliders re-fetch the fragments via HTMX as the user drags."""
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         today = datetime.now(UTC).date()
         with view.warehouse() as con:
             when_done = render_forecast_when_done(
@@ -626,7 +667,7 @@ def create_app(
         items: int = 20,
         start: str | None = None,
     ) -> HTMLResponse:
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         start_date = _parse_asof(start) or datetime.now(UTC).date()
         try:
             items_int = max(1, int(items))
@@ -657,7 +698,7 @@ def create_app(
         days: int = 30,
         start: str | None = None,
     ) -> HTMLResponse:
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         start_date = _parse_asof(start) or datetime.now(UTC).date()
         try:
             days_int = max(1, int(days))
@@ -706,7 +747,7 @@ def create_app(
 
         from .materialise import materialise as run_materialise
 
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         contract_obj = view.contract
 
         since_date = _parse_asof(since)
@@ -769,7 +810,7 @@ def create_app(
     def aging_fragment(
         request: Request, workflow: str, asof: str | None = None
     ) -> HTMLResponse:
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         asof_date = _parse_asof(asof)
         with view.warehouse() as con:
             aging = view.render_aging(con, asof=asof_date)
@@ -808,7 +849,7 @@ def create_app(
         per the source adapter convention, but the URL accepts
         either form.
         """
-        view = _open_view(workflow_id)
+        view = _open_view(workflow_id, request)
         # Accept ids with or without the leading `#` for GitHub
         # PR numbers — both `12345` and `#12345` route to the
         # canonical warehouse id (`#12345`).
@@ -864,7 +905,7 @@ def create_app(
         `page` is 1-indexed; the component clamps to the valid
         range and caps page_size at 200.
         """
-        view = _open_view(workflow)
+        view = _open_view(workflow, request)
         # Normalise sort/direction via the component's whitelist —
         # invalid values fall back to defaults inside render().
         sort_key: SortKey = sort if sort in (
