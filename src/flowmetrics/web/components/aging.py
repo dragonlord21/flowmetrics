@@ -528,16 +528,28 @@ def render(
     # thresholds are statistically shaky. Flag at 3× as a
     # reasonable "consider broadening" trigger (configurable
     # later if teams want different sensitivity).
+    #
+    # Window for the ratio: prefer the user's CONFIGURED
+    # reference window when set (that's what the filter bar
+    # promises). Falls back to the observed completion span
+    # (min..max of completed_at among matching rows) only when
+    # no reference window was supplied — otherwise we'd report
+    # "7d" when the user explicitly chose 14, and the message
+    # contradicts the dropdown above it.
     SMELL_RATIO_THRESHOLD = 3.0
     smell = False
     smell_text = ""
-    if (
-        items
-        and pct_source_earliest is not None
-        and pct_source_latest is not None
-    ):
+    if items:
+        if reference is not None:
+            window_days = reference.days_inclusive
+        elif (
+            pct_source_earliest is not None
+            and pct_source_latest is not None
+        ):
+            window_days = (pct_source_latest - pct_source_earliest).days + 1
+        else:
+            window_days = 0
         max_age = max(i.age_days for i in items)
-        window_days = (pct_source_latest - pct_source_earliest).days + 1
         if window_days > 0 and max_age / window_days >= SMELL_RATIO_THRESHOLD:
             ratio = max_age / window_days
             smell = True
