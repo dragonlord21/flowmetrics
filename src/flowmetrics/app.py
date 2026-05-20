@@ -29,7 +29,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
 from .contract import ContractError, load_contract
-from .windows import Window, parse_windows
+from .windows import Window, last_completed_week, parse_windows
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
 from .web.components.cycle_time import render as render_cycle_time
@@ -251,7 +251,44 @@ class WorkflowView:
                 if self.data_max_date else None
             ),
             "data_is_stale": self.data_is_stale,
+            # Quick-range preset that matches the current anchor
+            # + durations, so the dropdown shows the right
+            # selection after a preset round-trip (instead of
+            # reverting to "Custom"). None when no preset
+            # matches (data-max-anchored defaults, manually-set
+            # custom values, advanced mode).
+            "active_preset": self._active_preset(),
         }
+
+    def _active_preset(self) -> str | None:
+        """Map (anchor, view_days, ref_days) → the preset name
+        whose math produces those values, or None for custom.
+
+        Mirrors the preset table in the filter-bar template +
+        the JS `flowmetricsApplyPreset` switch — keep all three
+        in sync when adding a preset."""
+        if self.view_window.to != self.reference_period.to:
+            return None
+        anchor = self.view_window.to
+        v = self.view_window.days_inclusive
+        r = self.reference_period.days_inclusive
+        today_utc = datetime.now(UTC).date()
+        if anchor == today_utc:
+            if v == 7 and r == 7:
+                return "last-7-days"
+            if v == 14 and r == 14:
+                return "last-14-days"
+            if v == 30 and r == 14:
+                return "last-30-days"
+            if v == 90 and r == 14:
+                return "last-90-days"
+        last_sat = last_completed_week(today=today_utc).to
+        if anchor == last_sat:
+            if v == 7 and r == 7:
+                return "last-week"
+            if v == 14 and r == 14:
+                return "last-2-weeks"
+        return None
 
     def _slug(self) -> str:
         c = self.contract

@@ -1092,13 +1092,14 @@
            how far back each window reaches. #}
         <label class="filter-compact">Quick range
           <select name="preset" onchange="flowmetricsApplyPreset(this.form, this.value)">
-            <option value="">Custom…</option>
-            <option value="last-7-days">Last 7 days</option>
-            <option value="last-14-days">Last 14 days</option>
-            <option value="last-30-days">Last 30 days</option>
-            <option value="last-90-days">Last 90 days</option>
-            <option value="last-week">Last week (Sun–Sat)</option>
-            <option value="last-2-weeks">Last 2 weeks</option>
+            {%- set ap = contract.active_preset -%}
+            <option value=""{% if not ap %} selected{% endif %}>Custom…</option>
+            <option value="last-7-days"{% if ap == "last-7-days" %} selected{% endif %}>Last 7 days</option>
+            <option value="last-14-days"{% if ap == "last-14-days" %} selected{% endif %}>Last 14 days</option>
+            <option value="last-30-days"{% if ap == "last-30-days" %} selected{% endif %}>Last 30 days</option>
+            <option value="last-90-days"{% if ap == "last-90-days" %} selected{% endif %}>Last 90 days</option>
+            <option value="last-week"{% if ap == "last-week" %} selected{% endif %}>Last week (Sun–Sat)</option>
+            <option value="last-2-weeks"{% if ap == "last-2-weeks" %} selected{% endif %}>Last 2 weeks</option>
           </select>
         </label>
         <label class="filter-compact">Anchor

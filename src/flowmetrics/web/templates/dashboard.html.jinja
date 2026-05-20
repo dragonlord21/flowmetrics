@@ -13,10 +13,10 @@
   {%- set qs = ('&' + q) if q else '' -%}
 
   {% for slug, label in [
-    ('cycle-time', 'Cycle time'),
-    ('throughput', 'Throughput'),
     ('aging', 'Aging WIP'),
+    ('throughput', 'Throughput'),
     ('cfd', 'Cumulative Flow'),
+    ('cycle-time', 'Cycle time'),
     ('forecast', 'Forecast'),
   ] %}
     <section class="metric metric-loading"
