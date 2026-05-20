@@ -383,16 +383,20 @@ class TestTooltipDateMatchesDataAcrossTimezones:
     """
 
     def _tooltip_for_first_dot(self, page: Page, server_url: str) -> str:
-        page.goto(server_url + "/workflows/astral-uv-week/")
+        # Detail page renders the cycle-time chart inline (the
+        # dashboard now lazy-loads tiles via HTMX, with fade-in
+        # animation; that's a moving target for "hover the dot
+        # and read the tooltip"). Same chart partial, same
+        # tooltip wiring — only the page chrome differs.
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg")
         page.wait_for_timeout(800)
+        # Playwright's `Locator.hover()` scrolls the target into
+        # view before firing the move — robust against the
+        # sticky filter bar / page chrome that grew during the
+        # filter-bar redesign and pushed the chart down.
         dot = page.locator("#cycle-time-tile svg .mark-symbol path").first
-        bbox = dot.bounding_box()
-        assert bbox is not None
-        page.mouse.move(
-            bbox["x"] + bbox["width"] / 2,
-            bbox["y"] + bbox["height"] / 2,
-        )
+        dot.hover(force=True)
         page.wait_for_timeout(500)
         return page.evaluate(
             "() => document.querySelector('#vg-tooltip-element')?.innerText || ''"
@@ -447,8 +451,12 @@ class TestDotsClusterInTheirDateColumn:
     ):
         """For the leftmost (earliest) dot, its center x must be
         >= the x of the matching axis tick label and < the x of
-        the following tick label."""
-        page.goto(server_url + "/workflows/astral-uv-week/")
+        the following tick label.
+
+        Uses the detail page rather than the dashboard — the
+        dashboard now lazy-loads tiles with a fade-in animation,
+        which makes "hover at a precise pixel" flaky."""
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg")
         page.wait_for_timeout(800)
 
@@ -473,12 +481,15 @@ class TestDotsClusterInTheirDateColumn:
         )
         assert len(dated) >= 3, f"expected >= 3 date labels; got {dated}"
 
-        # Hover the leftmost dot, read its tooltip date.
+        # Hover the leftmost dot, read its tooltip date. Use
+        # Playwright's `hover()` so it scrolls into view first
+        # — the dot may be below the fold after the filter-bar
+        # redesign pushed the chart down.
         dot = page.locator("#cycle-time-tile svg .mark-symbol path").first
+        dot.hover(force=True)
         bbox = dot.bounding_box()
         assert bbox is not None
         dot_cx = bbox["x"] + bbox["width"] / 2
-        page.mouse.move(dot_cx, bbox["y"] + bbox["height"] / 2)
         page.wait_for_timeout(500)
         tooltip = page.evaluate(
             "() => document.querySelector('#vg-tooltip-element')?.innerText || ''"

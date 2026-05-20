@@ -26,6 +26,8 @@ from datetime import UTC, date, datetime, time, timedelta
 
 import duckdb
 
+from typing import Literal
+
 from ...utc_dates import to_utc_display_date, to_utc_iso_date
 from ...windows import Window
 
@@ -38,12 +40,21 @@ class DailyThroughput:
     date_iso: str          # YYYY-MM-DD (UTC)
     date_display: str      # "May 04, 2026" — pre-formatted for tooltips
     count: int
-    # True for Saturdays and Sundays (UTC). The chart paints a faint
-    # background band over weekend columns so weekend-vs-weekday is
-    # visually obvious without reading the dates. Hardcoded to
-    # Sat/Sun for v1 — a configurable weekend-days set is a future
-    # hook (some teams' weekend isn't Sat/Sun).
-    is_weekend: bool
+    # Calendar-day classification. The chart paints a faint
+    # background band over weekend columns so weekend-vs-weekday
+    # is visually obvious without reading the dates. `holiday`
+    # is a future hook (per-contract calendar of holidays);
+    # only `weekday` / `weekend` are emitted today.
+    day_type: Literal["weekday", "weekend", "holiday"]
+    # Warehouse coverage for this date. A zero count on a
+    # `warehouse` day is a TRUE zero (no completions that day,
+    # e.g. weekend); a "zero" on a `missing` day is a GAP (no
+    # data, backfill-able from the system of record). `stale`
+    # is a future hook for "data exists but is older than the
+    # cron heartbeat"; only `warehouse` / `missing` emitted
+    # today. Defaults `warehouse` so contracts without explicit
+    # materialise bounds don't get every day flagged missing.
+    data_coverage: Literal["warehouse", "missing", "stale"] = "warehouse"
 
 
 @dataclass(frozen=True)
@@ -83,7 +94,8 @@ class ThroughputData:
                 "date_iso": d.date_iso,
                 "date_display": d.date_display,
                 "count": d.count,
-                "is_weekend": d.is_weekend,
+                "day_type": d.day_type,
+                "data_coverage": d.data_coverage,
             }
             for d in self.daily
         ]
@@ -134,13 +146,12 @@ class ThroughputData:
             "width": "container",
             "layer": [
                 # Faint background rect on weekend columns. Drawn
-                # under the bars (first layer). Filtered to
-                # `is_weekend == true`; spans the full y-range via
-                # `y` and `y2` left unbound (Vega-Lite stretches a
-                # rect over the full chart height).
+                # under the bars (first layer). Spans the full
+                # y-range via `y`/`y2` left unbound (Vega-Lite
+                # stretches a rect over the full chart height).
                 {
                     "transform": [
-                        {"filter": "datum.is_weekend"},
+                        {"filter": "datum.day_type === 'weekend'"},
                     ],
                     "mark": {
                         "type": "rect",
@@ -151,8 +162,45 @@ class ThroughputData:
                         "x": x_encoding,
                     },
                 },
-                # The throughput bars themselves.
+                # Slightly heavier rect on `missing` (uncovered)
+                # columns so a no-data day is visually distinct
+                # from a real zero-completion day. Same shape
+                # as the weekend backdrop; different opacity +
+                # diagonal hint via stroke.
                 {
+                    "transform": [
+                        {"filter": "datum.data_coverage !== 'warehouse'"},
+                    ],
+                    "mark": {
+                        "type": "rect",
+                        "color": "__theme:border__",
+                        "opacity": 0.55,
+                    },
+                    "encoding": {
+                        "x": x_encoding,
+                        "tooltip": [
+                            {
+                                "field": "date_display",
+                                "type": "nominal",
+                                "title": "Completed",
+                            },
+                            {
+                                "field": "data_coverage",
+                                "type": "nominal",
+                                "title": "Data",
+                            },
+                        ],
+                    },
+                },
+                # Throughput bars — covered days only. A bar of
+                # height 0 on a covered day is a true zero
+                # (rendered as a single-pixel sliver at the
+                # baseline, distinguishable from the empty
+                # column under the `missing` backdrop above).
+                {
+                    "transform": [
+                        {"filter": "datum.data_coverage === 'warehouse'"},
+                    ],
                     "mark": {
                         "type": "bar",
                         "color": bar_color,
@@ -183,6 +231,27 @@ class ThroughputData:
                         ],
                     },
                 },
+                # "no data" marker for uncovered days — a small
+                # em-dash anchored at the baseline. Lets the
+                # viewer tell apart "true zero" from "gap" even
+                # without hovering.
+                {
+                    "transform": [
+                        {"filter": "datum.data_coverage !== 'warehouse'"},
+                    ],
+                    "mark": {
+                        "type": "text",
+                        "text": "—",
+                        "baseline": "bottom",
+                        "dy": -2,
+                        "color": "__theme:muted__",
+                        "fontSize": 11,
+                    },
+                    "encoding": {
+                        "x": x_encoding,
+                        "y": {"value": 0},
+                    },
+                },
             ],
             "config": {
                 "view": {"stroke": None},
@@ -206,12 +275,24 @@ def render(
     contract_name: str,
     *,
     view: Window | None = None,
+    warehouse_start: date | None = None,
+    warehouse_stop: date | None = None,
 ) -> ThroughputData:
     """Compute the daily throughput series for `contract_name`.
 
     `view`: clamps the x-axis to completions inside this
     inclusive date range. When None the window is data-derived
     (first completion → last completion).
+
+    `warehouse_start` / `warehouse_stop`: the contract's
+    materialise window — the date range `flow materialise` last
+    queried. Days inside this range are tagged `is_covered=True`
+    on each `DailyThroughput` row, so a zero on a covered day
+    is a TRUE zero (no completions that day) while a "zero" on
+    an uncovered day is a GAP (no data, backfill-able). The
+    spec renders these differently — covered days get bars,
+    uncovered get a "—" marker. When either is None all days
+    are tagged covered (no gap visualization).
     """
     where = ["contract_id = ?", "created_at IS NOT NULL", "completed_at IS NOT NULL"]
     params: list = [contract_name]
@@ -226,12 +307,34 @@ def render(
         params,
     ).fetchall()
 
+    # Warehouse coverage display fields. Populated in both
+    # branches so the template's empty state can name where
+    # data DOES exist when the view has zero matching rows.
+    wh_earliest_iso = warehouse_start.isoformat() if warehouse_start else None
+    wh_latest_iso = warehouse_stop.isoformat() if warehouse_stop else None
+    wh_earliest_display = (
+        to_utc_display_date(
+            datetime.combine(warehouse_start, time.min, tzinfo=UTC)
+        )
+        if warehouse_start else None
+    )
+    wh_latest_display = (
+        to_utc_display_date(
+            datetime.combine(warehouse_stop, time.min, tzinfo=UTC)
+        )
+        if warehouse_stop else None
+    )
+
     if not rows:
         return ThroughputData(
             daily=(),
             headline="No completed items in this window.",
             first_date_iso=None,
             last_date_iso=None,
+            warehouse_earliest_iso=wh_earliest_iso,
+            warehouse_latest_iso=wh_latest_iso,
+            warehouse_earliest_display=wh_earliest_display,
+            warehouse_latest_display=wh_latest_display,
         )
 
     # Dict keyed by date for O(1) lookup during the enumeration.
@@ -256,15 +359,31 @@ def render(
         # Anchor the date as a UTC midnight datetime so the shared
         # utility's TZ-strict validation accepts it.
         anchored = datetime.combine(cur, time.min, tzinfo=UTC)
+        # `data_coverage`: inside the materialise window =
+        # `warehouse`; outside = `missing` (gap; backfill-able).
+        # Without both warehouse bounds we can't tell coverage
+        # from actual zeros, so default `warehouse` for the
+        # whole series.
+        coverage: Literal["warehouse", "missing", "stale"]
+        if warehouse_start is None or warehouse_stop is None:
+            coverage = "warehouse"
+        elif warehouse_start <= cur <= warehouse_stop:
+            coverage = "warehouse"
+        else:
+            coverage = "missing"
+        # Python: weekday() returns 0=Mon … 6=Sun. Sat/Sun =
+        # weekend. Per-contract holiday calendar is a future
+        # hook (would override weekend/weekday on those dates).
+        day_type: Literal["weekday", "weekend", "holiday"] = (
+            "weekend" if cur.weekday() >= 5 else "weekday"
+        )
         daily.append(
             DailyThroughput(
                 date_iso=to_utc_iso_date(anchored),
                 date_display=to_utc_display_date(anchored),
                 count=by_date.get(cur, 0),
-                # Python: weekday() returns 0=Mon … 6=Sun. Treat
-                # Sat (5) and Sun (6) as weekend. Configurable
-                # per-team is a future hook.
-                is_weekend=cur.weekday() >= 5,
+                day_type=day_type,
+                data_coverage=coverage,
             )
         )
         cur += timedelta(days=1)
@@ -283,4 +402,8 @@ def render(
         headline=headline,
         first_date_iso=daily[0].date_iso,
         last_date_iso=daily[-1].date_iso,
+        warehouse_earliest_iso=wh_earliest_iso,
+        warehouse_latest_iso=wh_latest_iso,
+        warehouse_earliest_display=wh_earliest_display,
+        warehouse_latest_display=wh_latest_display,
     )

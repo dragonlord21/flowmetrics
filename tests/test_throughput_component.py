@@ -245,10 +245,55 @@ class TestThroughputShape:
             f"seen: {marks_seen}"
         )
 
-    def test_each_row_flags_is_weekend_correctly(self):
-        """Saturday + Sunday in UTC are weekend; Mon–Fri are not.
+    def test_data_coverage_distinguishes_missing_from_zero(self):
+        """`data_coverage` tags each day as `warehouse` (inside
+        the materialise window — a 0 is a true zero) or
+        `missing` (outside — no data, backfill-able). The
+        chart renders these visually distinctly so operators
+        don't mistake a gap for a quiet day."""
+        from datetime import datetime, date
+
+        con = duckdb.connect(":memory:")
+        con.execute(
+            """CREATE TABLE work_items (
+                contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+                title VARCHAR, url VARCHAR,
+                created_at TIMESTAMP, completed_at TIMESTAMP,
+                cycle_time_days DOUBLE
+            )"""
+        )
+        # One completion on May 5 inside the warehouse window
+        # (May 4-6). View is May 2-8: May 2/3 = missing (before
+        # warehouse), May 4-6 = warehouse, May 7/8 = missing.
+        con.execute(
+            "INSERT INTO work_items VALUES "
+            "('c', 'github', '#1', 't', NULL, "
+            "'2026-05-05 09:00', '2026-05-05 12:00', 0.13)"
+        )
+        from flowmetrics.windows import Window
+        data = render(
+            con, "c",
+            view=Window(from_=date(2026, 5, 2), to=date(2026, 5, 8)),
+            warehouse_start=date(2026, 5, 4),
+            warehouse_stop=date(2026, 5, 6),
+        )
+        by_iso = {d.date_iso: d.data_coverage for d in data.daily}
+        assert by_iso == {
+            "2026-05-02": "missing",
+            "2026-05-03": "missing",
+            "2026-05-04": "warehouse",
+            "2026-05-05": "warehouse",
+            "2026-05-06": "warehouse",
+            "2026-05-07": "missing",
+            "2026-05-08": "missing",
+        }, f"coverage classification wrong; got {by_iso}"
+
+    def test_each_row_flags_day_type_correctly(self):
+        """Saturday + Sunday in UTC are weekend; Mon–Fri are
+        weekday. `day_type` is a string-typed classification
+        with room for future values (`holiday`).
         2026-05-02 = Sat, 2026-05-03 = Sun, 2026-05-04 = Mon."""
-        from datetime import datetime, UTC
+        from datetime import datetime
 
         con = duckdb.connect(":memory:")
         con.execute(
@@ -272,12 +317,12 @@ class TestThroughputShape:
             rows,
         )
         data = render(con, "c")
-        by_iso = {d.date_iso: d.is_weekend for d in data.daily}
+        by_iso = {d.date_iso: d.day_type for d in data.daily}
         assert by_iso == {
-            "2026-05-02": True,   # Sat
-            "2026-05-03": True,   # Sun
-            "2026-05-04": False,  # Mon
-        }, f"weekend flagging is wrong; got {by_iso}"
+            "2026-05-02": "weekend",
+            "2026-05-03": "weekend",
+            "2026-05-04": "weekday",
+        }, f"day_type classification is wrong; got {by_iso}"
 
     def test_chart_x_axis_orders_dates_ascending(self, warehouse):
         """User-reported bug: the throughput x-axis was rendering

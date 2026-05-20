@@ -1141,23 +1141,23 @@
           </select>
         </label>
         <label class="filter-compact">Anchor
-          <input type="date" name="anchor" value="{{ contract.anchor }}">
+          <input type="date" name="anchor" value="{{ contract.anchor }}"
+                 onchange="this.form.submit()">
         </label>
         <label class="filter-compact">View
-          <select name="view_days">
+          <select name="view_days" onchange="this.form.submit()">
             {% for d in [7, 14, 30, 60, 90, 180] %}
               <option value="{{ d }}"{% if d == contract.view_days %} selected{% endif %}>{{ d }} days</option>
             {% endfor %}
           </select>
         </label>
         <label class="filter-compact">Reference
-          <select name="ref_days">
+          <select name="ref_days" onchange="this.form.submit()">
             {% for d in [7, 14, 30, 60, 90] %}
               <option value="{{ d }}"{% if d == contract.ref_days %} selected{% endif %}>{{ d }} days</option>
             {% endfor %}
           </select>
         </label>
-        <button type="submit" class="filter-apply">Apply</button>
         <a class="filter-reset" href="{{ request.url.path }}">Reset</a>
 
         <details class="filter-advanced"{% if contract.is_advanced_window %} open{% endif %}>
@@ -1169,13 +1169,13 @@
           </p>
           <fieldset class="filter-window">
             <legend>View window</legend>
-            <label>From <input type="date" name="view_from" value="{% if contract.is_advanced_window %}{{ contract.view_from }}{% endif %}"></label>
-            <label>To <input type="date" name="view_to" value="{% if contract.is_advanced_window %}{{ contract.view_to }}{% endif %}"></label>
+            <label>From <input type="date" name="view_from" value="{% if contract.is_advanced_window %}{{ contract.view_from }}{% endif %}" onchange="this.form.submit()"></label>
+            <label>To <input type="date" name="view_to" value="{% if contract.is_advanced_window %}{{ contract.view_to }}{% endif %}" onchange="this.form.submit()"></label>
           </fieldset>
           <fieldset class="filter-window">
             <legend>Reference period</legend>
-            <label>From <input type="date" name="ref_from" value="{% if contract.is_advanced_window %}{{ contract.ref_from }}{% endif %}"></label>
-            <label>To <input type="date" name="ref_to" value="{% if contract.is_advanced_window %}{{ contract.ref_to }}{% endif %}"></label>
+            <label>From <input type="date" name="ref_from" value="{% if contract.is_advanced_window %}{{ contract.ref_from }}{% endif %}" onchange="this.form.submit()"></label>
+            <label>To <input type="date" name="ref_to" value="{% if contract.is_advanced_window %}{{ contract.ref_to }}{% endif %}" onchange="this.form.submit()"></label>
           </fieldset>
         </details>
       </form>

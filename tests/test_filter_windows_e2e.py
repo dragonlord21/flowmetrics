@@ -174,19 +174,20 @@ class TestFilterBarWindows:
         assert "May 4, 2026" in body_text or "May 04, 2026" in body_text
         assert "May 10, 2026" in body_text
 
-    def test_apply_button_submits_form_to_same_url(
+    def test_changing_a_control_auto_submits(
         self, server_url: str, page: Page
     ):
-        """Setting the common-mode controls (anchor + view_days)
-        and clicking 'Apply' navigates to the same path with
-        the new query params. View days = 7 with an anchor in
-        May 2026 should produce a 7-day CFD."""
+        """Filter controls auto-submit on change (Apply button
+        was removed — change-driven submission matches how
+        operators actually use the filter bar). One change at
+        a time so we don't race two navigations."""
         page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd")
-        page.wait_for_selector("input[name='anchor']")
-        page.fill("input[name='anchor']", "2026-05-10")
+        page.wait_for_selector("select[name='view_days']")
+        # Default anchor for the fixture is data-max (~May 10);
+        # setting view_days=7 → 7-day CFD window ending at the
+        # anchor.
         page.select_option("select[name='view_days']", "7")
-        page.locator("button.filter-apply").click()
-        page.wait_for_url("**anchor=2026-05-10**view_days=7**")
+        page.wait_for_url("**view_days=7**")
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
         assert "7 days" in page.locator("body").inner_text()
 

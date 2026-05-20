@@ -329,7 +329,16 @@ class WorkflowView:
         )
 
     def render_throughput(self, con):
-        return render_throughput(con, self.id, view=self.view_window)
+        return render_throughput(
+            con, self.id,
+            view=self.view_window,
+            # Contract's materialise window defines what dates
+            # the warehouse covers. Days inside = real zeros
+            # possible; outside = "no data, backfill needed".
+            # The throughput spec renders these differently.
+            warehouse_start=self.contract.start,
+            warehouse_stop=self.contract.stop,
+        )
 
     def render_forecast_when_done(self, con, *, items: int, start_date=None):
         return render_forecast_when_done(
