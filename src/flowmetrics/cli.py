@@ -1078,19 +1078,49 @@ def forecast_how_many(
     default=False,
     help="Offline reads cache only; online hits the source API on miss.",
 )
+@click.option(
+    "--since",
+    "since",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help=(
+        "Override the contract's `start` for this run only. "
+        "ISO YYYY-MM-DD (UTC). Used for targeted backfills, e.g. "
+        "the aging page's coverage-gap action."
+    ),
+)
+@click.option(
+    "--until",
+    "until",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help=(
+        "Override the contract's `stop` for this run only. "
+        "ISO YYYY-MM-DD (UTC)."
+    ),
+)
 def materialise(
     name: str,
     data_dir: Path,
     contracts_dir: Path,
     cache_dir: Path,
     offline: bool,
+    since,  # click.DateTime → datetime | None
+    until,
 ) -> None:
     """Fetch + canonicalise + write Parquet for one contract.
 
     Invoked by external cron / systemd-timer / k8s CronJob. Exits 0
     on success, non-zero on any failure. Operators see the error in
     cron mail or systemd journal.
+
+    `--since` and `--until` override the contract YAML's start/stop
+    for this invocation only — they don't mutate the YAML. Useful
+    for targeted backfills when the warehouse needs to be brought
+    forward without changing the contract's canonical window.
     """
+    import dataclasses
+
     from .contract import ContractError, load_contract
     from .materialise import materialise as run_materialise
 
@@ -1099,6 +1129,15 @@ def materialise(
     except ContractError as exc:
         click.echo(f"error: {exc}", err=True)
         sys.exit(2)
+
+    # Click's DateTime returns datetime; we want date.
+    overrides: dict = {}
+    if since is not None:
+        overrides["start"] = since.date()
+    if until is not None:
+        overrides["stop"] = until.date()
+    if overrides:
+        contract = dataclasses.replace(contract, **overrides)
 
     manifest = run_materialise(
         contract=contract,

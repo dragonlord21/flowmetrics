@@ -32,6 +32,30 @@ class ContractError(ValueError):
 
 
 @dataclass(frozen=True)
+class WorkflowStates:
+    """3-category classification of workflow states. Order
+    within each tuple is the kanban order (left to right).
+
+    - `backlog`: items not yet started; excluded from CFD and
+      Aging WIP entirely (Vacanti — backlog is not WIP).
+    - `wip`: actively-being-worked states; each becomes a band
+      on the CFD and a column on Aging WIP.
+    - `done`: terminal/departure states; CFD shows them as the
+      bottom band(s). Aging excludes them (items have completed).
+    """
+
+    backlog: tuple[str, ...] = ()
+    wip: tuple[str, ...] = ()
+    done: tuple[str, ...] = ()
+
+    def cfd_bands(self) -> tuple[str, ...]:
+        """States to render as CFD bands, in kanban order:
+        WIP first (top of stack), done at the bottom
+        (departures). Backlog is excluded."""
+        return self.wip + self.done
+
+
+@dataclass(frozen=True)
 class Contract:
     name: str
     source: Literal["github", "jira"]
@@ -43,6 +67,10 @@ class Contract:
     # Window
     start: date | None = None
     stop: date | None = None
+    # Optional 3-category state classification. When set,
+    # stage-aware views (CFD, Aging) consult this to filter and
+    # order. When unset, views fall back to data-derived ordering.
+    states: WorkflowStates | None = None
 
 
 def load_contract(name: str, contracts_dir: Path) -> Contract:
@@ -119,6 +147,51 @@ def load_contract(name: str, contracts_dir: Path) -> Contract:
                 f"contract.{field_name} must be YYYY-MM-DD; got {v!r}"
             ) from exc
 
+    # Optional `states:` block — 3-category classification of
+    # workflow states (backlog/wip/done). Within each category the
+    # list order is the kanban order (no inference). Each state
+    # name can appear in at most one category. Reclassify by
+    # moving a state name between lists.
+    raw_states = body.get("states")
+    states_obj: WorkflowStates | None
+    if raw_states is None:
+        states_obj = None
+    else:
+        if not isinstance(raw_states, dict):
+            raise ContractError(
+                f"contract.states must be a mapping of "
+                f"category → [state_name, …]; got "
+                f"{type(raw_states).__name__}"
+            )
+        valid_categories = {"backlog", "wip", "done"}
+        seen: dict[str, str] = {}  # state_name → category
+        parsed: dict[str, tuple[str, ...]] = {
+            "backlog": (), "wip": (), "done": (),
+        }
+        for category, names in raw_states.items():
+            if category not in valid_categories:
+                raise ContractError(
+                    f"unknown category {category!r} in contract.states; "
+                    f"valid categories are: backlog, wip, done"
+                )
+            if not isinstance(names, list):
+                raise ContractError(
+                    f"contract.states.{category} must be a list of "
+                    f"state names; got {type(names).__name__}"
+                )
+            names_tuple = tuple(str(n) for n in names)
+            for n in names_tuple:
+                if n in seen:
+                    raise ContractError(
+                        f"state {n!r} appears in more than one "
+                        f"category: {seen[n]!r} and {category!r}. "
+                        f"Each state name can be in at most one "
+                        f"category."
+                    )
+                seen[n] = category
+            parsed[category] = names_tuple
+        states_obj = WorkflowStates(**parsed)
+
     return Contract(
         name=name,
         source=source,
@@ -127,4 +200,5 @@ def load_contract(name: str, contracts_dir: Path) -> Contract:
         jira_project=jira_project,
         start=_parse_date("start"),
         stop=_parse_date("stop"),
+        states=states_obj,
     )

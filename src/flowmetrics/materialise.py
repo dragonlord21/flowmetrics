@@ -83,7 +83,36 @@ def materialise(
         "Slice 1 contract requires explicit start/stop dates; "
         "richer scoping arrives in later slices."
     )
-    items = list(source.fetch_completed_in_window(contract.start, contract.stop))
+    completed = list(
+        source.fetch_completed_in_window(contract.start, contract.stop)
+    )
+    # Also capture in-flight items (started but not yet completed)
+    # so the aging-WIP chart has data to plot. Without this the
+    # warehouse only knows about completed work and aging is
+    # always empty. The asof for fetch_in_flight is "right now"
+    # — that's the only honest snapshot of "what's open" the
+    # source can give us.
+    #
+    # Tolerate a cache miss in offline mode: the offline test
+    # fixture doesn't carry `is:open` query responses (only
+    # `is:merged ... in window`), so re-running an existing
+    # offline materialise shouldn't crash. The cost is an empty
+    # aging chart until the next online refresh, which is exactly
+    # the empty-state UI the user already sees.
+    from .cache import CacheMiss
+
+    try:
+        in_flight = list(
+            source.fetch_in_flight(asof=datetime.now(UTC).date())
+        )
+    except CacheMiss:
+        in_flight = []
+    # Defensive de-dup by item_id in case a PR closed between the
+    # two fetches and shows up in both lists. The completed copy
+    # wins (it has the completion timestamp).
+    completed_ids = {i.item_id for i in completed}
+    in_flight = [i for i in in_flight if i.item_id not in completed_ids]
+    items = completed + in_flight
 
     completed_at = datetime.now(UTC)
 

@@ -96,6 +96,117 @@ def known_item(warehouse) -> tuple[str, str]:
     return row[0], row[1]
 
 
+@pytest.fixture
+def synth_warehouse() -> duckdb.DuckDBPyConnection:
+    """In-memory warehouse with a single synthetic item whose
+    transitions extend PAST completed_at — exactly the live-data
+    case where a PR is re-labeled after merge. Lets us exercise
+    the post-completion truncation logic without depending on the
+    offline fixture cache (which doesn't include this case)."""
+    from datetime import datetime as _dt
+    con = duckdb.connect(":memory:")
+    con.execute(
+        """
+        CREATE TABLE work_items (
+          contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+          title VARCHAR, url VARCHAR,
+          created_at TIMESTAMP, completed_at TIMESTAMP,
+          cycle_time_days DOUBLE
+        )
+        """
+    )
+    con.execute(
+        """
+        CREATE TABLE transitions (
+          contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+          entered_at TIMESTAMP, stage VARCHAR, signal VARCHAR
+        )
+        """
+    )
+    con.execute(
+        "INSERT INTO work_items VALUES "
+        "('demo', 'github', '#1', 'Test', 'https://example.com',"
+        " '2026-05-06 16:00:00', '2026-05-07 08:00:00', 2.0)"
+    )
+    # Transitions: 4 in-cycle + 1 post-completion.
+    con.execute(
+        "INSERT INTO transitions VALUES "
+        "('demo', 'github', '#1', '2026-05-06 16:00:00', 'Draft', 'github-pr-created'),"
+        "('demo', 'github', '#1', '2026-05-06 18:00:00', 'Awaiting Review', 'github-label-added'),"
+        "('demo', 'github', '#1', '2026-05-06 22:00:00', 'Approved', 'github-label-added'),"
+        "('demo', 'github', '#1', '2026-05-07 08:00:00', 'Merged', 'github-pr-merged'),"
+        "('demo', 'github', '#1', '2026-05-09 16:00:00', 'Approved', 'github-label-added')"
+    )
+    # Also add an in-flight item (no completed_at) for the
+    # "keep all events" test.
+    con.execute(
+        "INSERT INTO work_items VALUES "
+        "('demo', 'github', '#2', 'Open', 'https://example.com',"
+        " '2026-05-06 10:00:00', NULL, NULL)"
+    )
+    con.execute(
+        "INSERT INTO transitions VALUES "
+        "('demo', 'github', '#2', '2026-05-06 10:00:00', 'Draft', 'github-pr-created'),"
+        "('demo', 'github', '#2', '2026-05-08 12:00:00', 'Awaiting Review', 'github-label-added'),"
+        "('demo', 'github', '#2', '2026-05-10 09:00:00', 'Changes Requested', 'github-label-added')"
+    )
+    yield con
+    con.close()
+
+
+class TestLifecyclePostCompletionTruncation:
+    """Post-merge label changes can land in the transitions
+    table — e.g., someone re-tags a PR days after merging. These
+    events don't change cycle time (which uses created_at /
+    completed_at), but they extend the lifecycle visualization
+    PAST completion with a fake "Merged · 2d 8h" dwell that
+    misleads the viewer into thinking the cycle is longer than
+    it is.
+
+    Pin: when the work_items row says completed_at = T, the
+    lifecycle's stages must end at or before T. Any transition
+    rows with entered_at > T are post-completion noise and
+    don't belong on the cycle-view timeline.
+    """
+
+    def test_stages_dont_extend_past_completed_at(self, synth_warehouse):
+        """Item #1 has 5 transitions: 4 in-cycle (Draft, Awaiting
+        Review, Approved, Merged at 08:00 on May 7) + 1 post-
+        completion (Approved at May 9 16:00 — 2 days later).
+        The lifecycle stages must end at or before completed_at
+        (May 7 08:00); the post-completion transition is
+        polluting noise and must not show up as a "Merged · 2d"
+        dwell."""
+        from flowmetrics.web.components.lifecycle import render
+        data = render(synth_warehouse, "demo", "github", "#1")
+        completed_iso = "2026-05-07T08:00:00"
+        for stage in data.stages:
+            assert stage.exited_at_iso[:19] <= completed_iso, (
+                f"stage {stage.stage!r} exits at "
+                f"{stage.exited_at_iso} which is AFTER completed_at "
+                f"({completed_iso}) — post-completion transitions are "
+                f"polluting the lifecycle view. Truncate at "
+                f"completed_at when building stages."
+            )
+        # And the last stage's exit MUST be exactly completed_at
+        # (the Merged event), not the spurious post-merge re-tag.
+        assert data.stages[-1].exited_at_iso[:19] == completed_iso, (
+            f"last stage should exit at completed_at; got "
+            f"{data.stages[-1].exited_at_iso}"
+        )
+
+    def test_in_flight_items_keep_all_events(self, synth_warehouse):
+        """Truncation only applies to COMPLETED items. Item #2
+        has completed_at=NULL and 3 transitions — all 3 must
+        appear in the lifecycle view."""
+        from flowmetrics.web.components.lifecycle import render
+        data = render(synth_warehouse, "demo", "github", "#2")
+        assert len(data.events) == 3, (
+            f"in-flight item should keep all 3 transitions; got "
+            f"{len(data.events)}"
+        )
+
+
 class TestLifecycleShape:
     def test_returns_events_in_ascending_time_order(self, warehouse, known_item):
         source, item_id = known_item

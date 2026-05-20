@@ -24,4 +24,22 @@
   {% with mode = 'tile', data = aging %}
     {% include "_partials/aging_tile.html.jinja" %}
   {% endwith %}
+
+  {% with summary = {"title": "Cumulative Flow", "headline": cfd.headline} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+  {% with mode = 'tile', data = cfd %}
+    {% include "_partials/cfd_tile.html.jinja" %}
+  {% endwith %}
+
+  {# Forecast — no chart on the dashboard (the page has two
+     slider-driven panels). Link out instead, with a single-line
+     summary of what's available. #}
+  {% with summary = {"title": "Forecast", "headline": "Monte Carlo over the throughput history — answer 'when will N items be done?' and 'how many done by date X?' with interactive sliders."} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+  <section class="metric metric--link-only">
+    <a class="details-link"
+       href="/workflows/{{ contract.name }}/metrics/forecast">Open forecast →</a>
+  </section>
 {% endblock %}

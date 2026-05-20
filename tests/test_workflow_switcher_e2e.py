@@ -1,0 +1,171 @@
+"""E2E: workflow picker re-renders the page with the chosen
+workflow's data, and preserves whatever sub-route the viewer is
+on (dashboard, metric detail).
+
+Was decorative until this slice — the dropdown carried the
+correct options but was `disabled`. This test pins:
+
+  1. The dropdown is enabled and lists every contract under
+     `contracts_dir`.
+  2. Changing the selection navigates to the chosen workflow.
+  3. Sub-route is preserved across the switch — picking a new
+     workflow from `/workflows/A/metrics/cycle-time` lands on
+     `/workflows/B/metrics/cycle-time`, not `/workflows/B/`.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import socket
+import threading
+import time
+from pathlib import Path
+
+import pytest
+import uvicorn
+import yaml
+from click.testing import CliRunner
+from playwright.sync_api import Page, expect
+
+from flowmetrics.cli import cli
+
+pytestmark = pytest.mark.e2e
+
+FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class _ServerThread(threading.Thread):
+    def __init__(self, app, port: int):
+        super().__init__(daemon=True)
+        config = uvicorn.Config(
+            app,
+            host="127.0.0.1",
+            port=port,
+            log_level="error",
+            access_log=False,
+        )
+        self.server = uvicorn.Server(config)
+
+    def run(self) -> None:
+        self.server.run()
+
+    def stop(self) -> None:
+        self.server.should_exit = True
+
+
+@pytest.fixture(scope="module")
+def server_url(tmp_path_factory):
+    """Materialise TWO contracts so the dropdown has something to
+    switch BETWEEN. Both use the GitHub fixture cache (offline)
+    so the test stays hermetic and fast."""
+    from flowmetrics.app import create_app
+
+    tmp_path = tmp_path_factory.mktemp("workflow-switcher")
+    contracts_dir = tmp_path / "contracts"
+    contracts_dir.mkdir()
+    data_dir = tmp_path / "data"
+
+    # Two identical-shape contracts so both have data; the test
+    # only cares that switching navigates correctly.
+    for name in ("alpha-workflow", "beta-workflow"):
+        (contracts_dir / f"{name}.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "contract": {
+                        "name": name,
+                        "source": "github",
+                        "repo": "astral-sh/uv",
+                        "start": "2026-05-04",
+                        "stop": "2026-05-10",
+                    }
+                }
+            )
+        )
+        res = CliRunner().invoke(
+            cli,
+            [
+                "materialise",
+                name,
+                "--data-dir",
+                str(data_dir),
+                "--contracts-dir",
+                str(contracts_dir),
+                "--cache-dir",
+                str(FIXTURE_CACHE),
+                "--offline",
+            ],
+            catch_exceptions=False,
+        )
+        assert res.exit_code == 0, res.output
+
+    app = create_app(data_dir=data_dir, contracts_dir=contracts_dir)
+    port = _free_port()
+    thread = _ServerThread(app, port)
+    thread.start()
+    for _ in range(50):
+        with (
+            contextlib.suppress(OSError),
+            socket.create_connection(("127.0.0.1", port), timeout=0.2),
+        ):
+            break
+        time.sleep(0.1)
+    else:
+        thread.stop()
+        raise RuntimeError("uvicorn did not start in time")
+
+    yield f"http://127.0.0.1:{port}"
+
+    thread.stop()
+    thread.join(timeout=3)
+
+
+class TestWorkflowSwitcher:
+    def test_dropdown_is_enabled_and_lists_all_workflows(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/workflows/alpha-workflow")
+        select = page.locator("select[name='workflow']")
+        expect(select).to_be_visible()
+        # Must NOT be disabled — that was the slice 2 placeholder
+        # behaviour and is the whole bug this test guards.
+        is_disabled = page.evaluate(
+            "() => document.querySelector(\"select[name='workflow']\").disabled"
+        )
+        assert is_disabled is False, (
+            "workflow select must be enabled so users can switch"
+        )
+        options = page.evaluate(
+            "() => Array.from(document.querySelectorAll(\"select[name='workflow'] option\")).map(o => o.value)"
+        )
+        assert "alpha-workflow" in options
+        assert "beta-workflow" in options
+
+    def test_selecting_a_different_workflow_navigates_there(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/workflows/alpha-workflow")
+        page.wait_for_selector("select[name='workflow']:not([disabled])")
+        page.select_option("select[name='workflow']", "beta-workflow")
+        page.wait_for_url("**/workflows/beta-workflow**")
+        # The contract chip in the page header should now read
+        # beta-workflow — confirms a real re-render, not just URL
+        # change.
+        page_text = page.locator("body").inner_text()
+        assert "beta-workflow" in page_text
+
+    def test_switcher_preserves_metric_sub_route(
+        self, server_url: str, page: Page
+    ):
+        """Switching workflow from a metric-detail URL lands on
+        the same metric in the new workflow — not the dashboard.
+        Without this, every switch loses the viewer's context."""
+        page.goto(server_url + "/workflows/alpha-workflow/metrics/cycle-time")
+        page.wait_for_selector("select[name='workflow']:not([disabled])")
+        page.select_option("select[name='workflow']", "beta-workflow")
+        page.wait_for_url("**/workflows/beta-workflow/metrics/cycle-time**")

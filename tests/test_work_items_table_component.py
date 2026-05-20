@@ -76,9 +76,16 @@ def warehouse() -> duckdb.DuckDBPyConnection:
 
 class TestWorkItemsTableShape:
     def test_renders_one_row_per_completed_item(self, warehouse):
+        """`count` is the TOTAL matching rows (across pages);
+        `len(rows)` is items on the current page (default 25)."""
         data = render(warehouse, "astral-uv-week")
         assert data.count == 43
-        assert len(data.rows) == 43
+        assert len(data.rows) == 25
+        assert data.total_pages == 2
+        # Page 2 has the remaining 18 rows.
+        page2 = render(warehouse, "astral-uv-week", page=2)
+        assert page2.count == 43
+        assert len(page2.rows) == 18
 
     def test_row_fields_cover_identity_lifecycle_and_link(self, warehouse):
         data = render(warehouse, "astral-uv-week")
@@ -171,6 +178,38 @@ class TestWorkItemsTableShape:
         for r in filtered.rows:
             assert r.completed_at == "2026-05-04"
             assert needle in r.title.lower()
+
+    def test_in_flight_at_filter_populates_age_days_field(self, warehouse):
+        """When the table is scoped to in-flight items at an as-of
+        date, each row carries `age_days = (asof - created_at) + 1`
+        (Vacanti's CD - SD + 1 formula — same `+1` inclusive rule
+        cycle time uses; a same-day item is 1d not 0d)."""
+        data = render(
+            warehouse, "astral-uv-week", in_flight_at="2026-05-06"
+        )
+        if not data.rows:
+            return
+        for r in data.rows:
+            assert r.age_days is not None, (
+                f"in_flight_at filter must populate age_days; got "
+                f"None for {r.item_id!r}"
+            )
+            # Minimum legal value is 1d per Vacanti.
+            assert r.age_days >= 1
+            # Cross-check: re-compute from the row's created_at.
+            from datetime import date as _d
+            asof_d = _d.fromisoformat("2026-05-06")
+            created_d = _d.fromisoformat(r.created_at)
+            assert r.age_days == (asof_d - created_d).days + 1
+
+    def test_age_days_is_none_when_in_flight_at_not_set(self, warehouse):
+        """The Age column is meaningless without an asof context.
+        Routes that aren't aging-scoped (cycle-time, throughput
+        detail) leave the field None and the template doesn't
+        render the column."""
+        data = render(warehouse, "astral-uv-week")
+        for r in data.rows:
+            assert r.age_days is None
 
     def test_sort_by_created_at_orders_by_start_date(self, warehouse):
         """The new column needs a sort affordance. Pass

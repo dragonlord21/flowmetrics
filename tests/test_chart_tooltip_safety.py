@@ -45,7 +45,12 @@ from datetime import date
 
 from flowmetrics.cli import cli
 from flowmetrics.web.components.aging import render as render_aging
+from flowmetrics.web.components.cfd import render as render_cfd
 from flowmetrics.web.components.cycle_time import render as render_cycle_time
+from flowmetrics.web.components.forecast import (
+    render_how_many as render_forecast_how_many,
+    render_when_done as render_forecast_when_done,
+)
 from flowmetrics.web.components.throughput import render as render_throughput
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
@@ -135,7 +140,34 @@ def _collect_component_specs(warehouse) -> list[tuple[str, dict]]:
                 ).vega_spec_json()
             ),
         ),
-        # Future: add cfd, forecast, etc. as they land.
+        (
+            "forecast_when_done",
+            json.loads(
+                render_forecast_when_done(
+                    warehouse,
+                    "astral-uv-week",
+                    items=20,
+                    start_date=date(2026, 5, 11),
+                ).vega_spec_json()
+            ),
+        ),
+        (
+            "forecast_how_many",
+            json.loads(
+                render_forecast_how_many(
+                    warehouse,
+                    "astral-uv-week",
+                    start_date=date(2026, 5, 11),
+                    end_date=date(2026, 6, 10),
+                ).vega_spec_json()
+            ),
+        ),
+        (
+            "cfd",
+            json.loads(
+                render_cfd(warehouse, "astral-uv-week").vega_spec_json()
+            ),
+        ),
     ]
 
 

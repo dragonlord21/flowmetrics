@@ -1,0 +1,42 @@
+{# CFD chart fragment: chart container + Vega-Lite embed.
+   Used inside the tile partial AND returned from
+   `/api/internal/cfd` as the HTMX swap payload.
+
+   Required context:
+     data           — CfdData
+     chart_height   — int pixels (~320 for tile, ~440 for detail)
+     contract.name  — for any back-links
+#}
+{%- set chart_container_id = "cfd-chart" -%}
+{%- set _h = chart_height|default(320) -%}
+
+<div id="{{ chart_container_id }}" class="metric-chart"
+     data-chart-height="{{ _h }}">
+  {% if not data.daily %}
+    <p class="aging-empty">
+      No transitions captured yet.
+    </p>
+  {% endif %}
+</div>
+{% if data.daily %}
+<script>
+  (function () {
+    if (window.__flowmetricsCfdView) {
+      try { window.__flowmetricsCfdView.finalize(); }
+      catch (e) { /* finalize is best-effort */ }
+      window.__flowmetricsCfdView = null;
+    }
+    const spec = {{ data.vega_spec_json() | safe }};
+    spec.height = {{ _h }};
+    vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
+      actions: false,
+      renderer: "svg"
+    }).then(function (res) {
+      window.__flowmetricsCfdView = res.view;
+    }).catch(function (err) {
+      const el = document.getElementById("{{ chart_container_id }}");
+      el.innerText = "Chart render failed: " + err;
+    });
+  })();
+</script>
+{% endif %}

@@ -60,14 +60,12 @@ class ThroughputData:
         """Vega-Lite bar chart: one bar per enumerated date, height
         = count. Dates rendered as nominal pre-formatted strings to
         avoid the TZ-shift bug the cycle-time chart was burned by."""
-        # Knox secondary deep berry. Hue family distinct from the
-        # cycle-time chart (which is in plum-shade territory now),
-        # so a viewer scanning the dashboard sees "two metrics, two
-        # palettes" without color overload. One color for all bars —
-        # they are the same kind of observation, not categorical.
-        # Resolved at embed time by `window.applyTheme` from the CSS
-        # `--s-700` token.
-        bar_color = "__theme:s-700__"
+        # Neutral gray. The dashboard's coloured accent budget is
+        # spent on the import-button CTA and the cycle-time P85
+        # commitment line; everything else — including throughput
+        # bars — stays monochrome so the eye finds the meaning
+        # without colour fighting for attention.
+        bar_color = "__theme:muted__"
 
         values = [
             {

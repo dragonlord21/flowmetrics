@@ -276,7 +276,7 @@ class TestDetailPageCycleTime:
     def test_detail_page_renders_same_chart_full_size(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/cycle-time")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         # The detail page uses the same partial in 'detail' mode; the
         # underlying SVG must still render.
@@ -289,7 +289,7 @@ class TestDetailPageCycleTime:
         sections below the tile. Stubs in Slice 2; populated later.
         Assert the section headers are present so the slot exists.
         """
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/cycle-time")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         # Section H2s render UPPERCASE per Knox eyebrow style;
         # compare case-insensitively so the assertion survives
@@ -308,7 +308,7 @@ class TestDetailPageCycleTime:
         (title + headline above the chart tile). Replaces the
         old standalone <h1>page-title pattern with the reusable
         component pattern."""
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/cycle-time")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         summary = page.locator(".metric-summary")
         expect(summary).to_be_visible()
@@ -326,7 +326,7 @@ class TestContractScopedUrls:
     contract id so the system is multi-contract-ready by URL shape.
     `/metrics/cycle-time` (the singular form) is no longer the
     canonical URL; the canonical form is
-    `/contracts/{contract_id}/metrics/cycle-time`.
+    `/workflows/{contract_id}/metrics/cycle-time`.
 
     These tests pin the new URL shape. They will require the routes
     in flowmetrics/app.py to be reshaped.
@@ -335,14 +335,14 @@ class TestContractScopedUrls:
     def test_contract_scoped_dashboard_url_returns_200_with_chart(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         expect(page.locator("#cycle-time-tile svg")).to_be_visible()
 
     def test_contract_scoped_metric_detail_url_returns_200_with_chart(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/cycle-time")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         expect(page.locator("#cycle-time-tile svg")).to_be_visible()
 
@@ -351,19 +351,19 @@ class TestContractScopedUrls:
     ):
         """The Details → link on the dashboard tile must point at
         the contract-scoped URL, not the singular legacy form."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         link = page.locator("#cycle-time-tile a:has-text('Details')")
         href = link.get_attribute("href")
         assert href is not None and href.startswith(
-            "/contracts/astral-uv-week/metrics/cycle-time"
+            "/workflows/astral-uv-week/metrics/cycle-time"
         ), (
-            f"Details link should point at /contracts/<id>/metrics/cycle-time; "
+            f"Details link should point at /workflows/<id>/metrics/cycle-time; "
             f"got {href!r}"
         )
 
     def test_unknown_contract_returns_404(self, server_url: str, page: Page):
-        response = page.request.get(server_url + "/contracts/does-not-exist/")
+        response = page.request.get(server_url + "/workflows/does-not-exist/")
         assert response.status == 404, (
             f"expected 404 for unknown contract; got {response.status}"
         )
@@ -383,7 +383,7 @@ class TestTooltipDateMatchesDataAcrossTimezones:
     """
 
     def _tooltip_for_first_dot(self, page: Page, server_url: str) -> str:
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg")
         page.wait_for_timeout(800)
         dot = page.locator("#cycle-time-tile svg .mark-symbol path").first
@@ -448,7 +448,7 @@ class TestDotsClusterInTheirDateColumn:
         """For the leftmost (earliest) dot, its center x must be
         >= the x of the matching axis tick label and < the x of
         the following tick label."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg")
         page.wait_for_timeout(800)
 
@@ -531,7 +531,7 @@ class TestMetricSummaryAboveChart:
         The dashboard now hosts multiple metric tiles (cycle time,
         throughput, …) each with its own summary block. Scope to
         the cycle-time summary by header text."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         # Cycle-time summary: the .metric-summary block whose title
         # text contains "Cycle time".
@@ -571,7 +571,7 @@ class TestMetricSummaryAboveChart:
         to the summary component above the chart, not to the chart
         tile itself. Tile shows the chart; summary shows the
         numbers."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         # No headline inside the tile.
         inner = page.locator("#cycle-time-tile .metric-headline").count()
@@ -589,7 +589,7 @@ class TestDetailPageNoSubtitleNoise:
     """
 
     def test_per_item_subtitle_is_removed(self, server_url: str, page: Page):
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/cycle-time")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         body = page.locator("body").inner_text()
         assert "Per-item cycle time over the window" not in body, (
@@ -609,7 +609,7 @@ class TestDetailPageHeader:
     def test_detail_page_site_header_contains_metric_name(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/cycle-time")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         header_text = page.locator(".site-header").inner_text()
         assert "Cycle time" in header_text, (
@@ -628,7 +628,7 @@ class TestDetailPageHeader:
         """The dashboard shows multiple metrics; pinning one name to
         the header would be wrong. The contract name is what
         identifies the page."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         header_text = page.locator(".site-header").inner_text()
         assert "Cycle time" not in header_text, (
@@ -646,7 +646,7 @@ class TestThroughputOnDashboard:
     def test_dashboard_renders_throughput_tile_with_bars(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         page.wait_for_timeout(400)
         # Vega-Lite renders bar marks under the `.mark-rect` class
@@ -668,7 +668,7 @@ class TestThroughputOnDashboard:
     ):
         """Same composable pattern as cycle time: the headline lives
         in `.metric-summary` ABOVE the chart tile in DOM order."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         # There are two metric-summary blocks on the dashboard now
         # (cycle time + throughput); find the one near the
@@ -699,14 +699,14 @@ class TestThroughputOnDashboard:
     def test_throughput_detail_page_renders_chart_full_size(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/throughput")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         expect(page.locator("#throughput-tile svg")).to_be_visible()
 
     def test_throughput_detail_page_header_carries_metric_name(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/throughput")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         header_text = page.locator(".site-header").inner_text()
         assert "Throughput" in header_text, (
@@ -717,12 +717,12 @@ class TestThroughputOnDashboard:
     def test_throughput_tile_details_link_uses_contract_scoped_url(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         link = page.locator("#throughput-tile a:has-text('Details')")
         href = link.get_attribute("href")
         assert href and href.startswith(
-            "/contracts/astral-uv-week/metrics/throughput"
+            "/workflows/astral-uv-week/metrics/throughput"
         ), (
             f"throughput Details → must link to the contract-scoped "
             f"URL; got {href!r}"
@@ -731,7 +731,7 @@ class TestThroughputOnDashboard:
     def test_throughput_reset_button_swaps_chart_via_htmx(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         page.wait_for_timeout(400)
         n_before = page.locator("#throughput-tile svg .mark-rect path").count()
@@ -768,7 +768,7 @@ class TestThroughputOnDashboard:
         the LAST `.mark-rect` group (the bars). Among those bars
         the tallest is May 04 — 19 completions in the fixture.
         """
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/throughput")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         page.wait_for_selector("#work-items", timeout=10000)
         page.wait_for_timeout(500)
@@ -828,7 +828,7 @@ class TestThroughputOnDashboard:
     ):
         """The "clear" affordance on the active-filter chip removes
         the date filter and the table re-renders with all rows."""
-        page.goto(server_url + "/contracts/astral-uv-week/metrics/throughput")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/throughput")
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
         page.wait_for_selector("#work-items", timeout=10000)
         page.wait_for_timeout(500)
@@ -862,16 +862,22 @@ class TestThroughputOnDashboard:
         assert page.locator(".work-items-active-filter").count() == 0, (
             "clear link should remove the active-filter chip"
         )
+        # 43 total rows but pagination caps page 1 at 25.
         n_rows = page.locator("table.work-items-grid tbody tr").count()
-        assert n_rows == 43, (
-            f"clear should restore all 43 rows; got {n_rows}"
+        assert n_rows == 25, (
+            f"clear should restore first page of 25 rows; got {n_rows}"
+        )
+        # The total count is still surfaced in the header.
+        header = page.locator(".work-items-count").inner_text()
+        assert "43 items" in header, (
+            f"header must show total count of 43; got {header!r}"
         )
 
     def test_throughput_fragment_endpoint_returns_chart_only(
         self, server_url: str, page: Page
     ):
         response = page.request.get(
-            server_url + "/api/internal/throughput?contract=astral-uv-week"
+            server_url + "/api/internal/throughput?workflow=astral-uv-week"
         )
         assert response.status == 200
         html = response.text()
@@ -901,7 +907,7 @@ class TestAgingOnDashboard:
         in-flight items) — empty state is a "no items in flight"
         message, not a chart, since Vega-Lite can't draw a nominal
         x-axis with zero values."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#aging-tile", timeout=10000)
         # No SVG; explicit empty-state message.
         expect(page.locator("#aging-tile .aging-empty")).to_be_visible()
@@ -928,7 +934,7 @@ class TestAgingOnDashboard:
         `.mark-point`; it doesn't exist in v5's SVG output."""
         page.goto(
             server_url
-            + "/contracts/astral-uv-week/metrics/aging?asof=2026-05-06"
+            + "/workflows/astral-uv-week/metrics/aging?asof=2026-05-06"
         )
         page.wait_for_selector("#aging-tile svg", timeout=10000)
         page.wait_for_timeout(400)
@@ -946,7 +952,7 @@ class TestAgingOnDashboard:
         self, server_url: str, page: Page
     ):
         page.goto(
-            server_url + "/contracts/astral-uv-week/metrics/aging"
+            server_url + "/workflows/astral-uv-week/metrics/aging"
         )
         page.wait_for_selector("#aging-tile", timeout=10000)
         header_text = page.locator(".site-header").inner_text()
@@ -961,7 +967,7 @@ class TestAgingOnDashboard:
         chart was unreliable across Vega-Lite versions."""
         page.goto(
             server_url
-            + "/contracts/astral-uv-week/metrics/aging?asof=2026-05-06"
+            + "/workflows/astral-uv-week/metrics/aging?asof=2026-05-06"
         )
         page.wait_for_selector("#aging-tile svg", timeout=10000)
         page.wait_for_timeout(500)
@@ -991,20 +997,89 @@ class TestAgingOnDashboard:
     def test_aging_tile_details_link_uses_contract_scoped_url(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#aging-tile", timeout=10000)
         link = page.locator("#aging-tile a:has-text('Details')")
         href = link.get_attribute("href")
         assert href and href.startswith(
-            "/contracts/astral-uv-week/metrics/aging"
+            "/workflows/astral-uv-week/metrics/aging"
         ), f"aging Details → must link to contract-scoped URL; got {href!r}"
+
+    def test_default_asof_shows_actionable_coverage_gap_message(
+        self, server_url: str, page: Page
+    ):
+        """User-pinned distinction: empty answers should be action-
+        first. The fixture's data ends in early May; default
+        asof=today is AFTER the latest data, so the message must
+        name the actual gap (latest data date vs asof) AND offer
+        a concrete way to fill it (button + collapsed CLI fallback).
+        """
+        page.goto(server_url + "/workflows/astral-uv-week/")
+        page.wait_for_selector("#aging-tile", timeout=10000)
+        empty = page.locator("#aging-tile .aging-empty")
+        expect(empty).to_be_visible()
+        text = empty.inner_text()
+        # The message names the gap concretely.
+        assert "Most recent data is from" in text, (
+            f"empty message must name the latest data date; got {text!r}"
+        )
+        # The primary action is a button that POSTs to the
+        # materialise endpoint.
+        btn = page.locator("#aging-tile .aging-empty button.btn--primary")
+        expect(btn).to_be_visible()
+        hx_post = btn.get_attribute("hx-post")
+        assert hx_post and "/api/internal/materialise" in hx_post, (
+            f"button must hx-post to the materialise endpoint; got {hx_post!r}"
+        )
+        # Both since and until are encoded in the URL so the backfill
+        # window matches the gap.
+        assert "since=" in hx_post and "until=" in hx_post, (
+            f"materialise URL must carry since + until; got {hx_post!r}"
+        )
+
+    def test_real_empty_state_says_warehouse_covers_this_date(
+        self, server_url: str, page: Page
+    ):
+        """A fragment-endpoint round-trip is the cleanest way to
+        exercise the real-empty branch without needing a fixture
+        date that happens to be in-window AND have zero in-flight.
+        Hit `/api/internal/aging` with no asof (defaults to today
+        UTC) and inspect the HTML — but for the fixture, today is
+        past contract.stop so the empty state is 'outside window'.
+        We can confirm the 'real empty' branch via the rendered
+        text on a synthetic asof if available; otherwise rely on
+        the unit test (TestAgingShape) which pins the component
+        contract directly.
+
+        This e2e test just confirms the empty-state machinery
+        EXISTS on the rendered page (one of the four messages),
+        not which branch lit up."""
+        page.goto(
+            server_url + "/workflows/astral-uv-week/metrics/aging"
+        )
+        page.wait_for_selector("#aging-tile", timeout=10000)
+        empty = page.locator("#aging-tile .aging-empty")
+        if empty.count() == 0:
+            return  # in-flight items rendered; nothing to assert
+        text = empty.inner_text().lower()
+        # Some empty-state message rendered.
+        assert any(
+            phrase in text
+            for phrase in (
+                "most recent data is from",
+                "earliest data is from",
+                "no items in flight",
+                "warehouse covers",
+                "import data",
+            )
+        ), f"empty-state message must explain why; got {text!r}"
 
     def test_aging_fragment_endpoint_supports_asof_param(
         self, server_url: str, page: Page
     ):
         response = page.request.get(
             server_url
-            + "/api/internal/aging?contract=astral-uv-week&asof=2026-05-06"
+            + "/api/internal/aging?workflow=astral-uv-week&asof=2026-05-06"
         )
         assert response.status == 200
         html = response.text()
@@ -1015,6 +1090,127 @@ class TestAgingOnDashboard:
             assert forbidden not in html.lower()
 
 
+class TestWorkflowUrls:
+    """URL & terminology rename: `/workflows/{id}` →
+    `/workflows/{id}[/{slug}]` and `?contract=` → `?workflow=`.
+
+    "Contract" was internal jargon ("no engineer would use that
+    word"). External surfaces (URLs, query params, UI labels) now
+    use "workflow"; the YAML format keeps the `contract:` key for
+    now since renaming the on-disk schema is a separate change.
+
+    The slug is decorative — derived from the workflow's source
+    (repo for github, project for jira) and ignored by routing
+    but preserved on canonical links for shareable URLs.
+    """
+
+    def test_dashboard_at_workflows_id(self, server_url: str, page: Page):
+        r = page.request.get(server_url + "/workflows/astral-uv-week")
+        assert r.status == 200
+        assert "cycle-time-tile" in r.text()
+
+    def test_dashboard_with_slug_also_routes(
+        self, server_url: str, page: Page
+    ):
+        """The slug is decorative — same dashboard, same content."""
+        r = page.request.get(
+            server_url + "/workflows/astral-uv-week/astral-sh-uv"
+        )
+        assert r.status == 200
+        assert "cycle-time-tile" in r.text()
+
+    def test_metric_pages_under_workflows(
+        self, server_url: str, page: Page
+    ):
+        for metric in ("cycle-time", "throughput", "aging", "forecast"):
+            url = (
+                server_url
+                + f"/workflows/astral-uv-week/metrics/{metric}"
+            )
+            r = page.request.get(url)
+            assert r.status == 200, (
+                f"{metric}: got {r.status} at {url}"
+            )
+
+    def test_items_route_under_workflows(
+        self, server_url: str, page: Page
+    ):
+        r = page.request.get(
+            server_url + "/workflows/astral-uv-week/items/19342"
+        )
+        assert r.status == 200
+
+    def test_internal_endpoints_use_workflow_query_param(
+        self, server_url: str, page: Page
+    ):
+        for path in ("cycle-time", "throughput", "aging", "work-items"):
+            r = page.request.get(
+                server_url
+                + f"/api/internal/{path}?workflow=astral-uv-week"
+            )
+            assert r.status == 200, f"{path}: got {r.status}"
+
+    def test_old_contracts_path_no_longer_routes(
+        self, server_url: str, page: Page
+    ):
+        """No back-compat redirects in v1 — the old shape was
+        never published. Asserting 404 catches accidental
+        re-introduction of `/contracts/...` routes."""
+        r = page.request.get(server_url + "/contracts/astral-uv-week")
+        assert r.status == 404
+        # Hitting the endpoint with `?contract=` (instead of
+        # `?workflow=`) should fail param validation — `workflow`
+        # is now the required name.
+        r2 = page.request.get(
+            server_url + "/api/internal/cycle-time?contract=astral-uv-week"
+        )
+        assert r2.status in (400, 404, 422), r2.status
+
+    def test_dashboard_tile_links_use_workflows_prefix(
+        self, server_url: str, page: Page
+    ):
+        """Each tile's Details → link points at the new URL."""
+        page.goto(server_url + "/workflows/astral-uv-week")
+        page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
+        for tile in ("cycle-time-tile", "throughput-tile", "aging-tile"):
+            link = page.locator(f"#{tile} a:has-text('Details')")
+            if link.count() == 0:
+                continue  # tile may not have a details link (forecast)
+            href = link.get_attribute("href")
+            assert href and href.startswith("/workflows/astral-uv-week"), (
+                f"#{tile} Details → must point at /workflows/...; got {href!r}"
+            )
+
+    def test_filter_bar_says_workflow_not_contract(
+        self, server_url: str, page: Page
+    ):
+        page.goto(server_url + "/workflows/astral-uv-week")
+        page.wait_for_selector(".filter-bar", timeout=10000)
+        bar = page.locator(".filter-bar").inner_text()
+        assert "Workflow" in bar, (
+            f"filter bar must label the select 'Workflow'; got {bar!r}"
+        )
+        assert "Contract" not in bar, (
+            f"filter bar must not say 'Contract'; got {bar!r}"
+        )
+
+    def test_site_header_includes_system_and_workflow(
+        self, server_url: str, page: Page
+    ):
+        """Header carries both the upstream system (GitHub / Jira)
+        and the workflow name — distinct concepts the prior single
+        'contract name' chip conflated."""
+        page.goto(server_url + "/workflows/astral-uv-week")
+        page.wait_for_selector(".site-header", timeout=10000)
+        text = page.locator(".site-header").inner_text()
+        assert "astral-uv-week" in text, (
+            f"header must include the workflow name; got {text!r}"
+        )
+        assert "GitHub" in text or "github" in text, (
+            f"header must include the upstream system; got {text!r}"
+        )
+
+
 class TestSiteBrandLink:
     """The "flowmetrics" brand text in the site header is a link to
     the home page (`/`). Standard web convention; lets the user
@@ -1023,7 +1219,7 @@ class TestSiteBrandLink:
     """
 
     def test_brand_is_an_anchor_to_root(self, server_url: str, page: Page):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector(".site-header", timeout=10000)
         brand = page.locator(".site-header .brand")
         # The .brand element must BE an <a> tag (not a span wrapping
@@ -1052,7 +1248,7 @@ class TestResetButton:
     def test_tile_has_reset_button_with_hx_get(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         btn = page.locator("#cycle-time-tile button.reset-btn").first
         expect(btn).to_be_visible()
@@ -1075,7 +1271,7 @@ class TestResetButton:
         no broken styling)."""
         response = page.request.get(
             server_url
-            + "/api/internal/cycle-time?contract=astral-uv-week"
+            + "/api/internal/cycle-time?workflow=astral-uv-week"
         )
         assert response.status == 200, (
             f"fragment endpoint returned {response.status}; expected 200"
@@ -1107,7 +1303,7 @@ class TestResetButton:
         (a new SVG element is in place after the swap). The jitter
         is random per render, so we can also assert the post-reset
         SVG has the same number of data marks."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         page.wait_for_timeout(500)
         marks_before = page.locator("#cycle-time-tile .mark-symbol path").count()
@@ -1138,17 +1334,24 @@ class TestWorkItemsTableOnDetailPages:
     throughput detail page; only the surrounding chart differs.
     """
 
-    _DETAIL = "/contracts/astral-uv-week/metrics/cycle-time"
+    _DETAIL = "/workflows/astral-uv-week/metrics/cycle-time"
 
-    def test_detail_page_renders_work_items_table_with_all_rows(
+    def test_detail_page_renders_work_items_table_with_paged_rows(
         self, server_url: str, page: Page
     ):
+        """Default page size is 25; the fixture has 43 items so
+        page 1 shows 25 + page 2 shows 18. The header still
+        reports the total."""
         page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         rows = page.locator("table.work-items-grid tbody tr")
-        assert rows.count() == 43, (
-            f"expected 43 work-item rows on detail page; "
-            f"got {rows.count()}"
+        assert rows.count() == 25, (
+            f"expected first page of 25 rows; got {rows.count()}"
+        )
+        # Pager shows total context.
+        pager_info = page.locator(".work-items-pager-info").inner_text()
+        assert "1 of 2" in pager_info, (
+            f"pager must show 'Page 1 of 2'; got {pager_info!r}"
         )
 
     def test_table_columns_show_id_title_started_completed_cycle(
@@ -1171,7 +1374,8 @@ class TestWorkItemsTableOnDetailPages:
         page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         before = page.locator("table.work-items-grid tbody tr").count()
-        assert before == 43
+        # 43 total, paginated to 25 per page.
+        assert before == 25
 
         # HTMX's keyup-changed trigger fires on keyup events; Playwright's
         # `fill()` sets the value without dispatching keyup, so use
@@ -1205,8 +1409,9 @@ class TestWorkItemsTableOnDetailPages:
 
         default_order = _cycle_values()
         # Default is completed_at DESC — values are not necessarily
-        # monotonic in cycle_time. Sanity: we have 43 entries.
-        assert len(default_order) == 43
+        # monotonic in cycle_time. With 25-per-page pagination
+        # only the first page's worth is visible.
+        assert len(default_order) == 25
 
         # Click the Cycle (d) sort header.
         page.locator("table.work-items-grid thead a:has-text('Cycle')").click()
@@ -1268,7 +1473,7 @@ class TestWorkItemsTableOnDetailPages:
         self, server_url: str, page: Page
     ):
         """The leftmost cell (item_id) is a link to the per-item
-        lifecycle page under /contracts/<id>/items/<item_id>."""
+        lifecycle page under /workflows/<id>/items/<item_id>."""
         page.goto(server_url + self._DETAIL)
         page.wait_for_selector("#work-items", timeout=10000)
         first_id_link = page.locator(
@@ -1276,7 +1481,7 @@ class TestWorkItemsTableOnDetailPages:
         )
         href = first_id_link.get_attribute("href")
         assert href is not None
-        assert href.startswith("/contracts/astral-uv-week/items/"), (
+        assert href.startswith("/workflows/astral-uv-week/items/"), (
             f"id-cell link must point at the lifecycle page; got {href!r}"
         )
 
@@ -1287,7 +1492,7 @@ class TestWorkItemsTableOnDetailPages:
         belongs to detail pages — including it on the dashboard
         duplicates information already in the charts and makes the
         landing page noisy."""
-        page.goto(server_url + "/contracts/astral-uv-week/")
+        page.goto(server_url + "/workflows/astral-uv-week/")
         # Let charts load so we know the page is fully rendered.
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         page.wait_for_selector("#throughput-tile svg", timeout=10000)
@@ -1312,7 +1517,7 @@ class TestWorkItemsFragmentEndpoint:
     ):
         response = page.request.get(
             server_url
-            + "/api/internal/work-items?contract=astral-uv-week"
+            + "/api/internal/work-items?workflow=astral-uv-week"
         )
         assert response.status == 200
         html = response.text()
@@ -1345,7 +1550,7 @@ class TestWorkItemsFragmentEndpoint:
         response = page.request.get(
             server_url
             + "/api/internal/work-items"
-            "?contract=astral-uv-week&sort=cycle_time_days&direction=desc"
+            "?workflow=astral-uv-week&sort=cycle_time_days&direction=desc"
         )
         assert response.status == 200
         html = response.text()
@@ -1375,7 +1580,7 @@ class TestWorkItemsFragmentEndpoint:
         response = page.request.get(
             server_url
             + "/api/internal/work-items"
-            "?contract=astral-uv-week&q=zzz-impossible-needle"
+            "?workflow=astral-uv-week&q=zzz-impossible-needle"
         )
         assert response.status == 200
         html = response.text()
@@ -1393,7 +1598,7 @@ class TestWorkItemsFragmentEndpoint:
         response = page.request.get(
             server_url
             + "/api/internal/work-items"
-            "?contract=astral-uv-week&completed_on=2026-05-04"
+            "?workflow=astral-uv-week&completed_on=2026-05-04"
         )
         assert response.status == 200
         html = response.text()
@@ -1408,13 +1613,13 @@ class TestWorkItemsFragmentEndpoint:
         self, server_url: str, page: Page
     ):
         response = page.request.get(
-            server_url + "/api/internal/work-items?contract=does-not-exist"
+            server_url + "/api/internal/work-items?workflow=does-not-exist"
         )
         assert response.status == 404
 
 
 class TestLifecyclePage:
-    """`/contracts/<id>/items/<source>/<item_id>` shows a per-item
+    """`/workflows/<id>/items/<source>/<item_id>` shows a per-item
     lifecycle view. Two presentation modes:
 
       - **Chartable (≥ 2 stages)**: gantt-style swimlane with one bar
@@ -1448,7 +1653,7 @@ class TestLifecyclePage:
 
         clean = item_id.lstrip("#")
         return (
-            f"/contracts/astral-uv-week/items/"
+            f"/workflows/astral-uv-week/items/"
             f"{quote(clean, safe='')}"
         )
 
@@ -1564,7 +1769,7 @@ class TestLifecyclePage:
         — crosses midnight UTC, so the whole-day Vacanti formula
         gives `(May 09 - May 08) + 1 = 2d`. Elapsed wall-clock is
         ~10 hours."""
-        page.goto(server_url + "/contracts/astral-uv-week/items/19330")
+        page.goto(server_url + "/workflows/astral-uv-week/items/19330")
         page.wait_for_selector(".lifecycle-metric-strip", timeout=10000)
         strip = page.locator(".lifecycle-metric-strip").inner_text()
         assert "2d" in strip, (
@@ -1585,7 +1790,7 @@ class TestLifecyclePage:
     def test_unknown_item_returns_404(self, server_url: str, page: Page):
         response = page.request.get(
             server_url
-            + "/contracts/astral-uv-week/items/does-not-exist"
+            + "/workflows/astral-uv-week/items/does-not-exist"
         )
         assert response.status == 404
 
@@ -1593,7 +1798,7 @@ class TestLifecyclePage:
         self, server_url: str, page: Page
     ):
         response = page.request.get(
-            server_url + "/contracts/does-not-exist/items/1"
+            server_url + "/workflows/does-not-exist/items/1"
         )
         assert response.status == 404
 
@@ -1606,7 +1811,7 @@ class TestLifecyclePage:
         # The bare numeric form (no `#`, no `%23`) must work.
         response = page.request.get(
             server_url
-            + "/contracts/astral-uv-week/items/19342"
+            + "/workflows/astral-uv-week/items/19342"
         )
         assert response.status == 200, (
             f"bare numeric id should route to the canonical `#19342` "

@@ -18,9 +18,120 @@
 <div id="{{ chart_container_id }}" class="metric-chart"
      data-chart-height="{{ _h }}">
   {% if data.count == 0 %}
-    <p class="aging-empty">
-      No items in flight as of {{ data.asof_display }} (UTC).
-    </p>
+    {# Action-first empty states. Tell the operator what data we
+       have AND offer the exact import command they'd run to fill
+       the gap. Three branches:
+         - asof_after_coverage: latest data on hand < asof
+         - asof_before_coverage: earliest data on hand > asof
+         - no_work_in_flight: warehouse covers asof, real empty #}
+    {% if materialise_error %}
+      <div class="aging-empty aging-empty--error">
+        <p class="aging-empty-headline">Import failed.</p>
+        <p class="aging-empty-sub"><code>{{ materialise_error }}</code></p>
+      </div>
+    {% endif %}
+    {% if data.empty_state == "asof_after_coverage" %}
+      <div class="aging-empty aging-empty--gap">
+        <p class="aging-empty-headline">
+          Most recent data is from
+          <strong>{{ data.coverage.latest_display }}</strong>.
+          You're asking about
+          <strong>{{ data.asof_display }}</strong>.
+        </p>
+        <p class="aging-empty-sub">
+          Import data to cover the gap?
+        </p>
+        <div class="aging-empty-actions">
+          <button class="btn btn--primary"
+                  hx-post="/api/internal/materialise?workflow={{ contract.name }}&since={{ data.coverage.latest_iso }}&until={{ data.asof_iso }}{% if data.asof_iso %}&asof={{ data.asof_iso }}{% endif %}"
+                  hx-target="#aging-chart"
+                  hx-swap="outerHTML"
+                  hx-indicator="#aging-import-progress"
+                  hx-disabled-elt="this">
+            Import {{ data.coverage.latest_display }} → {{ data.asof_display }}
+          </button>
+          <span id="aging-import-progress" class="htmx-indicator aging-empty-progress">
+            Importing… this can take a minute.
+          </span>
+        </div>
+        <details class="aging-empty-cli">
+          <summary>or run from the terminal</summary>
+          <pre class="aging-empty-cmd">flow materialise {{ contract.name }} --since {{ data.coverage.latest_iso }} --until {{ data.asof_iso }}</pre>
+        </details>
+      </div>
+    {% elif data.empty_state == "asof_before_coverage" %}
+      <div class="aging-empty aging-empty--gap">
+        <p class="aging-empty-headline">
+          Earliest data is from
+          <strong>{{ data.coverage.earliest_display }}</strong>.
+          You're asking about
+          <strong>{{ data.asof_display }}</strong>.
+        </p>
+        <p class="aging-empty-sub">
+          Import data to cover the gap?
+        </p>
+        <div class="aging-empty-actions">
+          <button class="btn btn--primary"
+                  hx-post="/api/internal/materialise?workflow={{ contract.name }}&since={{ data.asof_iso }}&until={{ data.coverage.earliest_iso }}&asof={{ data.asof_iso }}"
+                  hx-target="#aging-chart"
+                  hx-swap="outerHTML"
+                  hx-indicator="#aging-import-progress"
+                  hx-disabled-elt="this">
+            Import {{ data.asof_display }} → {{ data.coverage.earliest_display }}
+          </button>
+          <span id="aging-import-progress" class="htmx-indicator aging-empty-progress">
+            Importing… this can take a minute.
+          </span>
+        </div>
+        <details class="aging-empty-cli">
+          <summary>or run from the terminal</summary>
+          <pre class="aging-empty-cmd">flow materialise {{ contract.name }} --since {{ data.asof_iso }} --until {{ data.coverage.earliest_iso }}</pre>
+        </details>
+      </div>
+    {% elif data.empty_state == "in_flight_never_captured" %}
+      <div class="aging-empty aging-empty--gap">
+        <p class="aging-empty-headline">
+          In-flight items haven't been captured yet.
+        </p>
+        <p class="aging-empty-sub">
+          The warehouse has completed-work data through
+          <strong>{{ data.coverage.latest_display }}</strong> but
+          no snapshot of currently-open work. Import to fetch
+          open items now.
+        </p>
+        <div class="aging-empty-actions">
+          <button class="btn btn--primary"
+                  hx-post="/api/internal/materialise?workflow={{ contract.name }}{% if data.asof_iso %}&asof={{ data.asof_iso }}{% endif %}"
+                  hx-target="#aging-chart"
+                  hx-swap="outerHTML"
+                  hx-indicator="#aging-import-progress"
+                  hx-disabled-elt="this">
+            Fetch current in-flight items
+          </button>
+          <span id="aging-import-progress" class="htmx-indicator aging-empty-progress">
+            Importing… this can take a minute.
+          </span>
+        </div>
+        <details class="aging-empty-cli">
+          <summary>or run from the terminal</summary>
+          <pre class="aging-empty-cmd">flow materialise {{ contract.name }}</pre>
+        </details>
+      </div>
+    {% else %}
+      {# "no_work_in_flight" — warehouse has captured in-flight
+         rows at some point AND covers asof; nothing is open at
+         this moment. The real answer; no fetch helps. #}
+      <div class="aging-empty aging-empty--real">
+        <p class="aging-empty-headline">
+          No items in flight on {{ data.asof_display }}.
+        </p>
+        <p class="aging-empty-sub">
+          The warehouse covers this date{% if data.coverage.earliest_display and data.coverage.latest_display %}
+          ({{ data.coverage.earliest_display }} – {{ data.coverage.latest_display }}){% endif %};
+          there genuinely was no open work at that moment.
+        </p>
+      </div>
+    {% endif %}
   {% endif %}
 </div>
 {% if data.count > 0 %}
@@ -43,6 +154,18 @@
       renderer: "svg"
     }).then(function (res) {
       window.__flowmetricsAgingView = res.view;
+      // Click a dot → navigate to that item's lifecycle page.
+      // Hover keeps showing the tooltip (default Vega-Lite
+      // behaviour for the `tooltip` encoding); click is the
+      // explicit drill-down gesture. Mirrors the cycle-time
+      // chart's behaviour.
+      res.view.addEventListener("click", function (_event, item) {
+        if (!item || !item.datum || !item.datum.item_id) return;
+        const cleanId = String(item.datum.item_id).replace(/^#/, "");
+        window.location.href =
+          "/workflows/{{ contract.name }}/items/" +
+          encodeURIComponent(cleanId);
+      });
     }).catch(function (err) {
       const el = document.getElementById("{{ chart_container_id }}");
       el.innerText = "Chart render failed: " + err;

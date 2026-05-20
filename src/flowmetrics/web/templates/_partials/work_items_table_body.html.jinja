@@ -1,23 +1,66 @@
 {# Work-items table body — count + table (or empty state).
 
-   Rendered into `#work-items-body` as innerHTML on every filter/sort
-   HTMX round-trip. The search input lives OUTSIDE this partial (in
-   work_items_table.html.jinja) so it keeps focus/caret across swaps.
+   Column-driven: the route passes a `data.columns` list and the
+   template iterates without metric-specific branching. New
+   columns + new views land by editing the Python column set, not
+   this template.
+
+   Rendered into `#work-items-body` as innerHTML on every HTMX
+   filter / sort / paginate round-trip. The search input lives
+   OUTSIDE this partial (in work_items_table.html.jinja) so it
+   keeps focus / caret across swaps.
 
    Required context:
      data            — WorkItemsTableData
      contract.name   — for building per-item links
 #}
-{%- macro sort_link(label, key) -%}
-  {%- set is_active = (data.sort == key) -%}
+{%- macro sort_link(col) -%}
+  {%- set is_active = (data.sort == col.sort_key) -%}
   {%- set next_dir = 'asc' if (is_active and data.direction == 'desc') else ('desc' if is_active else 'desc') -%}
   {%- set arrow = '↓' if (is_active and data.direction == 'desc') else ('↑' if is_active else '') -%}
   <a href="#"
-     hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ key }}&direction={{ next_dir }}&q={{ data.q|urlencode }}&completed_on={{ data.completed_on|urlencode }}"
+     hx-get="/api/internal/work-items?workflow={{ contract.name }}&sort={{ col.sort_key }}&direction={{ next_dir }}&q={{ data.q|urlencode }}&completed_on={{ data.completed_on|urlencode }}&in_flight_at={{ data.in_flight_at|urlencode }}&page=1"
      hx-target="#work-items-body"
      hx-swap="innerHTML">
-    {{ label }}{% if arrow %} <span class="sort-indicator">{{ arrow }}</span>{% endif %}
+    {{ col.label }}{% if arrow %} <span class="sort-indicator">{{ arrow }}</span>{% endif %}
   </a>
+{%- endmacro -%}
+
+{%- macro header_cell(col) -%}
+  <th{% if data.sort == col.sort_key %} class="sorted"{% endif %}
+     {%- if col.align == 'right' %} style="text-align:right;"{% endif %}>
+    {%- if col.sort_key %}{{ sort_link(col) }}{% else %}{{ col.label }}{% endif -%}
+  </th>
+{%- endmacro -%}
+
+{%- macro body_cell(col, r) -%}
+  {%- if col.kind == 'id-link' -%}
+    <td class="id">
+      {# Strip the GitHub `#` prefix from the URL path — `#` is
+         the canonical id form in the warehouse, but `%23` reads
+         as junk. The route accepts both forms; the cell shows
+         `#19291`. #}
+      <a href="/workflows/{{ contract.name }}/items/{{ r.item_id|replace('#', '')|urlencode }}">{{ r.item_id }}</a>
+    </td>
+  {%- elif col.kind == 'title-link' -%}
+    <td class="title">
+      {% if r.url -%}
+        <a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.title }}</a>
+      {%- else -%}
+        {{ r.title }}
+      {%- endif %}
+    </td>
+  {%- elif col.kind == 'date' -%}
+    <td>{{ r|attr(col.key) }}</td>
+  {%- elif col.kind == 'in-flight-date' -%}
+    {%- set v = r|attr(col.key) -%}
+    <td>{% if v %}{{ v }}{% else %}<span class="text-muted">— in flight —</span>{% endif %}</td>
+  {%- elif col.kind == 'int' -%}
+    {%- set v = r|attr(col.key) -%}
+    <td class="num">{% if v is not none %}{{ v|int }}{% else %}—{% endif %}</td>
+  {%- else -%}
+    <td>{{ r|attr(col.key) }}</td>
+  {%- endif -%}
 {%- endmacro -%}
 
 {% if data.completed_on %}
@@ -26,10 +69,10 @@
   <span class="work-items-active-filter-value">{{ data.completed_on_display }}</span>
   <a href="#"
      class="work-items-clear-filter"
-     hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}&q={{ data.q|urlencode }}"
+     hx-get="/api/internal/work-items?workflow={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}&q={{ data.q|urlencode }}&in_flight_at={{ data.in_flight_at|urlencode }}&page=1"
      hx-target="#work-items-body"
      hx-swap="innerHTML"
-     hx-on::after-request="document.getElementById('work-items-completed-on').value = ''"
+     hx-on:click="document.getElementById('work-items-completed-on').value = ''"
      title="Show all items">clear</a>
 </div>
 {% endif %}
@@ -42,37 +85,47 @@
 <table class="work-items-grid">
   <thead>
     <tr>
-      <th{% if data.sort == 'item_id' %} class="sorted"{% endif %}>{{ sort_link('#', 'item_id') }}</th>
-      <th{% if data.sort == 'title' %} class="sorted"{% endif %}>{{ sort_link('Title', 'title') }}</th>
-      <th{% if data.sort == 'created_at' %} class="sorted"{% endif %}>{{ sort_link('Started', 'created_at') }}</th>
-      <th{% if data.sort == 'completed_at' %} class="sorted"{% endif %}>{{ sort_link('Completed', 'completed_at') }}</th>
-      <th{% if data.sort == 'cycle_time_days' %} class="sorted"{% endif %} style="text-align:right;">{{ sort_link('Cycle (d)', 'cycle_time_days') }}</th>
+      {% for col in data.columns %}{{ header_cell(col) }}{% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for r in data.rows %}
     <tr>
-      <td class="id">
-        {# Strip the GitHub `#` prefix from the URL path — `#` is
-           the canonical id form in the warehouse, but in a URL it
-           would render as `%23` and that's ugly. The route accepts
-           both forms; the display cell still shows `#19291`. #}
-        <a href="/contracts/{{ contract.name }}/items/{{ r.item_id|replace('#', '')|urlencode }}">{{ r.item_id }}</a>
-      </td>
-      <td class="title">
-        {% if r.url %}
-          <a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.title }}</a>
-        {% else %}
-          {{ r.title }}
-        {% endif %}
-      </td>
-      <td>{{ r.created_at_display }}</td>
-      <td>{{ r.completed_at_display }}</td>
-      <td class="num">{{ r.cycle_time_days|int }}</td>
+      {% for col in data.columns %}{{ body_cell(col, r) }}{% endfor %}
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+{% if data.total_pages > 1 %}
+<nav class="work-items-pager" aria-label="Pagination">
+  {%- set base_url -%}
+    /api/internal/work-items?workflow={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}&q={{ data.q|urlencode }}&completed_on={{ data.completed_on|urlencode }}&in_flight_at={{ data.in_flight_at|urlencode }}
+  {%- endset -%}
+  <span class="work-items-pager-info">
+    Page {{ data.page }} of {{ data.total_pages }} · {{ data.page_size }} per page
+  </span>
+  <span class="work-items-pager-controls">
+    {% if data.page > 1 %}
+    <a href="#"
+       hx-get="{{ base_url }}&page={{ data.page - 1 }}"
+       hx-target="#work-items-body"
+       hx-swap="innerHTML">← Prev</a>
+    {% else %}
+    <span class="work-items-pager-disabled" aria-disabled="true">← Prev</span>
+    {% endif %}
+    {% if data.page < data.total_pages %}
+    <a href="#"
+       hx-get="{{ base_url }}&page={{ data.page + 1 }}"
+       hx-target="#work-items-body"
+       hx-swap="innerHTML">Next →</a>
+    {% else %}
+    <span class="work-items-pager-disabled" aria-disabled="true">Next →</span>
+    {% endif %}
+  </span>
+</nav>
+{% endif %}
+
 {% else %}
 <p class="work-items-empty">
   No items{% if data.q %} matching “{{ data.q }}”{% endif %}.

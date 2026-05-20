@@ -18,6 +18,8 @@ stand up multiple isolated instances per the multi-instance design.
 from __future__ import annotations
 
 import secrets
+from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -26,8 +28,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
+from .contract import ContractError, load_contract
 from .web.components.aging import render as render_aging
+from .web.components.cfd import render as render_cfd
 from .web.components.cycle_time import render as render_cycle_time
+from .web.components.forecast import (
+    render_how_many as render_forecast_how_many,
+    render_when_done as render_forecast_when_done,
+)
 from .web.components.lifecycle import (
     ItemNotFound,
     render as render_lifecycle,
@@ -42,10 +50,182 @@ from .web.components.work_items_table import (
 _TEMPLATES_DIR = Path(__file__).parent / "web" / "templates"
 
 
+def open_warehouse(data_dir: Path) -> duckdb.DuckDBPyConnection:
+    """Open an in-memory DuckDB connection with `work_items` and
+    `transitions` views registered against the Parquet warehouse
+    under `data_dir`.
+
+    Each ETL run writes a fresh per-day snapshot
+    (`year={Y}/month={M}/day={D}/items.parquet`). Cross-day re-runs
+    accumulate snapshots, so the same item appears in N partitions
+    once N days have passed. The views deduplicate at read time so
+    every consumer sees one canonical row per
+    `(contract_id, source, item_id)` — the LATEST snapshot —
+    without losing the on-disk history (useful for future
+    "what did aging look like at snapshot X" features).
+
+    `transitions` is similarly deduplicated. Transitions are
+    append-only events — same `entered_at` for the same item
+    should never collide — but a re-run that re-fetches the same
+    item writes identical rows again, so DISTINCT collapses them.
+
+    Both views fall back to empty stubs when the corresponding
+    parquet files don't exist yet (fresh install before
+    materialise has ever run).
+    """
+    con = duckdb.connect(":memory:")
+
+    work_items_glob = (data_dir / "work_items" / "**" / "*.parquet").as_posix()
+    try:
+        # Latest snapshot per (contract_id, source, item_id) by
+        # materialised_at. Stable tie-break by run_id keeps the
+        # answer deterministic when two snapshots share the exact
+        # same materialised_at (rare; same-second re-runs).
+        con.execute(
+            f"CREATE VIEW work_items AS "
+            f"SELECT * EXCLUDE (_dedup_rn) FROM ( "
+            f"  SELECT *, ROW_NUMBER() OVER ("
+            f"    PARTITION BY contract_id, source, item_id "
+            f"    ORDER BY materialised_at DESC, run_id DESC"
+            f"  ) AS _dedup_rn "
+            f"  FROM read_parquet('{work_items_glob}', hive_partitioning = true)"
+            f") WHERE _dedup_rn = 1"
+        )
+    except duckdb.IOException:
+        # No parquet yet — caller is on a fresh install. work_items
+        # is required by every component; let this raise.
+        raise
+
+    transitions_glob = (
+        data_dir / "transitions" / "**" / "*.parquet"
+    ).as_posix()
+    try:
+        # Transitions are append-only stage-entry events; identical
+        # rows across snapshots collapse via DISTINCT. No
+        # materialised_at column to order by (transitions don't
+        # carry one), but exact-row dedup is enough.
+        con.execute(
+            f"CREATE VIEW transitions AS "
+            f"SELECT DISTINCT * FROM read_parquet("
+            f"'{transitions_glob}', hive_partitioning = true)"
+        )
+    except duckdb.IOException:
+        con.execute(
+            "CREATE VIEW transitions AS "
+            "SELECT NULL::VARCHAR AS source, "
+            "NULL::VARCHAR AS item_id, "
+            "NULL::TIMESTAMP AS entered_at, "
+            "NULL::VARCHAR AS stage, "
+            "NULL::VARCHAR AS signal, "
+            "NULL::VARCHAR AS contract_id "
+            "WHERE FALSE"
+        )
+
+    return con
+
+
+# Exported for tests so they can exercise the production read path
+# without standing up a full FastAPI app.
+open_warehouse_for_test = open_warehouse
+
+
+class WorkflowView:
+    """Per-request workflow handle. Loads the contract once,
+    exposes the warehouse, and orchestrates renders. Replaces
+    the older `_workflow_context` + `_workflow_slug` + `_workflow_system_label`
+    + `load_contract` chain that loaded the contract three times
+    per dashboard request.
+
+    Routes pattern:
+        view = _open_view(workflow_id)
+        with view.warehouse() as con:
+            cfd = view.render_cfd(con)
+        return templates.TemplateResponse(
+            request, "cfd_detail.html.jinja",
+            {"contract": view.template_context(), "cfd": cfd, ...},
+        )
+    """
+
+    def __init__(
+        self,
+        workflow_id: str,
+        *,
+        contracts_dir: Path,
+        data_dir: Path,
+    ) -> None:
+        self.id = workflow_id
+        self._data_dir = data_dir
+        # One contract load per request. Propagates ContractError
+        # so a malformed YAML surfaces as an HTTP 500 with the
+        # parser's message — better than the silent degradation
+        # the old _workflow_slug/_workflow_system_label helpers
+        # had.
+        self.contract = load_contract(workflow_id, contracts_dir)
+
+    @contextmanager
+    def warehouse(self):
+        """Yield a DuckDB connection with views registered against
+        the warehouse. Same connection every render gets — single
+        per-request open, scoped by the `with`."""
+        con = open_warehouse(self._data_dir)
+        try:
+            yield con
+        finally:
+            con.close()
+
+    def template_context(self) -> dict:
+        """Template-side context for "what workflow is this":
+        id, source-system display name, decorative slug."""
+        return {
+            "name": self.id,
+            "system": self._system_label(),
+            "slug": self._slug(),
+        }
+
+    def _slug(self) -> str:
+        c = self.contract
+        if c.source == "github" and c.repo:
+            return c.repo.lower().replace("/", "-").replace(".", "-")
+        if c.source == "jira" and c.jira_project:
+            return c.jira_project.lower()
+        return self.id
+
+    def _system_label(self) -> str:
+        return {"github": "GitHub", "jira": "Jira"}.get(
+            self.contract.source, self.contract.source
+        )
+
+    # ---- render orchestration ------------------------------------
+
+    def render_cfd(self, con):
+        return render_cfd(
+            con, self.id,
+            contract_start=self.contract.start,
+            contract_stop=self.contract.stop,
+            states=self.contract.states,
+        )
+
+    def render_aging(self, con, *, asof=None):
+        return render_aging(
+            con, self.id,
+            asof=asof,
+            contract_start=self.contract.start,
+            contract_stop=self.contract.stop,
+            states=self.contract.states,
+        )
+
+    def render_cycle_time(self, con):
+        return render_cycle_time(con, self.id)
+
+    def render_throughput(self, con):
+        return render_throughput(con, self.id)
+
+
 def create_app(
     *,
     data_dir: Path,
     contracts_dir: Path,
+    cache_dir: Path | None = None,
     password: str | None = None,
 ) -> FastAPI:
     """Build a FastAPI app reading from this data dir.
@@ -54,10 +234,19 @@ def create_app(
     contract scope / data directory) share zero state. Mounted as a
     subprocess of uvicorn, started by `flow serve`.
 
+    `cache_dir` is the source-API response cache (used by the
+    materialise endpoint when the operator clicks "import data" on
+    an empty aging chart). Defaults to the CLI's `DEFAULT_CACHE_DIR`
+    if not supplied.
+
     `password` opt-in: when set, every request requires HTTP Basic
     auth (user='operator', password matches). Used for off-localhost
     binds where Tailscale or Caddy fronts the app.
     """
+    if cache_dir is None:
+        from .cli import DEFAULT_CACHE_DIR
+
+        cache_dir = DEFAULT_CACHE_DIR
     app = FastAPI(title="flowmetrics", version="1")
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
@@ -86,6 +275,18 @@ def create_app(
         auth_dep = [Depends(_require_auth)]
     else:
         auth_dep = []
+
+    def _open_view(workflow_id: str) -> WorkflowView:
+        """Factory: 404 if the contract YAML is missing, else
+        return a WorkflowView. Centralizes the (exists-check +
+        construct + bind to factory data/contracts dirs) shape
+        that every route used to inline."""
+        _ensure_contract_exists(workflow_id)
+        return WorkflowView(
+            workflow_id,
+            contracts_dir=contracts_dir,
+            data_dir=data_dir,
+        )
 
     def _parse_asof(value: str | None):
         """`?asof=YYYY-MM-DD` → `date(YYYY, MM, DD)`. `None` or
@@ -129,41 +330,6 @@ def create_app(
             )
         return candidates[0].stem
 
-    def _open_warehouse() -> duckdb.DuckDBPyConnection:
-        con = duckdb.connect(":memory:")
-        # Register both fact-table views across all partitions for
-        # this data_dir. The /**/ glob is intentionally agnostic to
-        # partition depth (year=…/month=…/day=…); Hive partition keys
-        # are discovered automatically. `transitions` may not exist
-        # on a brand-new install — fall back to an empty view so
-        # routes that don't need it still work.
-        for kind in ("work_items", "transitions"):
-            glob = (data_dir / kind / "**" / "*.parquet").as_posix()
-            try:
-                con.execute(
-                    f"CREATE VIEW {kind} AS "
-                    f"SELECT * FROM read_parquet('{glob}', "
-                    f"hive_partitioning = true)"
-                )
-            except duckdb.IOException:
-                # No parquet files yet for this fact table — register
-                # an empty stub view with the right column shape so
-                # downstream queries don't crash on missing relations.
-                if kind == "transitions":
-                    con.execute(
-                        "CREATE VIEW transitions AS "
-                        "SELECT NULL::VARCHAR AS source, "
-                        "NULL::VARCHAR AS item_id, "
-                        "NULL::TIMESTAMP AS entered_at, "
-                        "NULL::VARCHAR AS stage, "
-                        "NULL::VARCHAR AS signal, "
-                        "NULL::VARCHAR AS contract_id "
-                        "WHERE FALSE"
-                    )
-                else:
-                    raise
-        return con
-
     def _available_contracts() -> list[str]:
         return sorted(p.stem for p in contracts_dir.glob("*.yaml"))
 
@@ -175,58 +341,117 @@ def create_app(
         from fastapi.responses import RedirectResponse
 
         return RedirectResponse(
-            url=f"/contracts/{_first_contract_or_404()}/", status_code=307
+            url=f"/workflows/{_first_contract_or_404()}", status_code=307
         )
 
     @app.get(
-        "/contracts/{contract_id}/",
+        "/workflows/{workflow_id}/metrics/cfd",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def dashboard(request: Request, contract_id: str) -> HTMLResponse:
-        _ensure_contract_exists(contract_id)
-        # The dashboard is metric-overview only; the per-item table
-        # belongs to the metric detail pages. Don't pay the cost of
-        # building it here.
-        with _open_warehouse() as con:
-            cycle_time = render_cycle_time(con, contract_id)
-            throughput = render_throughput(con, contract_id)
-            aging = render_aging(con, contract_id)
+    def cfd_detail(request: Request, workflow_id: str) -> HTMLResponse:
+        view = _open_view(workflow_id)
+        with view.warehouse() as con:
+            cfd = view.render_cfd(con)
+        return templates.TemplateResponse(
+            request,
+            "cfd_detail.html.jinja",
+            {
+                "title": f"Cumulative Flow — {workflow_id}",
+                "metric_name": "Cumulative Flow",
+                "contract": view.template_context(),
+                "available_contracts": _available_contracts(),
+                "view": {"since": None, "until": None},
+                "cfd": cfd,
+            },
+        )
+
+    @app.get(
+        "/api/internal/cfd",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def cfd_fragment(request: Request, workflow: str) -> HTMLResponse:
+        view = _open_view(workflow)
+        with view.warehouse() as con:
+            cfd = view.render_cfd(con)
+        return templates.TemplateResponse(
+            request,
+            "_partials/cfd_chart_fragment.html.jinja",
+            {
+                "data": cfd,
+                "chart_height": 320,
+                "contract": view.template_context(),
+            },
+        )
+
+    def _dashboard(request: Request, workflow_id: str) -> HTMLResponse:
+        # Dashboard is metric-overview only; the per-item table
+        # belongs to the metric detail pages.
+        view = _open_view(workflow_id)
+        with view.warehouse() as con:
+            cycle_time = view.render_cycle_time(con)
+            throughput = view.render_throughput(con)
+            aging = view.render_aging(con)
+            cfd = view.render_cfd(con)
         return templates.TemplateResponse(
             request,
             "dashboard.html.jinja",
             {
-                "title": f"flowmetrics — {contract_id}",
-                "contract": {"name": contract_id},
+                "title": f"flowmetrics — {workflow_id}",
+                "contract": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "cycle_time": cycle_time,
                 "throughput": throughput,
                 "aging": aging,
+                "cfd": cfd,
             },
         )
 
+    # Two route declarations both delegating to `_dashboard`.
+    # `/workflows/{id}` is the minimum URL; `/workflows/{id}/{slug}`
+    # accepts a decorative slug for shareable canonical URLs. The
+    # slug isn't used by routing — both forms render the same page.
     @app.get(
-        "/contracts/{contract_id}/metrics/cycle-time",
+        "/workflows/{workflow_id}",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def cycle_time_detail(request: Request, contract_id: str) -> HTMLResponse:
-        _ensure_contract_exists(contract_id)
-        with _open_warehouse() as con:
-            cycle_time = render_cycle_time(con, contract_id)
-            work_items = render_work_items_table(con, contract_id)
+    def dashboard(request: Request, workflow_id: str) -> HTMLResponse:
+        return _dashboard(request, workflow_id)
+
+    @app.get(
+        "/workflows/{workflow_id}/{slug}",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def dashboard_with_slug(
+        request: Request, workflow_id: str, slug: str
+    ) -> HTMLResponse:
+        return _dashboard(request, workflow_id)
+
+    @app.get(
+        "/workflows/{workflow_id}/metrics/cycle-time",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def cycle_time_detail(request: Request, workflow_id: str) -> HTMLResponse:
+        view = _open_view(workflow_id)
+        with view.warehouse() as con:
+            cycle_time = view.render_cycle_time(con)
+            work_items = render_work_items_table(con, workflow_id)
         return templates.TemplateResponse(
             request,
             "cycle_time_detail.html.jinja",
             {
-                "title": f"Cycle time — {contract_id}",
+                "title": f"Cycle time — {workflow_id}",
                 # `metric_name` puts the metric in the site header
                 # so detail pages identify themselves at the top of
                 # the viewport. Dashboard routes pass no
                 # `metric_name` — the header stays multi-metric-neutral.
                 "metric_name": "Cycle time",
-                "contract": {"name": contract_id},
+                "contract": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "cycle_time": cycle_time,
@@ -242,10 +467,12 @@ def create_app(
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def cycle_time_fragment(request: Request, contract: str) -> HTMLResponse:
-        _ensure_contract_exists(contract)
-        with _open_warehouse() as con:
-            cycle_time = render_cycle_time(con, contract)
+    def cycle_time_fragment(
+        request: Request, workflow: str
+    ) -> HTMLResponse:
+        view = _open_view(workflow)
+        with view.warehouse() as con:
+            cycle_time = view.render_cycle_time(con)
         return templates.TemplateResponse(
             request,
             "_partials/cycle_time_chart_fragment.html.jinja",
@@ -254,27 +481,27 @@ def create_app(
                 "chart_height": 320,
                 # Templates that the fragment includes (the chart
                 # partial reads `contract.name` for href/hx-get URLs).
-                "contract": {"name": contract},
+                "contract": view.template_context(),
             },
         )
 
     @app.get(
-        "/contracts/{contract_id}/metrics/throughput",
+        "/workflows/{workflow_id}/metrics/throughput",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def throughput_detail(request: Request, contract_id: str) -> HTMLResponse:
-        _ensure_contract_exists(contract_id)
-        with _open_warehouse() as con:
-            throughput = render_throughput(con, contract_id)
-            work_items = render_work_items_table(con, contract_id)
+    def throughput_detail(request: Request, workflow_id: str) -> HTMLResponse:
+        view = _open_view(workflow_id)
+        with view.warehouse() as con:
+            throughput = view.render_throughput(con)
+            work_items = render_work_items_table(con, workflow_id)
         return templates.TemplateResponse(
             request,
             "throughput_detail.html.jinja",
             {
-                "title": f"Throughput — {contract_id}",
+                "title": f"Throughput — {workflow_id}",
                 "metric_name": "Throughput",
-                "contract": {"name": contract_id},
+                "contract": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "throughput": throughput,
@@ -287,46 +514,250 @@ def create_app(
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def throughput_fragment(request: Request, contract: str) -> HTMLResponse:
-        _ensure_contract_exists(contract)
-        with _open_warehouse() as con:
-            throughput = render_throughput(con, contract)
+    def throughput_fragment(
+        request: Request, workflow: str
+    ) -> HTMLResponse:
+        view = _open_view(workflow)
+        with view.warehouse() as con:
+            throughput = view.render_throughput(con)
         return templates.TemplateResponse(
             request,
             "_partials/throughput_chart_fragment.html.jinja",
             {
                 "data": throughput,
                 "chart_height": 280,
-                "contract": {"name": contract},
+                "contract": view.template_context(),
             },
         )
 
     @app.get(
-        "/contracts/{contract_id}/metrics/aging",
+        "/workflows/{workflow_id}/metrics/aging",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
     def aging_detail(
         request: Request,
-        contract_id: str,
+        workflow_id: str,
         asof: str | None = None,
     ) -> HTMLResponse:
-        _ensure_contract_exists(contract_id)
+        view = _open_view(workflow_id)
         asof_date = _parse_asof(asof)
-        with _open_warehouse() as con:
-            aging = render_aging(con, contract_id, asof=asof_date)
-            work_items = render_work_items_table(con, contract_id)
+        with view.warehouse() as con:
+            aging = view.render_aging(con, asof=asof_date)
+            # Table scope mirrors the chart: in-flight items only,
+            # at the same asof. Completed items aren't part of
+            # aging-WIP and don't belong here. Sort by start date
+            # ascending so the oldest open item — the one most
+            # likely past P85 — is at the top.
+            work_items = render_work_items_table(
+                con,
+                workflow_id,
+                in_flight_at=aging.asof_iso,
+                sort="created_at",
+                direction="asc",
+            )
         return templates.TemplateResponse(
             request,
             "aging_detail.html.jinja",
             {
-                "title": f"Aging WIP — {contract_id}",
+                "title": f"Aging WIP — {workflow_id}",
                 "metric_name": "Aging WIP",
-                "contract": {"name": contract_id},
+                "contract": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "aging": aging,
                 "work_items": work_items,
+            },
+        )
+
+    @app.get(
+        "/workflows/{workflow_id}/metrics/forecast",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def forecast_detail(
+        request: Request,
+        workflow_id: str,
+        items: int = 20,
+        days: int = 30,
+    ) -> HTMLResponse:
+        """Forecast page with two MCS panels driven by sliders.
+        Initial render uses sane defaults (20 items, 30 days);
+        sliders re-fetch the fragments via HTMX as the user drags."""
+        view = _open_view(workflow_id)
+        today = datetime.now(UTC).date()
+        with view.warehouse() as con:
+            when_done = render_forecast_when_done(
+                con, workflow_id, items=max(1, items), start_date=today
+            )
+            # Slider semantics: "N days" → N-day inclusive window.
+            # end_date = start + (N - 1) gives a window of size N.
+            how_many = render_forecast_how_many(
+                con,
+                workflow_id,
+                start_date=today,
+                end_date=today + timedelta(days=max(0, days - 1)),
+            )
+        return templates.TemplateResponse(
+            request,
+            "forecast_detail.html.jinja",
+            {
+                "title": f"Forecast — {workflow_id}",
+                "metric_name": "Forecast",
+                "contract": view.template_context(),
+                "available_contracts": _available_contracts(),
+                "view": {"since": None, "until": None},
+                "when_done": when_done,
+                "how_many": how_many,
+                "items_slider": items,
+                "days_slider": days,
+                "today_iso": today.isoformat(),
+            },
+        )
+
+    @app.get(
+        "/api/internal/forecast/when-done",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def forecast_when_done_fragment(
+        request: Request,
+        workflow: str,
+        items: int = 20,
+        start: str | None = None,
+    ) -> HTMLResponse:
+        view = _open_view(workflow)
+        start_date = _parse_asof(start) or datetime.now(UTC).date()
+        try:
+            items_int = max(1, int(items))
+        except (TypeError, ValueError):
+            items_int = 20
+        with view.warehouse() as con:
+            data = render_forecast_when_done(
+                con, workflow, items=items_int, start_date=start_date
+            )
+        return templates.TemplateResponse(
+            request,
+            "_partials/forecast_when_done_chart_fragment.html.jinja",
+            {
+                "data": data,
+                "contract": view.template_context(),
+                "chart_height": 280,
+            },
+        )
+
+    @app.get(
+        "/api/internal/forecast/how-many",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def forecast_how_many_fragment(
+        request: Request,
+        workflow: str,
+        days: int = 30,
+        start: str | None = None,
+    ) -> HTMLResponse:
+        view = _open_view(workflow)
+        start_date = _parse_asof(start) or datetime.now(UTC).date()
+        try:
+            days_int = max(1, int(days))
+        except (TypeError, ValueError):
+            days_int = 30
+        with view.warehouse() as con:
+            data = render_forecast_how_many(
+                con,
+                workflow,
+                start_date=start_date,
+                # Same N → N-day window semantics as the detail page.
+                end_date=start_date + timedelta(days=max(0, days_int - 1)),
+            )
+        return templates.TemplateResponse(
+            request,
+            "_partials/forecast_how_many_chart_fragment.html.jinja",
+            {
+                "data": data,
+                "contract": view.template_context(),
+                "chart_height": 280,
+            },
+        )
+
+    @app.post(
+        "/api/internal/materialise",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def materialise_action(
+        request: Request,
+        workflow: str,
+        since: str | None = None,
+        until: str | None = None,
+        asof: str | None = None,
+    ) -> HTMLResponse:
+        """Trigger `flow materialise` from the UI (the button on
+        the aging empty-state) and return the refreshed aging chart
+        fragment so HTMX can swap it in place.
+
+        Synchronous: runs the materialise inline, holds the request
+        until done. Fine for small contracts (seconds). A future
+        async + job-polling version can replace this without
+        changing the UI contract (button POSTs → fragment returns).
+        """
+        import dataclasses
+
+        from .materialise import materialise as run_materialise
+
+        view = _open_view(workflow)
+        contract_obj = view.contract
+
+        since_date = _parse_asof(since)
+        until_date = _parse_asof(until)
+        overrides: dict = {}
+        if since_date is not None:
+            overrides["start"] = since_date
+        if until_date is not None:
+            overrides["stop"] = until_date
+        if overrides:
+            contract_obj = dataclasses.replace(contract_obj, **overrides)
+
+        try:
+            run_materialise(
+                contract=contract_obj,
+                data_dir=data_dir,
+                cache_dir=cache_dir,
+                offline=False,  # button → hit the source, fetch new
+            )
+        except Exception as exc:  # noqa: BLE001 — surface anything
+            # Re-render the empty state with the error message so
+            # the operator sees what went wrong without leaving the
+            # page. Wraps the original aging payload (which still
+            # has its coverage/asof info) in an "import failed"
+            # banner.
+            asof_date = _parse_asof(asof)
+            with view.warehouse() as con:
+                aging = view.render_aging(con, asof=asof_date)
+            return templates.TemplateResponse(
+                request,
+                "_partials/aging_chart_fragment.html.jinja",
+                {
+                    "data": aging,
+                    "chart_height": 320,
+                    "contract": view.template_context(),
+                    "materialise_error": str(exc),
+                },
+            )
+
+        # Success: re-render the aging fragment against the fresh
+        # warehouse. HTMX swaps it in place.
+        asof_date = _parse_asof(asof)
+        with view.warehouse() as con:
+            aging = view.render_aging(con, asof=asof_date)
+        return templates.TemplateResponse(
+            request,
+            "_partials/aging_chart_fragment.html.jinja",
+            {
+                "data": aging,
+                "chart_height": 320,
+                "contract": view.template_context(),
             },
         )
 
@@ -336,30 +767,30 @@ def create_app(
         dependencies=auth_dep,
     )
     def aging_fragment(
-        request: Request, contract: str, asof: str | None = None
+        request: Request, workflow: str, asof: str | None = None
     ) -> HTMLResponse:
-        _ensure_contract_exists(contract)
+        view = _open_view(workflow)
         asof_date = _parse_asof(asof)
-        with _open_warehouse() as con:
-            aging = render_aging(con, contract, asof=asof_date)
+        with view.warehouse() as con:
+            aging = view.render_aging(con, asof=asof_date)
         return templates.TemplateResponse(
             request,
             "_partials/aging_chart_fragment.html.jinja",
             {
                 "data": aging,
                 "chart_height": 320,
-                "contract": {"name": contract},
+                "contract": view.template_context(),
             },
         )
 
     @app.get(
-        "/contracts/{contract_id}/items/{item_id:path}",
+        "/workflows/{workflow_id}/items/{item_id:path}",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
     def item_lifecycle(
         request: Request,
-        contract_id: str,
+        workflow_id: str,
         item_id: str,
     ) -> HTMLResponse:
         """Per-item lifecycle: timeline of stage transitions for one
@@ -377,20 +808,17 @@ def create_app(
         per the source adapter convention, but the URL accepts
         either form.
         """
-        _ensure_contract_exists(contract_id)
-        from .contract import load_contract
-
-        contract = load_contract(contract_id, contracts_dir)
+        view = _open_view(workflow_id)
         # Accept ids with or without the leading `#` for GitHub
         # PR numbers — both `12345` and `#12345` route to the
         # canonical warehouse id (`#12345`).
         resolved_id = item_id
-        if contract.source == "github" and not item_id.startswith("#"):
+        if view.contract.source == "github" and not item_id.startswith("#"):
             resolved_id = "#" + item_id
         try:
-            with _open_warehouse() as con:
+            with view.warehouse() as con:
                 data = render_lifecycle(
-                    con, contract_id, contract.source, resolved_id
+                    con, workflow_id, view.contract.source, resolved_id
                 )
         except ItemNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -398,11 +826,11 @@ def create_app(
             request,
             "item_lifecycle.html.jinja",
             {
-                "title": f"{data.item_id} — {contract_id}",
+                "title": f"{data.item_id} — {workflow_id}",
                 # The item id goes in the site header so the page
                 # identifies itself at the top of the viewport.
                 "metric_name": data.item_id,
-                "contract": {"name": contract_id},
+                "contract": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "data": data,
@@ -416,37 +844,57 @@ def create_app(
     )
     def work_items_fragment(
         request: Request,
-        contract: str,
+        workflow: str,
         q: str | None = None,
         completed_on: str | None = None,
+        in_flight_at: str | None = None,
         sort: str = "completed_at",
         direction: str = "desc",
+        page: int = 1,
     ) -> HTMLResponse:
-        """HTMX swap target for the work-items table: sort+filter
-        round-trip to the server, return only the partial.
+        """HTMX swap target for the work-items table: sort + filter
+        + paginate round-trip, returning only the partial.
 
-        `completed_on` is a YYYY-MM-DD date (UTC) that drills the
-        table to a single day — used when the viewer clicks a bar
-        on the throughput chart.
+        `completed_on` drills the table to a single completion date
+        (used by the throughput chart's bar-click handler).
+        `in_flight_at` restricts to items in-flight at the given
+        UTC date — the aging detail page passes this; pagination
+        and sort links propagate it so clicking "Next" doesn't
+        silently drop the in-flight scope.
+        `page` is 1-indexed; the component clamps to the valid
+        range and caps page_size at 200.
         """
-        _ensure_contract_exists(contract)
+        view = _open_view(workflow)
         # Normalise sort/direction via the component's whitelist —
         # invalid values fall back to defaults inside render().
         sort_key: SortKey = sort if sort in (
             "item_id", "title", "created_at",
-            "completed_at", "cycle_time_days"
+            "completed_at", "cycle_time_days", "age_days",
         ) else "completed_at"
         direction_key: SortDir = direction if direction in (
             "asc", "desc"
         ) else "desc"
-        with _open_warehouse() as con:
+        try:
+            page_int = max(1, int(page))
+        except (TypeError, ValueError):
+            page_int = 1
+        # On the aging page, the route sorts in-flight items by
+        # created_at ASC (oldest open first). HTMX-driven pagination
+        # without an explicit sort override should keep that
+        # contract.
+        if in_flight_at and sort == "completed_at":
+            sort_key = "created_at"
+            direction_key = "asc"
+        with view.warehouse() as con:
             data = render_work_items_table(
                 con,
-                contract,
+                workflow,
                 q=q,
                 completed_on=completed_on,
+                in_flight_at=in_flight_at,
                 sort=sort_key,
                 direction=direction_key,
+                page=page_int,
             )
         return templates.TemplateResponse(
             request,
@@ -458,7 +906,7 @@ def create_app(
             "_partials/work_items_table_body.html.jinja",
             {
                 "data": data,
-                "contract": {"name": contract},
+                "contract": view.template_context(),
             },
         )
 

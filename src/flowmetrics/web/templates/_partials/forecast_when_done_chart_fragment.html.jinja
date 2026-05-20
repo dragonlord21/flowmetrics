@@ -1,0 +1,67 @@
+{# Forecast WWIBD-Date chart fragment.
+
+   Required context:
+     data           — WhenDoneData (vega_spec_json(), p50/p85/p95_display, headline)
+     chart_height   — int pixels
+     contract.name  — for any back-links
+#}
+{%- set chart_container_id = "forecast-when-done-chart" -%}
+{%- set _h = chart_height|default(280) -%}
+
+<div id="{{ chart_container_id }}-wrap">
+  <p class="forecast-summary" id="forecast-when-done-summary">
+    {{ data.headline }}
+  </p>
+  {% if data.percentile_rows %}
+    <table class="forecast-percentiles">
+      <tbody>
+        {% for row in data.percentile_rows %}
+          <tr>
+            <td class="forecast-percentile-swatch">
+              <span class="forecast-dash"
+                    style="background-image: linear-gradient(to right, {{ row.color }} 50%, transparent 0%);
+                           background-size: {{ (loop.index * 6) }}px 2px;
+                           background-repeat: repeat-x;
+                           background-position: 0 50%;"></span>
+            </td>
+            <th scope="row" class="forecast-percentile-label">{{ row.label }}</th>
+            <td class="forecast-percentile-value">{{ row.value_display }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  <div id="{{ chart_container_id }}" class="metric-chart"
+       data-chart-height="{{ _h }}"></div>
+  <script>
+    (function () {
+      if (window.__flowmetricsForecastWhenDoneView) {
+        try { window.__flowmetricsForecastWhenDoneView.finalize(); }
+        catch (e) { /* finalize is best-effort */ }
+        window.__flowmetricsForecastWhenDoneView = null;
+      }
+      const spec = {{ data.vega_spec_json() | safe }};
+      spec.height = {{ _h }};
+      // First-paint fix: nominal x-axis with `width: "container"`
+      // locks in step-based sizing at embed time. If embed runs
+      // BEFORE the CSS grid has finalised column widths, the
+      // chart is sized to the (too-wide) initial container width
+      // and stays that way. Defer embed until after the next two
+      // animation frames so the grid layout has fully settled.
+      function embedWhenSettled() {
+        vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
+          actions: false,
+          renderer: "svg"
+        }).then(function (res) {
+          window.__flowmetricsForecastWhenDoneView = res.view;
+        }).catch(function (err) {
+          const el = document.getElementById("{{ chart_container_id }}");
+          el.innerText = "Chart render failed: " + err;
+        });
+      }
+      requestAnimationFrame(function () {
+        requestAnimationFrame(embedWhenSettled);
+      });
+    })();
+  </script>
+</div>

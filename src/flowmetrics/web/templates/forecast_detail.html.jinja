@@ -1,0 +1,100 @@
+{% extends "_base.html.jinja" %}
+
+{% block content %}
+  {% with summary = {"title": "Forecast", "headline": "Monte Carlo over " ~ when_done.daily_throughput_n_days ~ " days of throughput history. Drag the sliders to change the inputs."} %}
+    {% include "_partials/metric_summary.html.jinja" %}
+  {% endwith %}
+
+  <div class="forecast-grid">
+    {# WWIBD - Date panel #}
+    <section class="forecast-panel">
+      <header class="forecast-panel-header">
+        <h3>When will it be done?</h3>
+        <p class="forecast-panel-sub">
+          Given a backlog of <output id="items-output" for="items-slider">{{ items_slider }}</output> items,
+          what dates do P50/P85/P95 land on?
+        </p>
+        <label class="forecast-slider-label" for="items-slider">
+          Items
+          <input id="items-slider"
+                 type="range"
+                 name="items"
+                 min="1" max="500" step="1"
+                 value="{{ items_slider }}"
+                 hx-get="/api/internal/forecast/when-done?workflow={{ contract.name }}&start={{ today_iso }}"
+                 hx-target="#forecast-when-done-chart-wrap"
+                 hx-swap="outerHTML"
+                 hx-trigger="input changed delay:100ms"
+                 oninput="document.getElementById('items-output').textContent = this.value">
+        </label>
+      </header>
+      {% with data = when_done, chart_height = 280 %}
+        {% include "_partials/forecast_when_done_chart_fragment.html.jinja" %}
+      {% endwith %}
+    </section>
+
+    {# WWIBD - How Many panel #}
+    <section class="forecast-panel">
+      <header class="forecast-panel-header">
+        <h3>How many will be done?</h3>
+        <p class="forecast-panel-sub">
+          Over the next <output id="days-output" for="days-slider">{{ days_slider }}</output> days,
+          P50/P85/P95 counts (a high-confidence FLOOR — "at least this many").
+        </p>
+        <label class="forecast-slider-label" for="days-slider">
+          Days
+          <input id="days-slider"
+                 type="range"
+                 name="days"
+                 min="1" max="180" step="1"
+                 value="{{ days_slider }}"
+                 hx-get="/api/internal/forecast/how-many?workflow={{ contract.name }}&start={{ today_iso }}"
+                 hx-target="#forecast-how-many-chart-wrap"
+                 hx-swap="outerHTML"
+                 hx-trigger="input changed delay:100ms"
+                 oninput="document.getElementById('days-output').textContent = this.value">
+        </label>
+      </header>
+      {% with data = how_many, chart_height = 280 %}
+        {% include "_partials/forecast_how_many_chart_fragment.html.jinja" %}
+      {% endwith %}
+    </section>
+  </div>
+
+  <section class="detail-extras">
+    <h2>How to read this</h2>
+    <p>
+      Both panels run 10,000 Monte Carlo simulations against the
+      historical daily throughput captured by the warehouse. Each
+      simulation samples completed-items-per-day (with replacement)
+      from that distribution. The bars show how often each
+      outcome occurred across the 10K runs.
+    </p>
+
+    <h2>Caveats</h2>
+    <ul>
+      <li>Forecasts assume the future looks like the past. If your
+        team composition, scope, or process changed recently, the
+        baseline is a less reliable predictor.</li>
+      <li>Both panels share the same daily-throughput distribution.
+        Widening the historical window means more samples but
+        risks mixing regimes; narrowing trades stability for
+        responsiveness.</li>
+      <li>Date-direction (P85 by) means "85% of simulations
+        completed by this date or earlier." Count-direction
+        (P85 ≥) means "at least this many in 85% of simulations" —
+        a high-confidence floor, not a high-likelihood expectation.</li>
+    </ul>
+
+    <h2>Methodology</h2>
+    <p>
+      Per Vacanti, <em>When Will It Be Done?</em>: empirical
+      simulation outperforms point estimates because the daily
+      throughput distribution carries the operational variance
+      directly. Each run is independent; convergence to stable
+      percentiles is typically achieved by 10K runs.
+    </p>
+  </section>
+
+  <a class="back-link" href="/workflows/{{ contract.name }}/">← Back to dashboard</a>
+{% endblock %}

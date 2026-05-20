@@ -29,6 +29,18 @@
       renderer: "svg"
     }).then(function (res) {
       window.__flowmetricsCycleTimeView = res.view;
+      // Click a dot → navigate to that item's lifecycle page.
+      // Hover keeps showing the tooltip (Vega-Lite default
+      // behaviour for the `tooltip` encoding); click is the
+      // explicit drill-down gesture. Same pattern on the aging
+      // chart.
+      res.view.addEventListener("click", function (_event, item) {
+        if (!item || !item.datum || !item.datum.item_id) return;
+        const cleanId = String(item.datum.item_id).replace(/^#/, "");
+        window.location.href =
+          "/workflows/{{ contract.name }}/items/" +
+          encodeURIComponent(cleanId);
+      });
     }).catch(function (err) {
       const el = document.getElementById("{{ chart_container_id }}");
       el.innerText = "Chart render failed: " + err;

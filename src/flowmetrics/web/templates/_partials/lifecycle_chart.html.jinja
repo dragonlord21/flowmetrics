@@ -79,12 +79,12 @@
               "scale": {
                 "domain": stages.map(function (s) { return s.y_label; }),
                 "range": [
-                  "__theme:p-200__",
-                  "__theme:p-500__",
-                  "__theme:p-700__",
-                  "__theme:p-200__",
-                  "__theme:p-500__",
-                  "__theme:p-700__"
+                  "__theme:border__",
+                  "__theme:muted__",
+                  "__theme:fg__",
+                  "__theme:border__",
+                  "__theme:muted__",
+                  "__theme:fg__"
                 ]
               },
               "legend": null
@@ -100,7 +100,7 @@
       ].concat(terminalAt && terminalStage ? [
         {
           "data": {"values": [{"t": terminalAt, "label": terminalStage}]},
-          "mark": {"type": "rule", "color": "__theme:p-500__", "size": 2, "strokeDash": [4, 3]},
+          "mark": {"type": "rule", "color": "__theme:fg__", "size": 2, "strokeDash": [4, 3]},
           "encoding": {
             "x": {"field": "t", "type": "temporal"}
           }
@@ -115,7 +115,7 @@
             "dy": 4,
             "fontSize": 12,
             "fontWeight": 600,
-            "color": "__theme:p-700__"
+            "color": "__theme:fg__"
           },
           "encoding": {
             "x": {"field": "t", "type": "temporal"},

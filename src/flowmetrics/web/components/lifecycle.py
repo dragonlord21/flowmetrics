@@ -173,6 +173,23 @@ def render(
         [contract_name, source, item_id],
     ).fetchall()
 
+    # Drop transitions that landed AFTER completion. Post-merge
+    # label edits (e.g. someone re-tagging a PR days later) end
+    # up in the transitions table — they don't change cycle time
+    # (which is computed from work_items.created_at/completed_at)
+    # but they pollute the lifecycle view with a fake "Merged ·
+    # 2d 8h" dwell that's actually post-cycle activity. Truncate
+    # the events to the cycle window. For in-flight items
+    # (completed_at IS NULL), keep every event — the open
+    # lifecycle has no truncation point.
+    if header_completed_at is not None:
+        completed_aware = attach_utc(header_completed_at)
+        rows = [
+            (entered_at, stage, signal)
+            for entered_at, stage, signal in rows
+            if attach_utc(entered_at) <= completed_aware
+        ]
+
     events: list[LifecycleEvent] = []
     prev_dt = None
     for entered_at, stage, signal in rows:

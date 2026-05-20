@@ -27,15 +27,20 @@ from ...utc_dates import attach_utc, to_utc_display_date, to_utc_iso_date
 # the current CSS values. One theme change in CSS flows everywhere
 # without touching Python.
 #
-# Per-percentile assignment — three intensities of the brand hue:
-#   P50 — light plum  (typical / soft signal)      → --p-200
-#   P85 — primary plum (Vacanti commitment line)   → --p-500
-#   P95 — deep plum   (high-stakes commitment)     → --p-700
-_PCT_COLOR_P50 = "__theme:p-200__"
+# Per-percentile assignment — neutrals + ONE accent.
+#   P50 — light gray  (soft reference, "typical")  → --border
+#   P85 — primary plum (Vacanti's commitment line — the headline
+#         threshold this chart exists to evaluate against)
+#   P95 — dark gray   (deep reference)             → --muted
+# Plum is reserved for the page CTA (the import button) and the
+# single most-meaningful chart accent (P85). Other references
+# stay neutral so the eye finds the action and the threshold
+# without competing colours.
+_PCT_COLOR_P50 = "__theme:border__"
 _PCT_COLOR_P85 = "__theme:p-500__"
-_PCT_COLOR_P95 = "__theme:p-700__"
+_PCT_COLOR_P95 = "__theme:muted__"
 # Scatter dots — neutral. The data cloud is supporting visual; the
-# percentile lines are the hero.
+# P85 line is the hero.
 _SCATTER_COLOR = "__theme:muted__"
 
 
@@ -232,6 +237,9 @@ def _build_vega_spec(data: CycleTimeData) -> dict[str, Any]:
             "opacity": 0.7,
             "size": 80,
             "color": _SCATTER_COLOR,
+            # Signal clickability — the fragment script navigates
+            # to the item's lifecycle page on click.
+            "cursor": "pointer",
         },
         # Data lives on this layer (not top-level) so the rule/text
         # reference layers — each with their own 2-row dataset — don't

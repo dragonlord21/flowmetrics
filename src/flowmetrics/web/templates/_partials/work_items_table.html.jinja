@@ -12,12 +12,15 @@
 <div id="work-items" class="work-items"
      data-contract="{{ contract.name }}">
   <div class="work-items-controls">
-    {# The date filter survives sort/search swaps by being included
-       as a hidden form input that HTMX auto-attaches via `hx-include`.
-       Throughput-chart clicks update this input + re-fire the
-       fragment; the Clear link sets it back to empty. #}
+    {# Hidden inputs survive HTMX swaps (they live outside the
+       swap target) and HTMX serialises them into every search/
+       sort/paginate request via `hx-include`. Two of them:
+       `completed_on` for throughput-chart click drill-down, and
+       `in_flight_at` for the aging detail page's scope. #}
     <input id="work-items-completed-on" type="hidden" name="completed_on"
            value="{{ data.completed_on }}">
+    <input id="work-items-in-flight-at" type="hidden" name="in_flight_at"
+           value="{{ data.in_flight_at }}">
     <input id="work-items-search"
            class="work-items-search"
            type="search"
@@ -25,10 +28,10 @@
            value="{{ data.q }}"
            placeholder="Filter by title…"
            autocomplete="off"
-           hx-get="/api/internal/work-items?contract={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}"
+           hx-get="/api/internal/work-items?workflow={{ contract.name }}&sort={{ data.sort }}&direction={{ data.direction }}&page=1"
            hx-target="#work-items-body"
            hx-swap="innerHTML"
-           hx-include="#work-items-completed-on"
+           hx-include="#work-items-completed-on, #work-items-in-flight-at"
            hx-trigger="keyup changed delay:200ms, search">
   </div>
 
