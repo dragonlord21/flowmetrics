@@ -273,6 +273,12 @@ class WorkflowView:
             reference=self.reference_period,
         )
 
+    def render_lifecycle(self, con, *, source: str, item_id: str):
+        return render_lifecycle(
+            con, self.id, source, item_id,
+            reference=self.reference_period,
+        )
+
 
 def create_app(
     *,
@@ -928,8 +934,10 @@ def create_app(
             resolved_id = "#" + item_id
         try:
             with view.warehouse() as con:
-                data = render_lifecycle(
-                    con, workflow_id, view.contract.source, resolved_id
+                data = view.render_lifecycle(
+                    con,
+                    source=view.contract.source,
+                    item_id=resolved_id,
                 )
         except ItemNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc

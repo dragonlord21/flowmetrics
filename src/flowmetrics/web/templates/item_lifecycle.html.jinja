@@ -20,6 +20,15 @@
     <span class="lifecycle-metric-strip-value">{{ data.cycle_time_days|int }}d</span>
     <span class="lifecycle-metric-strip-formula">elapsed {{ data.elapsed_display }} · calendar days, ends inclusive (Vacanti)</span>
   </div>
+  {% if data.percentile_source_count > 0 %}
+  <div class="lifecycle-percentile-strip">
+    <span class="lifecycle-percentile-label">Team thresholds</span>
+    <span class="lifecycle-percentile-cell">P50 {{ data.p50_days|round(1) }}d</span>
+    <span class="lifecycle-percentile-cell">P85 {{ data.p85_days|round(1) }}d</span>
+    <span class="lifecycle-percentile-cell">P95 {{ data.p95_days|round(1) }}d</span>
+    <span class="lifecycle-percentile-source">from {{ data.percentile_source_count }} completed items</span>
+  </div>
+  {% endif %}
 
   {% if data.is_chartable %}
     <div class="metric">
