@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from random import Random
 from typing import Any
@@ -1099,6 +1099,17 @@ def forecast_how_many(
         "ISO YYYY-MM-DD (UTC)."
     ),
 )
+@click.option(
+    "--status-file",
+    "status_file",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Write a JSON status file (running → done/failed) at this "
+        "path. The Data Source page polls it during a "
+        "browser-triggered backfill."
+    ),
+)
 def materialise(
     name: str,
     data_dir: Path,
@@ -1107,6 +1118,7 @@ def materialise(
     offline: bool,
     since,  # click.DateTime → datetime | None
     until,
+    status_file: Path | None,
 ) -> None:
     """Fetch + canonicalise + write Parquet for one contract.
 
@@ -1118,15 +1130,46 @@ def materialise(
     for this invocation only — they don't mutate the YAML. Useful
     for targeted backfills when the warehouse needs to be brought
     forward without changing the contract's canonical window.
+
+    `--status-file` (opt-in) writes a JSON running → done/failed
+    record so the web Data Source page can poll a browser-triggered
+    backfill. Without it, behaviour is unchanged (cron path).
     """
     import dataclasses
 
+    from .backfill import write_status
     from .contract import ContractError, load_contract
     from .materialise import materialise as run_materialise
+
+    since_iso = since.date().isoformat() if since is not None else None
+    until_iso = until.date().isoformat() if until is not None else None
+    started = datetime.now(UTC)
+
+    def _status(state: str, message: str) -> None:
+        if status_file is None:
+            return
+        write_status(
+            status_file,
+            {
+                "workflow": name,
+                "since": since_iso,
+                "until": until_iso,
+                "status": state,
+                "started_at": started.isoformat(),
+                "finished_at": (
+                    None if state == "running"
+                    else datetime.now(UTC).isoformat()
+                ),
+                "message": message,
+            },
+        )
+
+    _status("running", "")
 
     try:
         contract = load_contract(name, contracts_dir)
     except ContractError as exc:
+        _status("failed", str(exc))
         click.echo(f"error: {exc}", err=True)
         sys.exit(2)
 
@@ -1139,17 +1182,28 @@ def materialise(
     if overrides:
         contract = dataclasses.replace(contract, **overrides)
 
-    manifest = run_materialise(
-        contract=contract,
-        data_dir=data_dir,
-        cache_dir=cache_dir,
-        offline=offline,
-    )
-    click.echo(
+    try:
+        manifest = run_materialise(
+            contract=contract,
+            data_dir=data_dir,
+            cache_dir=cache_dir,
+            offline=offline,
+        )
+    except Exception as exc:
+        _status("failed", f"{type(exc).__name__}: {exc}")
+        # No status file → preserve the cron path: let it raise.
+        if status_file is None:
+            raise
+        click.echo(f"error: {exc}", err=True)
+        sys.exit(1)
+
+    msg = (
         f"materialised {manifest.contract_id} (run_id={manifest.run_id}): "
         f"{manifest.items_fetched} items in "
         f"{(manifest.completed_at - manifest.started_at).total_seconds():.1f}s"
     )
+    _status("done", msg)
+    click.echo(msg)
 
 
 # ---------------------------------------------------------------------------

@@ -180,21 +180,24 @@ class TestPeriodFilterBar:
         assert date(2026, 5, 4) <= date.fromisoformat(lo) <= date(2026, 5, 10)
         assert date(2026, 5, 4) <= date.fromisoformat(hi) <= date(2026, 5, 10)
 
-    def test_aging_asof_follows_the_period_ending(
+    def test_aging_ignores_the_period_ending(
         self, server_url: str, page: Page
     ):
-        """Aging's "as of" date in the headline matches the
-        custom Period Ending — not today."""
+        """Aging is a "right now" snapshot pinned to the latest
+        materialise — a custom Period anchor in the URL must NOT
+        move its as-of date, and the page carries no Period bar."""
         page.goto(
             server_url + "/workflows/astral-uv-week/metrics/aging"
             "?period=custom&anchor=2026-05-06&view_days=30"
         )
         page.wait_for_selector(".metric-strip-headline")
         headline = page.locator(".metric-strip-headline").inner_text()
-        assert "May 06, 2026" in headline, (
-            f"aging headline must name the Period Ending date; "
-            f"got {headline!r}"
+        # The Period anchor must NOT drive aging's as-of date.
+        assert "May 06, 2026" not in headline, (
+            f"aging must ignore the Period anchor; got {headline!r}"
         )
+        # The aging page has no Period filter bar at all.
+        expect(page.locator("select[name='period']")).to_have_count(0)
 
     def test_reset_clears_the_query(self, server_url: str, page: Page):
         """The Reset link drops all filter params."""

@@ -172,3 +172,57 @@ class TestSourceAgnosticDispatch:
         )
         with pytest.raises(ValueError, match="unknown source prefix"):
             workitem_to_transitions(unknown)
+
+
+class TestWindowedBackfillKeepsFullHistory:
+    """Verification for the Data Source backfill: a windowed
+    `flow materialise --since/--until` re-fetches each item with
+    its FULL lifecycle — the WorkItem → transition bridge emits a
+    row for EVERY status interval and never clips by date. So a
+    re-fetched item is always complete, never thinner than a
+    prior snapshot, and dedup-latest-wins cannot lose history.
+    """
+
+    def test_github_bridge_emits_every_interval_including_pre_window(self):
+        """An item completed inside a narrow backfill window, but
+        whose lifecycle began long before it, keeps every
+        transition — the early ones are not dropped."""
+        item = WorkItem(
+            item_id="github:#42",
+            title="long-lived PR",
+            created_at=_ts(2024, 1, 5),
+            completed_at=_ts(2026, 5, 9),
+            status_intervals=[
+                # Created Jan 2024 — well before any "last 30 days"
+                # backfill window ending May 2026.
+                StatusInterval(_ts(2024, 1, 5), _ts(2024, 6, 1), "Draft"),
+                StatusInterval(_ts(2024, 6, 1), _ts(2026, 5, 9), "Awaiting Review"),
+                StatusInterval(_ts(2026, 5, 9), _ts(2026, 5, 9), "Merged"),
+            ],
+        )
+        txs = github_workitem_to_transitions(item)
+        entered = sorted(t.entered_at for t in txs)
+        assert entered == [
+            _ts(2024, 1, 5), _ts(2024, 6, 1), _ts(2026, 5, 9),
+        ], "every interval must survive — no date clipping"
+        assert txs[0].entered_at.year == 2024, (
+            "the pre-window creation transition must be kept"
+        )
+
+    def test_jira_bridge_emits_every_interval_including_pre_window(self):
+        item = WorkItem(
+            item_id="jira:CASSANDRA:1",
+            title="long-lived issue",
+            created_at=_ts(2024, 1, 5),
+            completed_at=_ts(2026, 5, 9),
+            status_intervals=[
+                StatusInterval(_ts(2024, 1, 5), _ts(2024, 6, 1), "Open"),
+                StatusInterval(_ts(2024, 6, 1), _ts(2026, 5, 9), "In Progress"),
+                StatusInterval(_ts(2026, 5, 9), _ts(2026, 5, 9), "Resolved"),
+            ],
+        )
+        txs = jira_workitem_to_transitions(item)
+        entered = sorted(t.entered_at for t in txs)
+        assert entered == [
+            _ts(2024, 1, 5), _ts(2024, 6, 1), _ts(2026, 5, 9),
+        ]

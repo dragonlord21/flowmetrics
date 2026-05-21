@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import tempfile
 import time
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import duckdb
@@ -31,9 +31,11 @@ from click.testing import CliRunner
 
 from flowmetrics.cli import cli
 from flowmetrics.web.components.forecast import (
+    _daily_throughput,
     render_how_many,
     render_when_done,
 )
+from flowmetrics.windows import Window
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
@@ -609,4 +611,91 @@ class TestHowMany:
         assert elapsed_ms < 200, (
             f"render_how_many averaged {elapsed_ms:.1f}ms — over the "
             f"200ms real-time target."
+        )
+
+
+class TestReferenceWindowDoesNotInventZeroDays:
+    """The Monte Carlo throughput sample must be the days the
+    warehouse actually OBSERVED — never phantom zero days from a
+    reference window wider than the data.
+
+    The reference period is anchored to the most recent data but
+    its length is user-tunable, so `reference.from_` routinely
+    predates the first completion. If the sample were padded with
+    zeros back to `reference.from_`, those NODATA days would be
+    silently read as 'zero throughput' and bias every forecast
+    pessimistically — the exact nodata-vs-zero trap.
+    """
+
+    def _warehouse(
+        self, items: list[tuple[datetime, datetime]]
+    ) -> duckdb.DuckDBPyConnection:
+        con = duckdb.connect(":memory:")
+        con.execute(
+            "CREATE TABLE work_items ("
+            "contract_id VARCHAR, created_at TIMESTAMP, "
+            "completed_at TIMESTAMP)"
+        )
+        con.executemany(
+            "INSERT INTO work_items VALUES ('c', ?, ?)", items
+        )
+        return con
+
+    def test_daily_throughput_clamps_to_the_observed_span(self):
+        """Five consecutive completion days, 2/day. A reference
+        window opening 25 days earlier must NOT prepend 25 zeros —
+        the sample is the observed span only."""
+        items = [
+            (datetime(2026, 5, day - 1, 9), datetime(2026, 5, day, 12))
+            for day in range(5, 10)  # May 5–9
+            for _ in range(2)
+        ]
+        con = self._warehouse(items)
+        wide = Window(from_=date(2026, 4, 10), to=date(2026, 5, 9))
+        samples = _daily_throughput(con, "c", reference=wide)
+        assert samples == [2, 2, 2, 2, 2], (
+            f"sample must be the observed completion span only, with "
+            f"no phantom leading zeros; got {samples}"
+        )
+
+    def test_interior_zero_days_between_completions_are_kept(self):
+        """A zero day BETWEEN two real completions is a true
+        observation — the warehouse covered that span — and stays
+        in the sample. Only days outside the span are dropped."""
+        con = self._warehouse([
+            (datetime(2026, 5, 4, 9), datetime(2026, 5, 5, 9)),
+            (datetime(2026, 5, 8, 9), datetime(2026, 5, 9, 9)),
+        ])
+        wide = Window(from_=date(2026, 1, 1), to=date(2026, 12, 31))
+        samples = _daily_throughput(con, "c", reference=wide)
+        assert samples == [1, 0, 0, 0, 1], (
+            f"interior zero days are real observations and must "
+            f"stay; got {samples}"
+        )
+
+    def test_forecast_not_biased_by_a_wide_reference_window(self):
+        """End-to-end: steady 2 items/day → 20 items takes ~10
+        days. A reference window padded with phantom zeros would
+        drag the P85 date far past that."""
+        items = [
+            (datetime(2026, 5, day - 1, 9), datetime(2026, 5, day, 12))
+            for day in range(5, 10)
+            for _ in range(2)
+        ]
+        con = self._warehouse(items)
+        wide = Window(from_=date(2026, 4, 10), to=date(2026, 5, 9))
+        data = render_when_done(
+            con, "c", items=20,
+            start_date=date(2026, 5, 10), reference=wide,
+        )
+        # 20 items at 2/day ≈ 10 days → ~May 20. Phantom-zero
+        # pollution (25 zeros / 30 days) would push this past July.
+        assert data.p85_iso <= "2026-06-05", (
+            f"a wide reference window biased the forecast — "
+            f"P85={data.p85_iso}"
+        )
+        assert data.daily_throughput_n_days == 5, (
+            f"the headline must report the observed span (5 days), "
+            f"not the reference width; got "
+            f"{data.daily_throughput_n_days}"
         )

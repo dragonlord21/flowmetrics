@@ -18,18 +18,10 @@
 <div id="{{ chart_container_id }}" class="metric-chart"
      data-chart-height="{{ _h }}">
   {% if data.count == 0 %}
-    {# Action-first empty states. Tell the operator what data we
-       have AND offer the exact import command they'd run to fill
-       the gap. Three branches:
-         - asof_after_coverage: latest data on hand < asof
-         - asof_before_coverage: earliest data on hand > asof
-         - no_work_in_flight: warehouse covers asof, real empty #}
-    {% if materialise_error %}
-      <div class="aging-empty aging-empty--error">
-        <p class="aging-empty-headline">Import failed.</p>
-        <p class="aging-empty-sub"><code>{{ materialise_error }}</code></p>
-      </div>
-    {% endif %}
+    {# Empty states. The headline names the gap; the action is
+       always the Data Source page — browser-based backfill, no
+       CLI. #}
+    {%- set ds_link = "/workflows/" ~ contract.name ~ "/data-source" -%}
     {% if data.empty_state == "asof_after_coverage" %}
       <div class="aging-empty aging-empty--gap">
         <p class="aging-empty-headline">
@@ -38,26 +30,10 @@
           You're asking about
           <strong>{{ data.asof_display }}</strong>.
         </p>
-        <p class="aging-empty-sub">
-          Import data to cover the gap?
+        <p class="aging-empty-sub">No data for this range yet.</p>
+        <p class="aging-empty-actions">
+          <a class="btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
         </p>
-        <div class="aging-empty-actions">
-          <button class="btn btn--primary"
-                  hx-post="/api/internal/materialise?workflow={{ contract.name }}&since={{ data.coverage.latest_iso }}&until={{ data.asof_iso }}{% if data.asof_iso %}&asof={{ data.asof_iso }}{% endif %}"
-                  hx-target="#aging-chart"
-                  hx-swap="outerHTML"
-                  hx-indicator="#aging-import-progress"
-                  hx-disabled-elt="this">
-            Import {{ data.coverage.latest_display }} → {{ data.asof_display }}
-          </button>
-          <span id="aging-import-progress" class="htmx-indicator aging-empty-progress">
-            Importing… this can take a minute.
-          </span>
-        </div>
-        <details class="aging-empty-cli">
-          <summary>or run from the terminal</summary>
-          <pre class="aging-empty-cmd">flow materialise {{ contract.name }} --since {{ data.coverage.latest_iso }} --until {{ data.asof_iso }}</pre>
-        </details>
       </div>
     {% elif data.empty_state == "asof_before_coverage" %}
       <div class="aging-empty aging-empty--gap">
@@ -67,26 +43,10 @@
           You're asking about
           <strong>{{ data.asof_display }}</strong>.
         </p>
-        <p class="aging-empty-sub">
-          Import data to cover the gap?
+        <p class="aging-empty-sub">No data for this range yet.</p>
+        <p class="aging-empty-actions">
+          <a class="btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
         </p>
-        <div class="aging-empty-actions">
-          <button class="btn btn--primary"
-                  hx-post="/api/internal/materialise?workflow={{ contract.name }}&since={{ data.asof_iso }}&until={{ data.coverage.earliest_iso }}&asof={{ data.asof_iso }}"
-                  hx-target="#aging-chart"
-                  hx-swap="outerHTML"
-                  hx-indicator="#aging-import-progress"
-                  hx-disabled-elt="this">
-            Import {{ data.asof_display }} → {{ data.coverage.earliest_display }}
-          </button>
-          <span id="aging-import-progress" class="htmx-indicator aging-empty-progress">
-            Importing… this can take a minute.
-          </span>
-        </div>
-        <details class="aging-empty-cli">
-          <summary>or run from the terminal</summary>
-          <pre class="aging-empty-cmd">flow materialise {{ contract.name }} --since {{ data.asof_iso }} --until {{ data.coverage.earliest_iso }}</pre>
-        </details>
       </div>
     {% elif data.empty_state == "in_flight_never_captured" %}
       <div class="aging-empty aging-empty--gap">
@@ -96,26 +56,11 @@
         <p class="aging-empty-sub">
           The warehouse has completed-work data through
           <strong>{{ data.coverage.latest_display }}</strong> but
-          no snapshot of currently-open work. Import to fetch
-          open items now.
+          no snapshot of currently-open work.
         </p>
-        <div class="aging-empty-actions">
-          <button class="btn btn--primary"
-                  hx-post="/api/internal/materialise?workflow={{ contract.name }}{% if data.asof_iso %}&asof={{ data.asof_iso }}{% endif %}"
-                  hx-target="#aging-chart"
-                  hx-swap="outerHTML"
-                  hx-indicator="#aging-import-progress"
-                  hx-disabled-elt="this">
-            Fetch current in-flight items
-          </button>
-          <span id="aging-import-progress" class="htmx-indicator aging-empty-progress">
-            Importing… this can take a minute.
-          </span>
-        </div>
-        <details class="aging-empty-cli">
-          <summary>or run from the terminal</summary>
-          <pre class="aging-empty-cmd">flow materialise {{ contract.name }}</pre>
-        </details>
+        <p class="aging-empty-actions">
+          <a class="btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
+        </p>
       </div>
     {% else %}
       {# "no_work_in_flight" — warehouse has captured in-flight

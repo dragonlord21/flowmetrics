@@ -7,10 +7,15 @@
      server-side renders complete. Per-tile failures don't block
      the page.
 
-     `request.url.query` carries view_from/to + ref_from/to so the
-     windows the operator selected propagate to each tile. #}
+     `request.url.query` carries the filter params (period /
+     anchor / view_days / ref_days) so the selected window
+     propagates to each tile. #}
   {%- set q = request.url.query -%}
   {%- set qs = ('&' + q) if q else '' -%}
+
+  <p class="dashboard-datasource">
+    <a href="/workflows/{{ contract.name }}/data-source">Data source &amp; backfill →</a>
+  </p>
 
   {% for slug, label in [
     ('aging', 'Aging WIP'),

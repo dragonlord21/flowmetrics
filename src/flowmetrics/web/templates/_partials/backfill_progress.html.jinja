@@ -1,0 +1,44 @@
+{# Backfill progress fragment.
+
+   Rendered into #backfill-progress by the POST, embedded on the
+   Data Source page on load, and — while a backfill runs — polls
+   itself via /api/internal/backfill-status every 2s.
+
+   Context: backfill (dict | None), workflow (str). #}
+{%- if backfill -%}
+{%- set st = backfill.status -%}
+<div id="backfill-progress-row"
+     class="backfill-progress backfill-progress--{{ st }}"
+     {% if st == "running" -%}
+     hx-get="/api/internal/backfill-status?workflow={{ workflow }}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     {%- endif %}>
+  {% if st == "running" %}
+    <span class="backfill-spinner" aria-hidden="true"></span>
+    <span>Backfilling{% if backfill.since and backfill.until %}
+      {{ backfill.since }} → {{ backfill.until }}{% endif %} —
+      this can take a minute. You can leave this page.</span>
+  {% elif st == "done" %}
+    <span>&check; Backfill complete.{% if backfill.message %}
+      {{ backfill.message }}{% endif %}</span>
+    {%- if poll %}
+    {# Delivered by the 2s poll — the backfill just finished.
+       Refresh the whole page so the coverage chart and the
+       headline pick up the new data. The page-load render omits
+       `poll`, so a page that opens on an already-done status
+       never triggers this — no reload loop. #}
+    <span class="backfill-spinner" aria-hidden="true"></span>
+    <span>Refreshing the page&hellip;</span>
+    <script>
+      setTimeout(function () { window.location.reload(); }, 1500);
+    </script>
+    {%- endif %}
+  {% else %}
+    <span>&cross; Backfill failed.{% if backfill.message %}
+      {{ backfill.message }}{% endif %}</span>
+  {% endif %}
+</div>
+{%- else -%}
+<div id="backfill-progress-row"></div>
+{%- endif -%}

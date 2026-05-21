@@ -888,14 +888,9 @@
     }
 
     /* ─────── Aging empty states ───────
-       Three flavors with different visual weight:
-       - --real      neutral. The answer is empty; no action.
-       - --outside-window
-                     warning-tinted. As-of is outside the workflow's
-                     start/stop; pick a different as-of.
-       - --stale     plum-tinted action card. Operator should run
-                     `flow materialise` to refresh; we name the
-                     exact command. */
+       - --real  neutral; the answer is genuinely empty.
+       - --gap   plum-tinted action card; the picked window has
+                 no data — links to the Data Source page. */
     .aging-empty {
       padding: 1.4rem 1.6rem;
       margin: 0.4rem 0;
@@ -1135,9 +1130,8 @@
       {% if contract.data_is_stale %}
         <p class="filter-stale-banner">
           Warehouse data ends <strong>{{ contract.data_max_date }}</strong>.
-          Pick a Period that overlaps it, or run
-          <code>flow materialise {{ contract.name }}</code> for newer data
-          (or wait for cron).
+          Pick a Period that overlaps it, or
+          <a href="/workflows/{{ contract.name }}/data-source">backfill newer data</a>.
         </p>
       {% endif %}
       {# The filter bar is a thin input layer: it emits a `period`

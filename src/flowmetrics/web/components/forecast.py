@@ -61,12 +61,22 @@ def _daily_throughput(
 ) -> list[int]:
     """Read the historical daily throughput as a list of integers.
 
-    One entry per calendar date from the earliest to latest
-    completion (inclusive of zero-count days, per the Vacanti
-    rule the throughput component pins). When `reference` is
-    supplied, the window is clamped to that inclusive range —
-    that's the operator's "MCS over a specific period" control
-    (the sample distribution the simulation draws from).
+    One entry per calendar date from the FIRST to the LAST
+    completion observed (inclusive of zero-count days in between,
+    per the Vacanti rule). When `reference` is supplied it scopes
+    WHICH completions count — the operator's "MCS over a specific
+    period" control — but it never extends the sample beyond the
+    observed span.
+
+    Crucially the walk is bounded by the observed completions, NOT
+    by `reference`. A reference window is routinely wider than the
+    data (its length is user-tunable and it is anchored to the
+    most recent data, so its start predates the first completion).
+    Padding the sample with zero days back to `reference.from_`
+    would feed the Monte Carlo NODATA days dressed up as "zero
+    throughput" — biasing every forecast pessimistically. Only the
+    span the warehouse provably observed (completions bracket it)
+    is safe to call zero on the quiet days.
     """
     where = ["contract_id = ?", "created_at IS NOT NULL", "completed_at IS NOT NULL"]
     params: list = [contract_name]
@@ -83,15 +93,11 @@ def _daily_throughput(
     if not rows:
         return []
     by_date = {d: int(n) for d, n in rows}
-    # When the reference window is explicit, walk THAT range so
-    # zero-count days inside the reference window are included
-    # (otherwise we'd implicitly trim leading/trailing zeros).
-    if reference is not None:
-        cur = reference.from_
-        last = reference.to
-    else:
-        cur = min(by_date)
-        last = max(by_date)
+    # Walk the observed completion span only. Interior zero days
+    # (real slow days between two completions) fall between min
+    # and max and stay in; phantom days outside the span do not.
+    cur = min(by_date)
+    last = max(by_date)
     out: list[int] = []
     while cur <= last:
         out.append(by_date.get(cur, 0))

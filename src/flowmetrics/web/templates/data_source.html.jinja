@@ -1,0 +1,127 @@
+{% extends "_base.html.jinja" %}
+
+{# The Data Source page is about the warehouse itself, not a
+   metric window — no Period filter bar. #}
+{% block filter_bar %}{% endblock %}
+
+{% block content %}
+  <style>
+    .ds-section { margin: 1.75rem 0; }
+    .ds-section h2 { margin-bottom: 0.2rem; }
+    .ds-coverage-chart { width: 100%; min-height: 11rem; }
+    .ds-backfill-form {
+      display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end;
+      margin-top: 0.5rem;
+    }
+    .ds-field {
+      display: flex; flex-direction: column; gap: 0.15rem;
+      font-size: 0.8125rem; color: var(--muted);
+    }
+    .ds-range {
+      font-size: 0.8125rem; color: var(--muted); padding-bottom: 0.3rem;
+    }
+    .ds-range strong { color: var(--fg); }
+    .backfill-progress {
+      margin-top: 0.75rem; padding: 0.5rem 0.75rem;
+      border-radius: 0.3rem; font-size: 0.875rem;
+      display: flex; gap: 0.6rem; align-items: center;
+    }
+    .backfill-progress--running,
+    .backfill-progress--failed {
+      background: var(--surface);
+      border-left: 0.25rem solid var(--p-500);
+    }
+    .backfill-progress--done {
+      background: var(--p-50);
+      border-left: 0.25rem solid var(--p-500);
+    }
+    .backfill-spinner {
+      flex: none; width: 0.85rem; height: 0.85rem;
+      border: 0.15rem solid var(--border);
+      border-top-color: var(--p-500); border-radius: 50%;
+      animation: ds-spin 0.8s linear infinite;
+    }
+    @keyframes ds-spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <div class="metric-strip">
+    <span class="metric-strip-label">Data Source</span>
+    <span class="metric-strip-headline">{{ coverage.headline }}</span>
+  </div>
+
+  <section class="ds-section">
+    <div id="ds-coverage" class="ds-coverage-chart"></div>
+    {% if coverage.days %}
+    <script>
+      (function () {
+        const spec = {{ coverage.vega_spec_json() | safe }};
+        vegaEmbed("#ds-coverage", window.applyTheme(spec), {
+          actions: false, renderer: "svg"
+        }).catch(function (err) {
+          document.getElementById("ds-coverage").innerText =
+            "Chart render failed: " + err;
+        });
+      })();
+    </script>
+    {% endif %}
+  </section>
+
+  <section class="ds-section">
+    <h2>Backfill</h2>
+    <p class="filter-hint">
+      Fetch a date range into the warehouse — runs in the background.
+    </p>
+    <form class="ds-backfill-form"
+          hx-post="/api/internal/backfill"
+          hx-target="#backfill-progress"
+          hx-swap="innerHTML">
+      <input type="hidden" name="workflow" value="{{ contract.name }}">
+      {# since / until are derived (read-only) from window + anchor. #}
+      <input type="hidden" name="since" id="ds-since">
+      <input type="hidden" name="until" id="ds-until">
+      <label class="ds-field">Window
+        <select id="ds-days" onchange="dsRecalc()">
+          <option value="1">1 day</option>
+          <option value="7">7 days</option>
+          <option value="30" selected>30 days</option>
+          <option value="60">60 days</option>
+          <option value="90">90 days</option>
+        </select>
+      </label>
+      <label class="ds-field">Up to &amp; including
+        <input type="date" id="ds-anchor"
+               max="{{ today }}" value="{{ today }}"
+               onchange="dsRecalc()">
+      </label>
+      <span class="ds-range" id="ds-range"></span>
+      <button type="submit" class="btn--primary">Backfill</button>
+    </form>
+    <div id="backfill-progress">
+      {% include "_partials/backfill_progress.html.jinja" %}
+    </div>
+  </section>
+
+  <a class="back-link"
+     href="{{ ('/workflows/' ~ contract.name ~ '/') | keep_filters }}">← Back to dashboard</a>
+
+  <script>
+    // The window length + anchor date resolve to an explicit
+    // [since, until] range — shown read-only and submitted as the
+    // hidden inputs. "N days up to and including the anchor."
+    function dsRecalc() {
+      var days = parseInt(document.getElementById("ds-days").value, 10);
+      var anchor = document.getElementById("ds-anchor").value;
+      if (!anchor) return;
+      var until = new Date(anchor + "T00:00:00Z");
+      var since = new Date(until);
+      since.setUTCDate(since.getUTCDate() - (days - 1));
+      var sinceStr = since.toISOString().slice(0, 10);
+      document.getElementById("ds-since").value = sinceStr;
+      document.getElementById("ds-until").value = anchor;
+      document.getElementById("ds-range").innerHTML =
+        "Will fetch <strong>" + sinceStr + "</strong> → " +
+        "<strong>" + anchor + "</strong>";
+    }
+    dsRecalc();
+  </script>
+{% endblock %}

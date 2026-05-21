@@ -10,7 +10,8 @@ by `parse_windows`); it does not re-decide dates. The model:
     and the NODATA state explains it.
   - The **reference period** is anchored to the most recent data
     (`data_max`), independent of the view.
-  - Aging's `asof` follows the view anchor.
+  - Aging's `asof` is pinned to the latest materialise (the
+    in-flight snapshot date), independent of the Period picker.
   - The completion-data coverage (`data_min_date` /
     `data_max_date`) is exposed so the filter-bar date input can
     be bounded to dates that actually have data.
@@ -155,11 +156,22 @@ class TestDataCoverage:
         assert date(2026, 5, 4) <= view.data_max_date <= date(2026, 5, 10)
 
 
-class TestAgingAsofFollowsAnchor:
-    def test_render_aging_asof_is_the_view_anchor(self, view_factory):
-        """Aging is "in-flight as of the anchor" — the date the
-        view window ends on."""
+class TestAgingPinnedToSnapshot:
+    def test_render_aging_asof_is_the_snapshot_not_the_anchor(
+        self, view_factory
+    ):
+        """Aging is a "right now" snapshot — its `asof` is pinned to
+        the latest materialise (the in-flight snapshot date), NOT
+        the Period anchor. A custom anchor in the past must not
+        move it."""
         view = view_factory(window_query(custom_ending="2026-05-06"))
         with view.warehouse() as con:
+            snapshot = con.execute(
+                "SELECT max(materialised_at) FROM work_items "
+                "WHERE contract_id = ?",
+                ["astral-uv-week"],
+            ).fetchone()[0]
             aging = view.render_aging(con)
-        assert aging.asof_iso == "2026-05-06"
+        assert aging.asof_iso == snapshot.date().isoformat()
+        # The Period anchor (2026-05-06) must NOT drive aging.
+        assert aging.asof_iso != "2026-05-06"

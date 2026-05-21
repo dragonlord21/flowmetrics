@@ -6,10 +6,9 @@ days (y-axis). Percentile lines drawn from completed-item cycle
 times serve as checkpoints — once an item ages past the
 commitment threshold (P85), it's likely to miss the forecast.
 
-The component takes an `asof` UTC date (defaulting to today) so
-historical views work: aging "as of last Friday" is a useful
-forensic question, and the fixture's bounded window only has
-in-flight items at intermediate as-of dates.
+The component takes a required `asof` UTC date. Aging is a "right
+now" metric: the caller pins `asof` to the in-flight snapshot date
+(the latest materialise), not a scrollable view anchor.
 """
 
 from __future__ import annotations
@@ -983,11 +982,12 @@ class TestEmptyReferenceWindow:
         assert "point" in _marks(spec)
 
 
-class TestCoverageGate:
-    """The view window the user picked vs the data the warehouse
-    holds. A view entirely outside the data → NODATA, never a
-    stale in-flight snapshot projected forward (the phantom
-    "318 in-flight as of <future>" bug)."""
+class TestPinnedToSnapshot:
+    """Aging is a "right now" metric: the caller pins `asof` to the
+    in-flight snapshot date. An ancient still-open item is reported
+    AT the snapshot date — never projected into some future range
+    the user scrolled to (the old phantom "318 in-flight as of
+    <future>" bug, fixed by removing the scrollable `view`)."""
 
     def _warehouse(self):
         from datetime import datetime as _dt
@@ -1010,7 +1010,7 @@ class TestCoverageGate:
         con.executemany(
             "INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?,?)",
             [
-                # An ancient still-open item — would project forward.
+                # An ancient still-open item — in flight at the snapshot.
                 ("c", "github", "#open", "ancient", None,
                  _dt(2024, 1, 1, 9, 0), None, None, _dt(2025, 1, 20)),
                 # A completed item — coverage is Jan 15, 2025 only.
@@ -1021,38 +1021,22 @@ class TestCoverageGate:
         )
         return con
 
-    def test_view_past_all_data_is_nodata_not_projected_items(self):
-        """An ancient still-open item must NOT be aged forward into
-        a view window past the data — a view entirely after the
-        data is NODATA."""
+    def test_old_open_item_is_in_flight_at_the_snapshot_date(self):
+        """`render` takes no `view` — the caller passes the snapshot
+        date as `asof` and the ancient open item is counted there."""
         data = render(
             self._warehouse(), "c",
-            asof=date(2026, 5, 16),
-            view=Window(from_=date(2026, 5, 10), to=date(2026, 5, 16)),
-        )
-        assert data.count == 0, (
-            "no item may be projected into a range with no data"
-        )
-        assert data.empty_state == "asof_after_coverage"
-        assert "No data available" in data.headline
-
-    def test_view_before_all_data_is_nodata(self):
-        """Symmetric — a view entirely before the data is NODATA."""
-        data = render(
-            self._warehouse(), "c",
-            asof=date(2020, 1, 7),
-            view=Window(from_=date(2020, 1, 1), to=date(2020, 1, 7)),
-        )
-        assert data.count == 0
-        assert data.empty_state == "asof_before_coverage"
-
-    def test_view_overlapping_data_still_renders(self):
-        """The gate only fires for a view ENTIRELY outside the
-        data — one that overlaps renders normally."""
-        data = render(
-            self._warehouse(), "c",
-            asof=date(2025, 1, 20),
-            view=Window(from_=date(2024, 12, 22), to=date(2025, 1, 20)),
+            asof=date(2025, 1, 20),  # the snapshot date
         )
         assert data.count == 1  # the ancient open item, in-flight
         assert data.empty_state is None
+
+    def test_render_rejects_a_view_argument(self):
+        """The scrollable `view` parameter is gone — aging no longer
+        follows the Period picker."""
+        with pytest.raises(TypeError):
+            render(
+                self._warehouse(), "c",
+                asof=date(2025, 1, 20),
+                view=Window(from_=date(2025, 1, 1), to=date(2025, 1, 20)),
+            )

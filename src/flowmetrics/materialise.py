@@ -25,8 +25,47 @@ import json
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+# A `.tmp` file from a Parquet/status write is short-lived — it
+# exists only for the few seconds of the `COPY`, then is renamed
+# into place. Anything older than this is debris from an
+# interrupted write and is safe to delete; a fresh `.tmp` from a
+# write in flight is always younger and is never touched.
+_STALE_TMP_AFTER = timedelta(minutes=30)
+
+
+def cleanup_tmp_files(
+    data_dir: Path,
+    *,
+    now: datetime,
+    older_than: timedelta = _STALE_TMP_AFTER,
+) -> int:
+    """Delete stale `.tmp` debris left by interrupted Parquet or
+    status writes, so the data directory stays clean (and
+    rsync-tidy). Returns the number deleted.
+
+    ONLY `.tmp` files are ever removed, and only those older than
+    `older_than` — `.parquet` snapshots and `.yaml` configs are
+    never touched, and a `.tmp` from a write in flight is spared.
+    """
+    deleted = 0
+    root = Path(data_dir)
+    if not root.exists():
+        return 0
+    for tmp in root.rglob("*.tmp"):
+        try:
+            mtime = datetime.fromtimestamp(tmp.stat().st_mtime, tz=UTC)
+        except OSError:
+            continue
+        if now - mtime >= older_than:
+            try:
+                tmp.unlink()
+                deleted += 1
+            except OSError:
+                pass
+    return deleted
 
 import duckdb
 
@@ -47,6 +86,88 @@ class RunManifest:
     items_fetched: int
 
 
+def _compact_one(
+    *, contract_dir: Path, stem: str, dedup_sql: str, now: datetime,
+) -> None:
+    """Collapse one table's snapshot files for a contract into a
+    single file. `dedup_sql` runs against a `src` view of all the
+    originals and must reproduce the read view's dedup exactly.
+
+    Crash-safe: write the compacted file (atomic .tmp + rename),
+    THEN delete the originals. A crash leaves either {originals}
+    or {originals + compacted} — both dedup to the same result.
+    """
+    if not contract_dir.exists():
+        return
+    originals = sorted(contract_dir.rglob(f"{stem}*.parquet"))
+    if len(originals) < 2:
+        return  # already a single file (or none) — nothing to merge
+    out_dir = (
+        contract_dir
+        / f"year={now.year}"
+        / f"month={now.month:02d}"
+        / f"day={now.day:02d}"
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{stem}-compacted-{uuid.uuid4().hex[:16]}.parquet"
+    tmp_path = out_path.parent / f"{out_path.name}.tmp"
+    file_list = ", ".join(
+        "'" + str(p).replace("'", "''") + "'" for p in originals
+    )
+    con = duckdb.connect()
+    try:
+        # No hive_partitioning: read the pure data columns so the
+        # compacted file's schema matches a normal snapshot —
+        # year/month/day stay path-only, never baked in as columns.
+        con.execute(
+            f"CREATE VIEW src AS SELECT * FROM read_parquet([{file_list}])"
+        )
+        out_literal = str(tmp_path).replace("'", "''")
+        con.execute(f"COPY ({dedup_sql}) TO '{out_literal}' (FORMAT PARQUET)")
+    finally:
+        con.close()
+    os.replace(tmp_path, out_path)
+    # Compacted file is safely in place — now drop the originals.
+    for p in originals:
+        try:
+            p.unlink()
+        except OSError:
+            pass
+
+
+def compact_contract(
+    data_dir: Path, contract_name: str, *, now: datetime,
+) -> None:
+    """Collapse a contract's accumulated snapshot files into one
+    file per table. Reads every snapshot, applies the read view's
+    dedup (latest per work item; DISTINCT for transitions), writes
+    a single file, then deletes the originals — never dropping a
+    work item, only the redundant older snapshots of it.
+    """
+    _compact_one(
+        contract_dir=(
+            data_dir / "work_items" / f"contract_id={contract_name}"
+        ),
+        stem="items",
+        dedup_sql=(
+            "SELECT * EXCLUDE (_rn) FROM ("
+            " SELECT *, ROW_NUMBER() OVER ("
+            "  PARTITION BY contract_id, source, item_id"
+            "  ORDER BY materialised_at DESC, run_id DESC) AS _rn"
+            " FROM src) WHERE _rn = 1"
+        ),
+        now=now,
+    )
+    _compact_one(
+        contract_dir=(
+            data_dir / "transitions" / f"contract_id={contract_name}"
+        ),
+        stem="transitions",
+        dedup_sql="SELECT DISTINCT * FROM src",
+        now=now,
+    )
+
+
 def materialise(
     *,
     contract: Contract,
@@ -59,6 +180,15 @@ def materialise(
     """
     started_at = datetime.now(UTC)
     run_id = uuid.uuid4().hex[:16]
+
+    # Sweep stale `.tmp` debris from any previously-interrupted
+    # write before this run starts. Never touches `.parquet` —
+    # the cumulative work-item history is upsert-only and sacred.
+    cleanup_tmp_files(data_dir, now=started_at)
+    # Collapse accumulated snapshots into one file per table
+    # before this run adds its own — keeps the warehouse to ~2
+    # files per table without ever dropping a work item.
+    compact_contract(data_dir, contract.name, now=started_at)
 
     if contract.source == "github":
         assert contract.repo  # validated at load_contract
@@ -116,12 +246,13 @@ def materialise(
 
     completed_at = datetime.now(UTC)
 
-    # Partition layout: contract_id/year/month/day. The date comes from
-    # the ETL run (materialised_at), so each cron tick lands in its own
-    # daily partition. Re-runs within the same calendar day overwrite
-    # that day's file (atomic via .tmp + rename); cron-once-a-day gives
-    # one Parquet per contract per day, so you can read history as a
-    # date glob if you ever need to.
+    # Partition layout: contract_id/year/month/day, dated by the
+    # ETL run (materialised_at). The FILENAME carries the run_id,
+    # so every run — daily cron OR a browser-triggered backfill —
+    # writes its own Parquet and never overwrites another. A
+    # narrow backfill therefore cannot clobber (or shrink) a
+    # broader same-day snapshot. The read view globs every file
+    # and dedups by materialised_at.
     year = completed_at.year
     month = completed_at.month
     day = completed_at.day
@@ -132,7 +263,7 @@ def materialise(
         / f"year={year}"
         / f"month={month:02d}"
         / f"day={day:02d}"
-        / "items.parquet"
+        / f"items-{run_id}.parquet"
     )
     transitions_path = (
         data_dir
@@ -141,7 +272,7 @@ def materialise(
         / f"year={year}"
         / f"month={month:02d}"
         / f"day={day:02d}"
-        / "transitions.parquet"
+        / f"transitions-{run_id}.parquet"
     )
     work_items_path.parent.mkdir(parents=True, exist_ok=True)
     transitions_path.parent.mkdir(parents=True, exist_ok=True)

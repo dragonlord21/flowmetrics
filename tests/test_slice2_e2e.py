@@ -36,7 +36,9 @@ import contextlib
 import socket
 import threading
 import time
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 import uvicorn
@@ -49,6 +51,79 @@ from flowmetrics.cli import cli
 pytestmark = pytest.mark.e2e
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
+
+
+def _materialise_aging_demo(
+    contracts_dir: Path, data_dir: Path, cache_dir: Path
+) -> None:
+    """Materialise a synthetic `aging-demo` contract whose warehouse
+    holds genuine in-flight items.
+
+    Aging WIP is pinned to the in-flight snapshot date. The
+    `astral-uv-week` fixture is all completed work, so its aging
+    chart is legitimately empty — it can't give browser evidence
+    that a *populated* aging chart renders. This contract can:
+    four open items (staggered ages) for the dot cloud, plus six
+    completed items as the cycle-time sample the P50/P85/P95
+    reference lines are drawn from.
+    """
+    from flowmetrics.compute import WorkItem
+    from flowmetrics.contract import Contract
+    from flowmetrics.materialise import materialise
+
+    name = "aging-demo"
+    (contracts_dir / f"{name}.yaml").write_text(
+        yaml.safe_dump({
+            "contract": {
+                "name": name, "source": "github", "repo": "x/y",
+                "start": "2026-01-01", "stop": "2026-12-31",
+            }
+        })
+    )
+    now = datetime.now(UTC)
+
+    def _item(item_id: str, *, created, completed):
+        return WorkItem(
+            item_id=item_id,
+            title=f"item {item_id}",
+            url=f"https://github.com/x/y/pull/{item_id.lstrip('#')}",
+            created_at=created,
+            completed_at=completed,
+        )
+
+    in_flight = [
+        _item("#101", created=now - timedelta(days=40), completed=None),
+        _item("#102", created=now - timedelta(days=25), completed=None),
+        _item("#103", created=now - timedelta(days=12), completed=None),
+        _item("#104", created=now - timedelta(days=3), completed=None),
+    ]
+    completed = []
+    for i, cycle in enumerate((1, 2, 3, 5, 8, 13), start=1):
+        started = now - timedelta(days=120 + i)
+        completed.append(
+            _item(
+                f"#{i}",
+                created=started,
+                completed=started + timedelta(days=cycle),
+            )
+        )
+
+    source = MagicMock()
+    source.fetch_completed_in_window.return_value = completed
+    source.fetch_in_flight.return_value = in_flight
+    with patch(
+        "flowmetrics.materialise.make_github_source",
+        return_value=source,
+    ):
+        materialise(
+            contract=Contract(
+                name=name, source="github", repo="x/y",
+                start=date(2026, 1, 1), stop=date(2026, 12, 31),
+            ),
+            data_dir=data_dir,
+            cache_dir=cache_dir,
+            offline=False,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +202,10 @@ def server_url(tmp_path_factory):
         catch_exceptions=False,
     )
     assert res.exit_code == 0, f"fixture materialise failed: {res.output}"
+
+    # A second contract with genuine in-flight items, so the aging
+    # chart has something to draw (see `_materialise_aging_demo`).
+    _materialise_aging_demo(contracts_dir, data_dir, tmp_path / "cache")
 
     app = create_app(data_dir=data_dir, contracts_dir=contracts_dir)
     port = _free_port()
@@ -902,13 +981,14 @@ class TestThroughputOnDashboard:
 class TestAgingOnDashboard:
     """Slice 3: aging is the third metric on the dashboard, sitting
     below throughput. Vacanti's Aging WIP — in-flight items at the
-    asof date, plotted by current state (x) and age in days (y),
+    snapshot date, plotted by current state (x) and age in days (y),
     with P50/P85/P95 reference lines from completed cycle times.
 
-    The fixture has zero in-flight items at today's asof (everything
-    in May 4–10 has long since completed by 2026-05-19+). Default
-    render is therefore the empty case; tests that need real points
-    pass `?asof=2026-05-06` to view aging mid-week.
+    Aging is pinned to the in-flight snapshot date (the latest
+    materialise) — it does not follow the Period picker. The
+    `astral-uv-week` fixture is all completed work, so its aging
+    chart is legitimately empty; tests that need a populated chart
+    point at the `aging-demo` contract (real in-flight items).
     """
 
     def test_dashboard_renders_aging_tile_with_zero_items_by_default(
@@ -934,19 +1014,18 @@ class TestAgingOnDashboard:
             f"got {text!r}"
         )
 
-    def test_aging_detail_with_historical_asof_renders_in_flight_dots(
+    def test_aging_detail_renders_in_flight_dots(
         self, server_url: str, page: Page
     ):
-        """`?asof=2026-05-06` makes items completed May 7–10 appear
-        as in-flight at that asof. The chart must draw at least one
-        point mark for them.
+        """The `aging-demo` contract has four genuine in-flight
+        items at the snapshot date. The chart must draw a point
+        mark for each.
 
         Vega-Lite renders point marks as `<path>` elements under a
         `g.role-mark.mark-symbol` group. Don't match unqualified
         `.mark-point`; it doesn't exist in v5's SVG output."""
         page.goto(
-            server_url
-            + "/workflows/astral-uv-week/metrics/aging?asof=2026-05-06"
+            server_url + "/workflows/aging-demo/metrics/aging"
         )
         page.wait_for_selector("#aging-tile svg", timeout=10000)
         page.wait_for_timeout(400)
@@ -956,8 +1035,8 @@ class TestAgingOnDashboard:
             ).length"""
         )
         assert n_points >= 1, (
-            f"at asof=2026-05-06 the fixture has ≥1 in-flight item; "
-            f"chart drew {n_points} point marks"
+            f"aging-demo has four in-flight items; chart drew "
+            f"{n_points} point marks"
         )
 
     def test_aging_detail_page_carries_metric_name_in_header(
@@ -978,8 +1057,7 @@ class TestAgingOnDashboard:
         anchoring text at the right edge of a layered nominal-x
         chart was unreliable across Vega-Lite versions."""
         page.goto(
-            server_url
-            + "/workflows/astral-uv-week/metrics/aging?asof=2026-05-06"
+            server_url + "/workflows/aging-demo/metrics/aging"
         )
         page.wait_for_selector("#aging-tile svg", timeout=10000)
         page.wait_for_timeout(500)
@@ -1021,11 +1099,11 @@ class TestAgingOnDashboard:
         self, server_url: str, page: Page
     ):
         """User-pinned distinction: empty answers should be action-
-        first. The dashboard's default Period ends today; the
-        fixture's data ends in early May, so aging-as-of-today is
-        past coverage — the empty state must name the gap (latest
-        data vs asof) AND offer a concrete way to fill it (button
-        + collapsed CLI fallback)."""
+        first. Aging pins its as-of to the snapshot date (the
+        latest materialise = today in this test); the fixture's
+        completion data ends in early May, so aging is past that
+        coverage — the empty state names the gap AND links to the
+        Data Source page for browser-based backfill (no CLI)."""
         page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#aging-tile", timeout=10000)
         empty = page.locator("#aging-tile .aging-empty")
@@ -1035,25 +1113,24 @@ class TestAgingOnDashboard:
         assert "Most recent data is from" in text, (
             f"empty message must name the latest data date; got {text!r}"
         )
-        # The primary action is a button that POSTs to the
-        # materialise endpoint, with the gap window encoded.
-        btn = page.locator("#aging-tile .aging-empty button.btn--primary")
-        expect(btn).to_be_visible()
-        hx_post = btn.get_attribute("hx-post")
-        assert hx_post and "/api/internal/materialise" in hx_post, (
-            f"button must hx-post to the materialise endpoint; got {hx_post!r}"
+        # No CLI command anywhere in the UI.
+        assert "flow materialise" not in text, (
+            f"empty state must not print a CLI command; got {text!r}"
         )
-        assert "since=" in hx_post and "until=" in hx_post, (
-            f"materialise URL must carry since + until; got {hx_post!r}"
+        # The action is a link to the Data Source page.
+        link = page.locator("#aging-tile .aging-empty a.btn--primary")
+        expect(link).to_be_visible()
+        href = link.get_attribute("href")
+        assert href and href.endswith("/data-source"), (
+            f"empty state must link to the Data Source page; got {href!r}"
         )
 
     def test_real_empty_state_says_warehouse_covers_this_date(
         self, server_url: str, page: Page
     ):
-        """Aging defaults its `asof` to the anchor — and the
-        dashboard anchors to the most recent data date. For the
-        fixture that date is covered by completed-work data but
-        has no open-work snapshot, so one of the empty-state
+        """Aging pins its `asof` to the in-flight snapshot date.
+        The `astral-uv-week` fixture is all completed work with no
+        open items at that date, so one of the empty-state
         messages must render.
 
         This e2e test just confirms the empty-state machinery
@@ -1082,12 +1159,15 @@ class TestAgingOnDashboard:
             )
         ), f"empty-state message must explain why; got {text!r}"
 
-    def test_aging_fragment_endpoint_supports_asof_param(
+    def test_aging_fragment_endpoint_returns_a_bare_fragment(
         self, server_url: str, page: Page
     ):
+        """The aging fragment endpoint returns just the chart
+        fragment — no Period param, no page chrome. `aging-demo`
+        has in-flight items, so the fragment carries the Vega
+        embed script."""
         response = page.request.get(
-            server_url
-            + "/api/internal/aging?workflow=astral-uv-week&asof=2026-05-06"
+            server_url + "/api/internal/aging?workflow=aging-demo"
         )
         assert response.status == 200
         html = response.text()

@@ -166,9 +166,8 @@ def render(
         total_completed = int(cov[0]) if cov and cov[0] else 0
         if total_completed == 0:
             headline = (
-                "No data materialised yet — run "
-                f"`flow materialise {contract_name}` to pull "
-                "completions from the source system."
+                "No data materialised yet — open the Data Source "
+                "page to fetch completions from the source system."
             )
         else:
             cov_from = to_utc_display_date(

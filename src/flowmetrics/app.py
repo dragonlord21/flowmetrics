@@ -18,20 +18,30 @@ stand up multiple isolated instances per the multi-instance design.
 from __future__ import annotations
 
 import secrets
+import subprocess
+import sys
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import duckdb
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
+from .backfill import (
+    display_status,
+    is_active,
+    read_status,
+    status_path,
+    write_status,
+)
 from .contract import ContractError, load_contract
 from .windows import DEFAULT_REFERENCE_DAYS, parse_windows
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
+from .web.components.data_source import render as render_data_source
 from .web.components.cycle_time import render as render_cycle_time
 from .web.components.forecast import (
     render_how_many as render_forecast_how_many,
@@ -56,11 +66,12 @@ def open_warehouse(data_dir: Path) -> duckdb.DuckDBPyConnection:
     `transitions` views registered against the Parquet warehouse
     under `data_dir`.
 
-    Each ETL run writes a fresh per-day snapshot
-    (`year={Y}/month={M}/day={D}/items.parquet`). Cross-day re-runs
-    accumulate snapshots, so the same item appears in N partitions
-    once N days have passed. The views deduplicate at read time so
-    every consumer sees one canonical row per
+    Each ETL run writes its OWN snapshot file —
+    `year={Y}/month={M}/day={D}/items-{run_id}.parquet` — so every
+    run (daily cron OR a browser-triggered backfill) is purely
+    additive and never overwrites another. Runs accumulate, so the
+    same item appears in N snapshots. The views deduplicate at read
+    time so every consumer sees one canonical row per
     `(contract_id, source, item_id)` — the LATEST snapshot —
     without losing the on-disk history (useful for future
     "what did aging look like at snapshot X" features).
@@ -290,15 +301,24 @@ class WorkflowView:
             states=self.contract.states,
         )
 
-    def render_aging(self, con, *, asof=None):
+    def render_aging(self, con):
+        # Aging WIP is a "right now" snapshot — pinned to the
+        # in-flight snapshot date (the latest materialise), NOT
+        # the Period anchor. The warehouse holds one in-flight
+        # snapshot, so aging can only be faithfully computed at
+        # that date.
+        snap = con.execute(
+            "SELECT max(materialised_at) FROM work_items "
+            "WHERE contract_id = ?",
+            [self.id],
+        ).fetchone()
+        snapshot_dt = snap[0] if snap else None
+        asof = (
+            snapshot_dt.date() if snapshot_dt is not None else self.today
+        )
         return render_aging(
             con, self.id,
-            # Aging is "in-flight as of the anchor" — the date the
-            # view window ends on. `?asof=` (the backfill flow)
-            # still overrides. `view` lets the component return
-            # NODATA when the picked window has no data behind it.
-            asof=asof or self.selection.anchor,
-            view=self.selection.view,
+            asof=asof,
             contract_start=self.contract.start,
             contract_stop=self.contract.stop,
             states=self.contract.states,
@@ -359,6 +379,7 @@ def create_app(
     contracts_dir: Path,
     cache_dir: Path | None = None,
     password: str | None = None,
+    offline: bool = False,
 ) -> FastAPI:
     """Build a FastAPI app reading from this data dir.
 
@@ -397,7 +418,7 @@ def create_app(
     from urllib.parse import parse_qsl, urlencode
 
     _CARRIED_PARAMS = frozenset({
-        "period", "anchor", "view_days", "ref_days", "asof",
+        "period", "anchor", "view_days", "ref_days",
     })
 
     @pass_context
@@ -462,9 +483,9 @@ def create_app(
             query=query,
         )
 
-    def _parse_asof(value: str | None):
-        """`?asof=YYYY-MM-DD` → `date(YYYY, MM, DD)`. `None` or
-        invalid → `None` (the component defaults to today UTC).
+    def _parse_iso_date(value: str | None):
+        """`YYYY-MM-DD` query param → `date`. `None` or invalid →
+        `None` (the caller supplies its own default).
         Defensive: don't 400 on a bad query param, just fall back."""
         if not value:
             return None
@@ -486,7 +507,7 @@ def create_app(
             detail=(
                 f"contract {name!r} not found under {contracts_dir}/ "
                 "(looked for .yaml and .yml). Create a YAML file there "
-                "and run `flow materialise`."
+                "first."
             ),
         )
 
@@ -575,6 +596,132 @@ def create_app(
                 "data": cfd,
                 "chart_height": 320,
                 "contract": view.template_context(),
+            },
+        )
+
+    # ---- Data Source page: coverage + browser-driven backfill ----
+
+    @app.get(
+        "/workflows/{workflow_id}/data-source",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def data_source_detail(
+        request: Request, workflow_id: str,
+    ) -> HTMLResponse:
+        """Per-workflow Data Source page: a completion-coverage
+        timeline plus a browser-driven backfill the operator runs
+        without ever touching the `flow materialise` CLI."""
+        view = _open_view(workflow_id, request)
+        with view.warehouse() as con:
+            coverage = render_data_source(con, workflow_id)
+        return templates.TemplateResponse(
+            request,
+            "data_source.html.jinja",
+            {
+                "title": f"Data Source — {workflow_id}",
+                "metric_name": "Data Source",
+                "contract": view.template_context(),
+                "available_contracts": _available_contracts(),
+                "view": {"since": None, "until": None},
+                "workflow": workflow_id,
+                "coverage": coverage,
+                "backfill": display_status(
+                    read_status(status_path(data_dir, workflow_id)),
+                    datetime.now(UTC),
+                ),
+                "today": view.today.isoformat(),
+            },
+        )
+
+    @app.post(
+        "/api/internal/backfill",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def backfill_start(
+        request: Request,
+        workflow: str = Form(...),
+        since: str = Form(...),
+        until: str = Form(...),
+    ) -> HTMLResponse:
+        """Kick off a backfill: spawn a detached `flow materialise`
+        subprocess that writes a JSON status file the page polls.
+        The status file is the lock — one backfill per workflow."""
+        _ensure_contract_exists(workflow)
+        spath = status_path(data_dir, workflow)
+
+        def _fragment(status: dict | None) -> HTMLResponse:
+            return templates.TemplateResponse(
+                request,
+                "_partials/backfill_progress.html.jinja",
+                {"backfill": status, "workflow": workflow},
+            )
+
+        existing = read_status(spath)
+        if is_active(existing, datetime.now(UTC)):
+            # A backfill is genuinely in flight — don't double-spawn.
+            # (A stale "running" record from a crashed run is not
+            # active, so it never wedges the workflow.)
+            return _fragment(existing)
+        try:
+            date.fromisoformat(since)
+            date.fromisoformat(until)
+        except ValueError:
+            return _fragment({
+                "workflow": workflow, "since": since, "until": until,
+                "status": "failed", "message": "Invalid date range.",
+            })
+        # Mark running now — closes the race where the page polls
+        # before the subprocess writes its own first record.
+        write_status(spath, {
+            "workflow": workflow, "since": since, "until": until,
+            "status": "running",
+            "started_at": datetime.now(UTC).isoformat(),
+            "finished_at": None, "message": "",
+        })
+        cmd = [
+            sys.executable, "-m", "flowmetrics", "materialise", workflow,
+            "--data-dir", str(data_dir),
+            "--contracts-dir", str(contracts_dir),
+            "--cache-dir", str(cache_dir),
+            "--since", since, "--until", until,
+            "--status-file", str(spath),
+        ]
+        if offline:
+            cmd.append("--offline")
+        # Detached: survives this request worker.
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return _fragment(read_status(spath))
+
+    @app.get(
+        "/api/internal/backfill-status",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def backfill_status(
+        request: Request, workflow: str,
+    ) -> HTMLResponse:
+        """Polled by the progress fragment while a backfill runs."""
+        return templates.TemplateResponse(
+            request,
+            "_partials/backfill_progress.html.jinja",
+            {
+                "backfill": display_status(
+                    read_status(status_path(data_dir, workflow)),
+                    datetime.now(UTC),
+                ),
+                "workflow": workflow,
+                # Poll-delivered: a `done` fragment from here means
+                # the backfill just finished, so the fragment
+                # refreshes the page. The page-load + POST renders
+                # omit this, so they never trigger a reload loop.
+                "poll": True,
             },
         )
 
@@ -772,12 +919,10 @@ def create_app(
     def aging_detail(
         request: Request,
         workflow_id: str,
-        asof: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
-        asof_date = _parse_asof(asof)
         with view.warehouse() as con:
-            aging = view.render_aging(con, asof=asof_date)
+            aging = view.render_aging(con)
             # Table scope mirrors the chart: in-flight items only,
             # at the same asof. Completed items aren't part of
             # aging-WIP and don't belong here. Sort by start date
@@ -867,7 +1012,7 @@ def create_app(
         start: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        start_date = _parse_asof(start) or view.today
+        start_date = _parse_iso_date(start) or view.today
         try:
             items_int = max(1, int(items))
         except (TypeError, ValueError):
@@ -898,7 +1043,7 @@ def create_app(
         start: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        start_date = _parse_asof(start) or view.today
+        start_date = _parse_iso_date(start) or view.today
         try:
             days_int = max(1, int(days))
         except (TypeError, ValueError):
@@ -921,98 +1066,17 @@ def create_app(
             },
         )
 
-    @app.post(
-        "/api/internal/materialise",
-        response_class=HTMLResponse,
-        dependencies=auth_dep,
-    )
-    def materialise_action(
-        request: Request,
-        workflow: str,
-        since: str | None = None,
-        until: str | None = None,
-        asof: str | None = None,
-    ) -> HTMLResponse:
-        """Trigger `flow materialise` from the UI (the button on
-        the aging empty-state) and return the refreshed aging chart
-        fragment so HTMX can swap it in place.
-
-        Synchronous: runs the materialise inline, holds the request
-        until done. Fine for small contracts (seconds). A future
-        async + job-polling version can replace this without
-        changing the UI contract (button POSTs → fragment returns).
-        """
-        import dataclasses
-
-        from .materialise import materialise as run_materialise
-
-        view = _open_view(workflow, request)
-        contract_obj = view.contract
-
-        since_date = _parse_asof(since)
-        until_date = _parse_asof(until)
-        overrides: dict = {}
-        if since_date is not None:
-            overrides["start"] = since_date
-        if until_date is not None:
-            overrides["stop"] = until_date
-        if overrides:
-            contract_obj = dataclasses.replace(contract_obj, **overrides)
-
-        try:
-            run_materialise(
-                contract=contract_obj,
-                data_dir=data_dir,
-                cache_dir=cache_dir,
-                offline=False,  # button → hit the source, fetch new
-            )
-        except Exception as exc:  # noqa: BLE001 — surface anything
-            # Re-render the empty state with the error message so
-            # the operator sees what went wrong without leaving the
-            # page. Wraps the original aging payload (which still
-            # has its coverage/asof info) in an "import failed"
-            # banner.
-            asof_date = _parse_asof(asof)
-            with view.warehouse() as con:
-                aging = view.render_aging(con, asof=asof_date)
-            return templates.TemplateResponse(
-                request,
-                "_partials/aging_chart_fragment.html.jinja",
-                {
-                    "data": aging,
-                    "chart_height": 320,
-                    "contract": view.template_context(),
-                    "materialise_error": str(exc),
-                },
-            )
-
-        # Success: re-render the aging fragment against the fresh
-        # warehouse. HTMX swaps it in place.
-        asof_date = _parse_asof(asof)
-        with view.warehouse() as con:
-            aging = view.render_aging(con, asof=asof_date)
-        return templates.TemplateResponse(
-            request,
-            "_partials/aging_chart_fragment.html.jinja",
-            {
-                "data": aging,
-                "chart_height": 320,
-                "contract": view.template_context(),
-            },
-        )
-
     @app.get(
         "/api/internal/aging",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
     def aging_fragment(
-        request: Request, workflow: str, asof: str | None = None
+        request: Request, workflow: str
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        asof_date = _parse_asof(asof)
         with view.warehouse() as con:
-            aging = view.render_aging(con, asof=asof_date)
+            aging = view.render_aging(con)
         return templates.TemplateResponse(
             request,
             "_partials/aging_chart_fragment.html.jinja",

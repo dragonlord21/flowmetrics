@@ -6,10 +6,11 @@ days (y-axis). Percentile lines from completed-item cycle times serve
 as commitment thresholds — an item aging past P85 is likely to miss
 the forecast.
 
-The component takes an `asof` UTC date parameter (default = today) so
-historical aging views work. The fixture for this codebase has all
-items completed within a bounded window, so the default render is
-empty against it — pass `asof=2026-05-06` for a non-empty demo.
+Aging WIP is a "right now" metric — current open work, aged. The
+caller pins the required `asof` UTC date to the in-flight snapshot
+date (the latest materialise), NOT a scrollable view anchor: the
+warehouse holds one in-flight snapshot, so aging can only be
+faithfully computed at that date.
 """
 
 from __future__ import annotations
@@ -381,7 +382,6 @@ def render(
     contract_name: str,
     *,
     asof: date,
-    view: Window | None = None,
     contract_start: date | None = None,
     contract_stop: date | None = None,
     states: WorkflowStates | None = None,
@@ -389,15 +389,13 @@ def render(
 ) -> AgingData:
     """Compute the aging-WIP payload for `contract_name` at `asof`.
 
-    `asof` is required — the caller (the one window model) supplies
-    it; the component never invents a date. Items are in-flight if:
+    Aging WIP is a "right now" metric — current open work, aged.
+    The caller pins `asof` to the in-flight snapshot date (the
+    latest materialise), NOT a scrollable view anchor: the
+    warehouse holds one in-flight snapshot, so aging can only be
+    faithfully computed at that date. Items are in-flight if:
       - created_at.date() ≤ asof
       - completed_at is null, OR completed_at.date() > asof
-
-    `view` is the picked view window. When it sits entirely
-    outside the warehouse's data, `render` returns NODATA rather
-    than projecting a stale in-flight snapshot forward into a
-    range with no data behind it.
 
     Current state is the latest transition with entered_at ≤ asof.
     Items with no transitions yet at asof are tagged `"Unknown"`.
@@ -462,38 +460,6 @@ def render(
         latest_display=cov_latest_display,
         last_materialised_iso=warehouse_last_materialised_iso,
     )
-
-    # Coverage gate: when the picked view window sits entirely
-    # outside the data the warehouse holds, there is nothing to
-    # render — return NODATA. Never project a stale in-flight
-    # snapshot forward into a range with no data (the phantom
-    # "318 in-flight as of <future>" bug).
-    if view is not None and latest_data_date is not None and (
-        view.from_ > latest_data_date or view.to < earliest_data_date
-    ):
-        return AgingData(
-            items=(),
-            count=0,
-            asof_iso=asof.isoformat(),
-            asof_display=asof_display,
-            headline=(
-                f"No data available for {_both(view.from_)[1]} "
-                f"– {asof_display}"
-            ),
-            empty_state=(
-                "asof_after_coverage"
-                if view.from_ > latest_data_date
-                else "asof_before_coverage"
-            ),
-            percentiles=PercentileProvenance(
-                p50=0.0, p85=0.0, p95=0.0, source_count=0,
-                source_window_earliest_iso=None,
-                source_window_latest_iso=None,
-                source_window_display="no completed items yet",
-                smell=False, smell_text="",
-            ),
-            coverage=coverage,
-        )
 
     # ONE bulk query for in-flight items + their current_state
     # (latest transition at or before asof). The earlier shape

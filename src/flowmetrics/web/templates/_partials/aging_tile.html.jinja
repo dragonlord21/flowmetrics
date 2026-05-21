@@ -6,7 +6,6 @@
 {%- set chart_container_id = "aging-chart" -%}
 {%- set chart_height = 480 if mode == 'detail' else 320 -%}
 {%- set _aging_reset = '/api/internal/aging?workflow=' ~ contract.name -%}
-{%- if data.asof_iso %}{% set _aging_reset = _aging_reset ~ '&asof=' ~ data.asof_iso %}{% endif -%}
 
 <section id="aging-tile" class="metric">
   <header class="metric-header">
