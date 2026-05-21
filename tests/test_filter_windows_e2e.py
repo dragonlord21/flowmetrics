@@ -191,6 +191,30 @@ class TestFilterBarWindows:
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
         assert "7 days" in page.locator("body").inner_text()
 
+    def test_empty_controls_are_omitted_from_the_url(
+        self, server_url: str, page: Page
+    ):
+        """Submitting the filter form must NOT emit empty
+        `name=` params. The advanced From/To inputs are blank
+        in common mode — they used to land in the URL as
+        `view_from=&view_to=&…` noise. flowmetricsSubmitFilters
+        disables empty controls before submission so they're
+        excluded."""
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd")
+        page.wait_for_selector("select[name='view_days']")
+        page.select_option("select[name='view_days']", "14")
+        page.wait_for_url("**view_days=14**")
+        url = page.evaluate("() => location.href")
+        # The advanced from/to inputs are empty in common mode;
+        # none of them should appear in the URL.
+        for empty_param in (
+            "view_from=", "view_to=", "ref_from=", "ref_to=",
+        ):
+            assert empty_param not in url, (
+                f"empty param {empty_param!r} leaked into the URL: "
+                f"{url}"
+            )
+
     def test_reset_link_clears_query_params(
         self, server_url: str, page: Page
     ):

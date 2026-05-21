@@ -145,25 +145,22 @@
       color: var(--muted);
       text-decoration: none;
     }
+    /* Workflow name in the breadcrumb — plain text in the
+       tertiary hue, regular body font. No code-stamp styling
+       (the mono font + surface chip read as a literal/code
+       token, which the workflow name isn't). */
     header.site-header .stamp {
-      font-family: var(--mono-font);
-      font-size: 0.75rem;
-      color: var(--muted);
-      background: var(--surface);
-      padding: 0.1875rem 0.4375rem;
-      border-radius: 0.25rem;
+      font-size: 0.9375rem;
+      color: var(--t-700);
       text-decoration: none;
     }
-    /* `a.stamp` is a clickable breadcrumb back to the workflow's
-       dashboard — make it visibly tappable. */
     header.site-header a.stamp:hover {
-      color: var(--fg);
-      background: var(--border);
+      text-decoration: underline;
     }
-    /* The current page's chip — looks the same but isn't a link. */
+    /* The current page's breadcrumb segment — same tertiary
+       hue, not a link. */
     header.site-header .stamp--current {
-      color: var(--fg);
-      background: var(--border);
+      color: var(--t-700);
     }
     header.site-header .header-sep {
       color: var(--border);
@@ -1128,8 +1125,11 @@
         {# Common case: preset + anchor + durations. View
            and reference share an anchor; durations decide
            how far back each window reaches. #}
+        {# Preset select is a client-side trigger only — no
+           `name`, so it never submits. The server recomputes
+           `active_preset` from the anchor + durations. #}
         <label class="filter-compact">Quick range
-          <select name="preset" onchange="flowmetricsApplyPreset(this.form, this.value)">
+          <select onchange="flowmetricsApplyPreset(this.form, this.value)">
             {%- set ap = contract.active_preset -%}
             <option value=""{% if not ap %} selected{% endif %}>Custom…</option>
             <option value="last-7-days"{% if ap == "last-7-days" %} selected{% endif %}>Last 7 days</option>
@@ -1142,17 +1142,17 @@
         </label>
         <label class="filter-compact">Anchor
           <input type="date" name="anchor" value="{{ contract.anchor }}"
-                 onchange="this.form.submit()">
+                 onchange="flowmetricsSubmitFilters(this.form)">
         </label>
         <label class="filter-compact">View
-          <select name="view_days" onchange="this.form.submit()">
+          <select name="view_days" onchange="flowmetricsSubmitFilters(this.form)">
             {% for d in [7, 14, 30, 60, 90, 180] %}
               <option value="{{ d }}"{% if d == contract.view_days %} selected{% endif %}>{{ d }} days</option>
             {% endfor %}
           </select>
         </label>
         <label class="filter-compact">Reference
-          <select name="ref_days" onchange="this.form.submit()">
+          <select name="ref_days" onchange="flowmetricsSubmitFilters(this.form)">
             {% for d in [7, 14, 30, 60, 90] %}
               <option value="{{ d }}"{% if d == contract.ref_days %} selected{% endif %}>{{ d }} days</option>
             {% endfor %}
@@ -1169,20 +1169,32 @@
           </p>
           <fieldset class="filter-window">
             <legend>View window</legend>
-            <label>From <input type="date" name="view_from" value="{% if contract.is_advanced_window %}{{ contract.view_from }}{% endif %}" onchange="this.form.submit()"></label>
-            <label>To <input type="date" name="view_to" value="{% if contract.is_advanced_window %}{{ contract.view_to }}{% endif %}" onchange="this.form.submit()"></label>
+            <label>From <input type="date" name="view_from" value="{% if contract.is_advanced_window %}{{ contract.view_from }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
+            <label>To <input type="date" name="view_to" value="{% if contract.is_advanced_window %}{{ contract.view_to }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
           </fieldset>
           <fieldset class="filter-window">
             <legend>Reference period</legend>
-            <label>From <input type="date" name="ref_from" value="{% if contract.is_advanced_window %}{{ contract.ref_from }}{% endif %}" onchange="this.form.submit()"></label>
-            <label>To <input type="date" name="ref_to" value="{% if contract.is_advanced_window %}{{ contract.ref_to }}{% endif %}" onchange="this.form.submit()"></label>
+            <label>From <input type="date" name="ref_from" value="{% if contract.is_advanced_window %}{{ contract.ref_from }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
+            <label>To <input type="date" name="ref_to" value="{% if contract.is_advanced_window %}{{ contract.ref_to }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
           </fieldset>
         </details>
       </form>
       <script>
+        // Submit the filter form, dropping empty-valued controls
+        // so the URL carries no `name=` noise. A disabled control
+        // isn't included in a GET submission — disabling the
+        // empties just before submit is the simplest way to omit
+        // them. (`form.submit()` skips the submit event, so this
+        // can't be a submit-event handler.)
+        function flowmetricsSubmitFilters(form) {
+          for (const el of form.elements) {
+            if (el.name && el.value === "") el.disabled = true;
+          }
+          form.submit();
+        }
         // Preset → set anchor + view_days + ref_days and clear
-        // the advanced from/to inputs, then submit. Submission
-        // strips empty advanced fields so the URL stays clean.
+        // the advanced from/to inputs, then submit. Cleared
+        // (empty) fields are dropped by flowmetricsSubmitFilters.
         function flowmetricsApplyPreset(form, preset) {
           if (!preset) return; // "Custom…" — just leave the form
           const today = new Date();
@@ -1209,7 +1221,7 @@
           for (const name of ["view_from", "view_to", "ref_from", "ref_to"]) {
             if (form.elements[name]) form.elements[name].value = "";
           }
-          form.submit();
+          flowmetricsSubmitFilters(form);
         }
       </script>
     </div>
