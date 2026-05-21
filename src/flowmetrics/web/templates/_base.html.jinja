@@ -136,7 +136,7 @@
          commitment line) are unambiguous. */
       font-family: var(--head-font);
       font-weight: 600;
-      font-size: 1.25rem;
+      font-size: 1.625rem;
       letter-spacing: -0.01em;
       color: var(--fg);
       text-decoration: none;
@@ -150,7 +150,7 @@
        (the mono font + surface chip read as a literal/code
        token, which the workflow name isn't). */
     header.site-header .stamp {
-      font-size: 0.9375rem;
+      font-size: 1.375rem;
       color: var(--t-700);
       text-decoration: none;
     }
@@ -164,13 +164,13 @@
     }
     header.site-header .header-sep {
       color: var(--border);
-      font-size: 0.875rem;
+      font-size: 1.25rem;
       user-select: none;
     }
     header.site-header .header-metric-name {
       font-family: var(--head-font);
       font-weight: 600;
-      font-size: 1.0625rem;
+      font-size: 1.4375rem;
       letter-spacing: -0.005em;
       color: var(--fg);
     }
@@ -1088,7 +1088,7 @@
     <div class="container">
       <a class="brand" href="/">flowmetrics</a>
       {% if contract %}
-        <span class="header-sep" aria-hidden="true">·</span>
+        <span class="header-sep" aria-hidden="true">›</span>
         {# Workflow label is a link to the workflow's dashboard,
            UNLESS we're already on that page (in which case it
            reads as the current breadcrumb). The `label` field
@@ -1101,7 +1101,7 @@
         {% endif %}
       {% endif %}
       {% if metric_name %}
-        <span class="header-sep" aria-hidden="true">·</span>
+        <span class="header-sep" aria-hidden="true">›</span>
         <span class="header-metric-name">{{ metric_name }}</span>
       {% endif %}
     </div>
