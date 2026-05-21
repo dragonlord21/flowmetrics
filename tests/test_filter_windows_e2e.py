@@ -1,14 +1,17 @@
-"""E2E: filter-bar view + reference windows propagate through
-the URL to every chart that consumes them.
+"""E2E: the Period filter bar.
 
-Pins:
-  - Defaults (no query params): 30-day view, 14-day reference
-    both anchored to today UTC. Pre-filled in the filter-bar
-    inputs.
-  - URL overrides (?view_from=...&view_to=...&ref_from=...&ref_to=...)
-    re-render the charts with the new windows and keep the
-    inputs in sync.
-  - Reset link clears all window params from the URL.
+The filter bar is a thin input layer — it emits a `period`
+choice (a preset, or Custom = anchor + view_days) and nothing
+else; `parse_windows` server-side turns it into the windows
+every view reads. Pins:
+
+  - The default Period is "Last 30 days".
+  - Picking a preset submits `?period=<name>`.
+  - "Custom" reveals Period Ending + View; the date input is
+    bounded to the data coverage (no picking a date with no
+    data behind it).
+  - A custom period drives the chart window.
+  - Reset clears the query.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ import contextlib
 import socket
 import threading
 import time
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -105,128 +108,103 @@ def server_url(tmp_path_factory):
     thread.join(timeout=3)
 
 
-class TestFilterBarWindows:
-    def test_inputs_default_to_30_day_view_and_14_day_reference(
+class TestPeriodFilterBar:
+    def test_default_period_is_last_30_days(
         self, server_url: str, page: Page
     ):
-        """No query params → common-mode controls populate with
-        defaults: anchor=data-max, view_days=30, ref_days=14.
-        Data-max anchor (rather than today) means defaults
-        produce non-empty charts when the contract's data is
-        from months ago."""
-        from datetime import date as _date
+        """No query params → the Period dropdown selects "Last 30
+        days" and the Custom fields stay hidden."""
         page.goto(server_url + "/workflows/astral-uv-week")
-        page.wait_for_selector("input[name='anchor']")
-
-        def _val(name: str) -> str:
-            return page.evaluate(
-                f"() => document.querySelector(\"[name='{name}']\").value"
-            )
-        anchor = _date.fromisoformat(_val("anchor"))
-        view_days = int(_val("view_days"))
-        ref_days = int(_val("ref_days"))
-
-        assert view_days == 30
-        assert ref_days == 14
-        # Anchor should be inside the fixture's window (May 4-10, 2026).
-        assert _date(2026, 5, 4) <= anchor <= _date(2026, 5, 10), (
-            f"default anchor should be the data-max completion "
-            f"date (within May 4-10, 2026 for the fixture); "
-            f"got {anchor}"
+        page.wait_for_selector("select[name='period']")
+        period = page.evaluate(
+            "() => document.querySelector(\"select[name='period']\").value"
         )
+        assert period == "last-30-days"
+        # The Period Ending field is Custom-only.
+        expect(page.locator("input[name='anchor']")).to_be_hidden()
 
-    def test_url_params_override_defaults_in_inputs(
+    def test_selecting_a_preset_submits_period(
         self, server_url: str, page: Page
     ):
-        """URL params land in the input values verbatim."""
-        page.goto(
-            server_url + "/workflows/astral-uv-week"
-            "?view_from=2026-05-04&view_to=2026-05-10"
-            "&ref_from=2026-05-04&ref_to=2026-05-07"
-        )
-        page.wait_for_selector("input[name='view_from']")
+        """Picking a preset auto-submits, emitting just
+        `?period=<name>` — no anchor/view_days noise."""
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd")
+        page.wait_for_selector("select[name='period']")
+        page.select_option("select[name='period']", "last-7-days")
+        page.wait_for_url("**period=last-7-days**")
+        url = page.evaluate("() => location.href")
+        assert "anchor=" not in url, f"preset URL should be clean: {url}"
+        assert "view_days=" not in url, f"preset URL should be clean: {url}"
 
-        def _val(name: str) -> str:
-            return page.evaluate(
-                f"() => document.querySelector(\"input[name='{name}']\").value"
-            )
-        assert _val("view_from") == "2026-05-04"
-        assert _val("view_to") == "2026-05-10"
-        assert _val("ref_from") == "2026-05-04"
-        assert _val("ref_to") == "2026-05-07"
-
-    def test_view_window_propagates_to_cfd_axis(
+    def test_custom_reveals_period_ending_and_view(
         self, server_url: str, page: Page
     ):
-        """View window's `to` shows up in the CFD headline (the
-        '… days (DATE – DATE)' range). Pins that the URL → render
-        → chart pipeline actually uses the supplied window."""
+        """Choosing "Custom…" reveals the Period Ending date
+        field and the View dropdown without submitting."""
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd")
+        page.wait_for_selector("select[name='period']")
+        expect(page.locator("input[name='anchor']")).to_be_hidden()
+        page.select_option("select[name='period']", "custom")
+        expect(page.locator("input[name='anchor']")).to_be_visible()
+        expect(page.locator("select[name='view_days']")).to_be_visible()
+
+    def test_custom_period_drives_the_cfd_window(
+        self, server_url: str, page: Page
+    ):
+        """A custom Period Ending + View resolves to that exact
+        window in the CFD headline."""
         page.goto(
             server_url + "/workflows/astral-uv-week/metrics/cfd"
-            "?view_from=2026-05-04&view_to=2026-05-10"
+            "?period=custom&anchor=2026-05-10&view_days=7"
         )
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
-        body_text = page.locator("body").inner_text()
-        assert "7 days" in body_text, (
-            "CFD headline should report a 7-day window (May 4 – May 10 "
-            f"inclusive); page text excerpt: {body_text[:1500]}"
+        body = page.locator("body").inner_text()
+        assert "7 days" in body, (
+            f"CFD headline should report a 7-day window; got "
+            f"{body[:1500]!r}"
         )
-        assert "May 4, 2026" in body_text or "May 04, 2026" in body_text
-        assert "May 10, 2026" in body_text
+        assert "May 10, 2026" in body
 
-    def test_changing_a_control_auto_submits(
+    def test_period_ending_is_bounded_to_the_data_coverage(
         self, server_url: str, page: Page
     ):
-        """Filter controls auto-submit on change (Apply button
-        was removed — change-driven submission matches how
-        operators actually use the filter bar). One change at
-        a time so we don't race two navigations."""
-        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd")
-        page.wait_for_selector("select[name='view_days']")
-        # Default anchor for the fixture is data-max (~May 10);
-        # setting view_days=7 → 7-day CFD window ending at the
-        # anchor.
-        page.select_option("select[name='view_days']", "7")
-        page.wait_for_url("**view_days=7**")
-        page.wait_for_selector("#cfd-chart svg", timeout=15000)
-        assert "7 days" in page.locator("body").inner_text()
+        """The Period Ending date input carries min/max bounding
+        it to the dates that actually have data — you can't pick a
+        period with no data behind it."""
+        page.goto(server_url + "/workflows/astral-uv-week?period=custom")
+        page.wait_for_selector("input[name='anchor']")
+        lo = page.get_attribute("input[name='anchor']", "min")
+        hi = page.get_attribute("input[name='anchor']", "max")
+        assert lo and hi, f"date input must be bounded; min={lo} max={hi}"
+        # The fixture's data sits inside May 4-10, 2026.
+        assert date(2026, 5, 4) <= date.fromisoformat(lo) <= date(2026, 5, 10)
+        assert date(2026, 5, 4) <= date.fromisoformat(hi) <= date(2026, 5, 10)
 
-    def test_empty_controls_are_omitted_from_the_url(
+    def test_aging_asof_follows_the_period_ending(
         self, server_url: str, page: Page
     ):
-        """Submitting the filter form must NOT emit empty
-        `name=` params. The advanced From/To inputs are blank
-        in common mode — they used to land in the URL as
-        `view_from=&view_to=&…` noise. flowmetricsSubmitFilters
-        disables empty controls before submission so they're
-        excluded."""
-        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd")
-        page.wait_for_selector("select[name='view_days']")
-        page.select_option("select[name='view_days']", "14")
-        page.wait_for_url("**view_days=14**")
-        url = page.evaluate("() => location.href")
-        # The advanced from/to inputs are empty in common mode;
-        # none of them should appear in the URL.
-        for empty_param in (
-            "view_from=", "view_to=", "ref_from=", "ref_to=",
-        ):
-            assert empty_param not in url, (
-                f"empty param {empty_param!r} leaked into the URL: "
-                f"{url}"
-            )
+        """Aging's "as of" date in the headline matches the
+        custom Period Ending — not today."""
+        page.goto(
+            server_url + "/workflows/astral-uv-week/metrics/aging"
+            "?period=custom&anchor=2026-05-06&view_days=30"
+        )
+        page.wait_for_selector(".metric-strip-headline")
+        headline = page.locator(".metric-strip-headline").inner_text()
+        assert "May 06, 2026" in headline, (
+            f"aging headline must name the Period Ending date; "
+            f"got {headline!r}"
+        )
 
-    def test_reset_link_clears_query_params(
-        self, server_url: str, page: Page
-    ):
-        """The 'Reset to defaults' link drops all query params."""
+    def test_reset_clears_the_query(self, server_url: str, page: Page):
+        """The Reset link drops all filter params."""
         page.goto(
             server_url + "/workflows/astral-uv-week"
-            "?view_from=2026-05-04&view_to=2026-05-10"
+            "?period=custom&anchor=2026-05-08&view_days=7"
         )
         page.wait_for_selector("a.filter-reset")
         page.locator("a.filter-reset").click()
         page.wait_for_url("**/workflows/astral-uv-week")
-        # No query string in the URL.
         url = page.evaluate("() => location.href")
-        assert "view_from" not in url
-        assert "ref_from" not in url
+        assert "period=" not in url
+        assert "anchor=" not in url

@@ -27,6 +27,7 @@ from click.testing import CliRunner
 
 from flowmetrics.cli import cli
 from flowmetrics.web.components.aging import render
+from flowmetrics.windows import Window
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
@@ -208,17 +209,12 @@ class TestAgingShape:
             f"{item.current_state!r} expected {expected[0]!r}"
         )
 
-    def test_default_asof_is_today_when_omitted(self, warehouse):
-        """Default behavior: asof = today UTC. Against this fixture
-        every item completed weeks ago, so default render is empty
-        (0 in-flight items)."""
-        data = render(warehouse, "astral-uv-week")
-        assert data.count == 0
-        assert data.asof_iso, "asof must be echoed back"
-        # Today's UTC date in ISO form.
-        from datetime import datetime
-        today_iso = datetime.now(UTC).date().isoformat()
-        assert data.asof_iso == today_iso
+    def test_asof_is_required_and_echoed_back(self, warehouse):
+        """`asof` is supplied by the caller (the one window
+        model) — the component never invents a date. It's echoed
+        back so the view can name it."""
+        data = render(warehouse, "astral-uv-week", asof=_DEMO_ASOF)
+        assert data.asof_iso == _DEMO_ASOF.isoformat()
 
     def test_item_carries_identity_and_url(self, warehouse):
         data = render(warehouse, "astral-uv-week", asof=_DEMO_ASOF)
@@ -868,3 +864,195 @@ class TestAgingShape:
             f"aging spec must include rule marks for percentile "
             f"thresholds; got {marks}"
         )
+
+
+def _marks(spec: dict) -> list[str]:
+    """All mark types in a Vega-Lite spec, recursively."""
+    out: list[str] = []
+
+    def _walk(node):
+        if isinstance(node, dict):
+            m = node.get("mark")
+            if isinstance(m, str):
+                out.append(m)
+            elif isinstance(m, dict) and "type" in m:
+                out.append(m["type"])
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                _walk(v)
+
+    _walk(spec)
+    return out
+
+
+class TestEmptyReferenceWindow:
+    """When the reference window captures zero completed items the
+    percentiles collapse to 0/0/0. Drawing "P50 0.0d" threshold
+    lines and a "NNN× wider" smell callout against an empty
+    sample is misinformation — the component must say so honestly
+    instead. (Surfaced by a user who picked a reference period
+    that landed entirely outside the data: the aging headline
+    read "P50 0.0d ... from 0 completed items" beside a smell
+    callout claiming the percentiles were "340× too narrow".)"""
+
+    def _warehouse_with_old_inflight_and_no_recent_completions(self):
+        from datetime import datetime as _dt
+
+        con = duckdb.connect(":memory:")
+        con.execute(
+            """CREATE TABLE work_items (
+                contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+                title VARCHAR, url VARCHAR,
+                created_at TIMESTAMP, completed_at TIMESTAMP,
+                cycle_time_days DOUBLE,
+                materialised_at TIMESTAMP
+            )"""
+        )
+        con.execute(
+            """CREATE TABLE transitions (
+                contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+                entered_at TIMESTAMP, stage VARCHAR, signal VARCHAR
+            )"""
+        )
+        con.executemany(
+            "INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?,?)",
+            [
+                # An ancient in-flight item — created Jan 2024,
+                # still open. Gives the chart a non-empty body.
+                ("c", "github", "#open", "ancient", None,
+                 _dt(2024, 1, 1, 9, 0), None, None,
+                 _dt(2026, 5, 10, 12, 0)),
+                # A completed item — but it completed in Jan 2024,
+                # OUTSIDE any May-2026 reference window.
+                ("c", "github", "#done", "old", None,
+                 _dt(2024, 1, 1, 9, 0), _dt(2024, 1, 2, 9, 0), 1.0,
+                 _dt(2026, 5, 10, 12, 0)),
+            ],
+        )
+        return con
+
+    _REF = Window(from_=date(2026, 5, 5), to=date(2026, 5, 10))
+    _ASOF = date(2026, 5, 10)
+
+    def test_old_inflight_item_still_renders(self):
+        """Sanity: the in-flight item shows even though the
+        reference window has no completions."""
+        con = self._warehouse_with_old_inflight_and_no_recent_completions()
+        data = render(con, "c", asof=self._ASOF, reference=self._REF)
+        assert data.count == 1
+        assert data.percentiles.source_count == 0
+
+    def test_zero_completions_in_reference_yields_no_smell(self):
+        """No smell when there is no historical sample to compare
+        against — a "NNN× wider" callout against an empty window
+        is noise, not signal."""
+        con = self._warehouse_with_old_inflight_and_no_recent_completions()
+        data = render(con, "c", asof=self._ASOF, reference=self._REF)
+        assert data.percentiles.smell is False, (
+            "smell must not fire when the reference window has "
+            "zero completed items"
+        )
+
+    def test_zero_completions_headline_is_honest(self):
+        """The headline must name the empty reference plainly,
+        never print "P50 0.0d" as if it were a real threshold."""
+        con = self._warehouse_with_old_inflight_and_no_recent_completions()
+        data = render(con, "c", asof=self._ASOF, reference=self._REF)
+        assert "0.0d" not in data.headline, (
+            f"headline must not print a 0.0d percentile for an "
+            f"empty reference sample; got {data.headline!r}"
+        )
+        assert "no completed items" in data.headline.lower(), (
+            f"headline must name the empty reference explicitly; "
+            f"got {data.headline!r}"
+        )
+
+    def test_zero_completions_omits_percentile_rule_layer(self):
+        """Percentile rule lines must be omitted entirely — three
+        dashed rules stacked on y=0 read as a real threshold."""
+        con = self._warehouse_with_old_inflight_and_no_recent_completions()
+        data = render(con, "c", asof=self._ASOF, reference=self._REF)
+        spec = json.loads(data.vega_spec_json())
+        assert "rule" not in _marks(spec), (
+            f"percentile rule lines must be omitted when there are "
+            f"no completions to draw them from; marks: {_marks(spec)}"
+        )
+        # The dots are still drawn — this is a populated chart.
+        assert "point" in _marks(spec)
+
+
+class TestCoverageGate:
+    """The view window the user picked vs the data the warehouse
+    holds. A view entirely outside the data → NODATA, never a
+    stale in-flight snapshot projected forward (the phantom
+    "318 in-flight as of <future>" bug)."""
+
+    def _warehouse(self):
+        from datetime import datetime as _dt
+
+        con = duckdb.connect(":memory:")
+        con.execute(
+            """CREATE TABLE work_items (
+                contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+                title VARCHAR, url VARCHAR,
+                created_at TIMESTAMP, completed_at TIMESTAMP,
+                cycle_time_days DOUBLE, materialised_at TIMESTAMP
+            )"""
+        )
+        con.execute(
+            """CREATE TABLE transitions (
+                contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+                entered_at TIMESTAMP, stage VARCHAR, signal VARCHAR
+            )"""
+        )
+        con.executemany(
+            "INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?,?)",
+            [
+                # An ancient still-open item — would project forward.
+                ("c", "github", "#open", "ancient", None,
+                 _dt(2024, 1, 1, 9, 0), None, None, _dt(2025, 1, 20)),
+                # A completed item — coverage is Jan 15, 2025 only.
+                ("c", "github", "#done", "t", None,
+                 _dt(2024, 1, 1, 9, 0), _dt(2025, 1, 15, 9, 0), 1.0,
+                 _dt(2025, 1, 20)),
+            ],
+        )
+        return con
+
+    def test_view_past_all_data_is_nodata_not_projected_items(self):
+        """An ancient still-open item must NOT be aged forward into
+        a view window past the data — a view entirely after the
+        data is NODATA."""
+        data = render(
+            self._warehouse(), "c",
+            asof=date(2026, 5, 16),
+            view=Window(from_=date(2026, 5, 10), to=date(2026, 5, 16)),
+        )
+        assert data.count == 0, (
+            "no item may be projected into a range with no data"
+        )
+        assert data.empty_state == "asof_after_coverage"
+        assert "No data available" in data.headline
+
+    def test_view_before_all_data_is_nodata(self):
+        """Symmetric — a view entirely before the data is NODATA."""
+        data = render(
+            self._warehouse(), "c",
+            asof=date(2020, 1, 7),
+            view=Window(from_=date(2020, 1, 1), to=date(2020, 1, 7)),
+        )
+        assert data.count == 0
+        assert data.empty_state == "asof_before_coverage"
+
+    def test_view_overlapping_data_still_renders(self):
+        """The gate only fires for a view ENTIRELY outside the
+        data — one that overlaps renders normally."""
+        data = render(
+            self._warehouse(), "c",
+            asof=date(2025, 1, 20),
+            view=Window(from_=date(2024, 12, 22), to=date(2025, 1, 20)),
+        )
+        assert data.count == 1  # the ancient open item, in-flight
+        assert data.empty_state is None

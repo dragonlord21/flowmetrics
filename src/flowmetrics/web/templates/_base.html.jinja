@@ -351,21 +351,14 @@
       margin: 0.3rem 0;
       font-size: 0.78125rem;
     }
-    .filter-window {
-      border: 0.0625rem solid var(--border);
-      border-radius: 0.3rem;
-      padding: 0.25rem 0.6rem 0.4rem 0.6rem;
-      display: inline-flex;
-      gap: 0.6rem;
-      align-items: center;
-      margin: 0.2rem 0.5rem 0.2rem 0;
+    .filter-custom {
+      /* `display: contents` so Period Ending + View lay out as
+         direct flex items of the bar. An author `display` beats
+         the UA `[hidden]` rule, so the hidden state is re-stated. */
+      display: contents;
     }
-    .filter-window legend {
-      color: var(--fg);
-      font-weight: 600;
-      font-size: 0.78125rem;
-      padding: 0 0.3rem;
-    }
+    .filter-custom[hidden] { display: none; }
+    .filter-advanced .filter-compact { margin-top: 0.3rem; }
     .filter-hint {
       color: var(--muted);
       font-weight: 400;
@@ -1141,112 +1134,96 @@
          dashboard's filter bar focuses on date controls only. #}
       {% if contract.data_is_stale %}
         <p class="filter-stale-banner">
-          Data anchored to <strong>{{ contract.data_max_date }}</strong> —
-          the most recent completion in the warehouse.
-          Run <code>flow materialise {{ contract.name }}</code> to refresh
+          Warehouse data ends <strong>{{ contract.data_max_date }}</strong>.
+          Pick a Period that overlaps it, or run
+          <code>flow materialise {{ contract.name }}</code> for newer data
           (or wait for cron).
         </p>
       {% endif %}
-      <form method="get" class="filter-bar-form" aria-label="Window controls">
-        {# Common case: preset + anchor + durations. View
-           and reference share an anchor; durations decide
-           how far back each window reaches. #}
-        {# Preset select is a client-side trigger only — no
-           `name`, so it never submits. The server recomputes
-           `active_preset` from the anchor + durations. #}
-        <label class="filter-compact">Quick range
-          <select onchange="flowmetricsApplyPreset(this.form, this.value)">
-            {%- set ap = contract.active_preset -%}
-            <option value=""{% if not ap %} selected{% endif %}>Custom…</option>
-            <option value="last-7-days"{% if ap == "last-7-days" %} selected{% endif %}>Last 7 days</option>
-            <option value="last-14-days"{% if ap == "last-14-days" %} selected{% endif %}>Last 14 days</option>
-            <option value="last-30-days"{% if ap == "last-30-days" %} selected{% endif %}>Last 30 days</option>
-            <option value="last-90-days"{% if ap == "last-90-days" %} selected{% endif %}>Last 90 days</option>
-            <option value="last-week"{% if ap == "last-week" %} selected{% endif %}>Last week (Sun–Sat)</option>
-            <option value="last-2-weeks"{% if ap == "last-2-weeks" %} selected{% endif %}>Last 2 weeks</option>
+      {# The filter bar is a thin input layer: it emits a `period`
+         choice (plus anchor + view_days for Custom, ref_days for
+         Advanced) and nothing else. All date math lives in
+         `parse_windows` server-side. #}
+      <form method="get" class="filter-bar-form" aria-label="Period controls">
+        <label class="filter-compact">Period
+          <select name="period"
+                  onchange="flowmetricsPeriodChanged(this.form)">
+            {%- set p = contract.window.period -%}
+            <option value="last-7-days"{% if p == "last-7-days" %} selected{% endif %}>Last 7 days</option>
+            <option value="last-14-days"{% if p == "last-14-days" %} selected{% endif %}>Last 14 days</option>
+            <option value="last-30-days"{% if p == "last-30-days" %} selected{% endif %}>Last 30 days</option>
+            <option value="last-90-days"{% if p == "last-90-days" %} selected{% endif %}>Last 90 days</option>
+            <option value="last-week"{% if p == "last-week" %} selected{% endif %}>Last week (Sun–Sat)</option>
+            <option value="last-2-weeks"{% if p == "last-2-weeks" %} selected{% endif %}>Last 2 weeks</option>
+            <option value="custom"{% if p == "custom" %} selected{% endif %}>Custom…</option>
           </select>
         </label>
-        <label class="filter-compact">Anchor
-          <input type="date" name="anchor" value="{{ contract.anchor }}"
-                 onchange="flowmetricsSubmitFilters(this.form)">
-        </label>
-        <label class="filter-compact">View
-          <select name="view_days" onchange="flowmetricsSubmitFilters(this.form)">
-            {% for d in [7, 14, 30, 60, 90, 180] %}
-              <option value="{{ d }}"{% if d == contract.view_days %} selected{% endif %}>{{ d }} days</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="filter-compact">Reference
-          <select name="ref_days" onchange="flowmetricsSubmitFilters(this.form)">
-            {% for d in [7, 14, 30, 60, 90] %}
-              <option value="{{ d }}"{% if d == contract.ref_days %} selected{% endif %}>{{ d }} days</option>
-            {% endfor %}
-          </select>
-        </label>
+        {# Custom fields — revealed only for `period=custom`. The
+           date input is bounded to the data coverage so the user
+           can't pick a Period Ending with no data behind it. #}
+        <div class="filter-custom"{% if not contract.window.is_custom %} hidden{% endif %}>
+          <label class="filter-compact">Period ending
+            <input type="date" name="anchor" value="{{ contract.window.anchor }}"
+                   {% if contract.data_min_date %}min="{{ contract.data_min_date }}"{% endif %}
+                   {% if contract.data_max_date %}max="{{ contract.data_max_date }}"{% endif %}
+                   onchange="flowmetricsSubmitFilters(this.form)">
+          </label>
+          <label class="filter-compact">View
+            <select name="view_days" onchange="flowmetricsSubmitFilters(this.form)">
+              {% for d in [7, 14, 30, 60, 90, 180] %}
+                <option value="{{ d }}"{% if d == contract.window.view_days %} selected{% endif %}>{{ d }} days</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
         <a class="filter-reset" href="{{ request.url.path }}">Reset</a>
 
-        <details class="filter-advanced"{% if contract.is_advanced_window %} open{% endif %}>
+        <details class="filter-advanced"{% if contract.window.is_advanced %} open{% endif %}>
           <summary>Advanced</summary>
           <p class="filter-hint">
-            Explicit From / To dates per window. When set, these
-            override the anchor + durations above (and let view
-            and reference end on different dates).
+            The <strong>reference period</strong> is the recent
+            sample the aging thresholds and forecasts draw from —
+            the last N days of completion data, ending on the most
+            recent data (independent of the Period above).
           </p>
-          <fieldset class="filter-window">
-            <legend>View window</legend>
-            <label>From <input type="date" name="view_from" value="{% if contract.is_advanced_window %}{{ contract.view_from }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
-            <label>To <input type="date" name="view_to" value="{% if contract.is_advanced_window %}{{ contract.view_to }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
-          </fieldset>
-          <fieldset class="filter-window">
-            <legend>Reference period</legend>
-            <label>From <input type="date" name="ref_from" value="{% if contract.is_advanced_window %}{{ contract.ref_from }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
-            <label>To <input type="date" name="ref_to" value="{% if contract.is_advanced_window %}{{ contract.ref_to }}{% endif %}" onchange="flowmetricsSubmitFilters(this.form)"></label>
-          </fieldset>
+          <label class="filter-compact">Reference
+            <select name="ref_days"
+                    data-default="{{ contract.default_ref_days }}"
+                    onchange="flowmetricsSubmitFilters(this.form)">
+              {% for d in [7, 14, 30, 60, 90] %}
+                <option value="{{ d }}"{% if d == contract.window.ref_days %} selected{% endif %}>{{ d }} days</option>
+              {% endfor %}
+            </select>
+          </label>
         </details>
       </form>
       <script>
-        // Submit the filter form, dropping empty-valued controls
-        // so the URL carries no `name=` noise. A disabled control
-        // isn't included in a GET submission — disabling the
-        // empties just before submit is the simplest way to omit
-        // them. (`form.submit()` skips the submit event, so this
-        // can't be a submit-event handler.)
+        // Submit the filter form, emitting only the params the
+        // chosen Period needs — no empty or redundant `name=`
+        // noise. A disabled control is excluded from a GET
+        // submission. (`form.submit()` skips the submit event, so
+        // this can't be a submit-event handler.)
         function flowmetricsSubmitFilters(form) {
-          for (const el of form.elements) {
-            if (el.name && el.value === "") el.disabled = true;
+          if (form.elements.period.value !== "custom") {
+            // Anchor + View only matter for Custom.
+            form.elements.anchor.disabled = true;
+            form.elements.view_days.disabled = true;
           }
+          // A default-length reference needn't ride in the URL.
+          const ref = form.elements.ref_days;
+          if (ref.value === ref.dataset.default) ref.disabled = true;
           form.submit();
         }
-        // Preset → set anchor + view_days + ref_days and clear
-        // the advanced from/to inputs, then submit. Cleared
-        // (empty) fields are dropped by flowmetricsSubmitFilters.
-        function flowmetricsApplyPreset(form, preset) {
-          if (!preset) return; // "Custom…" — just leave the form
-          const today = new Date();
-          let anchor = today;
-          let viewDays = 30;
-          let refDays = 14;
-          if (preset === "last-7-days")  { viewDays = 7;  refDays = 7;  }
-          else if (preset === "last-14-days") { viewDays = 14; refDays = 14; }
-          else if (preset === "last-30-days") { viewDays = 30; refDays = 14; }
-          else if (preset === "last-90-days") { viewDays = 90; refDays = 14; }
-          else if (preset === "last-week" || preset === "last-2-weeks") {
-            // Most recent COMPLETED Sun-to-Sat week. Mirror
-            // `last_completed_week` in flowmetrics.windows.
-            const dow = today.getUTCDay();       // 0=Sun..6=Sat
-            const daysBackToSat = dow === 6 ? 7 : (dow + 1);
-            anchor = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - daysBackToSat));
-            viewDays = preset === "last-2-weeks" ? 14 : 7;
-            refDays = viewDays;
+        // Period dropdown changed. A preset applies immediately;
+        // "Custom…" just reveals the Period Ending + View fields
+        // and waits for the user to set them.
+        function flowmetricsPeriodChanged(form) {
+          const custom = form.querySelector(".filter-custom");
+          if (form.elements.period.value === "custom") {
+            if (custom) custom.hidden = false;
+            return;
           }
-          form.elements.anchor.value = anchor.toISOString().slice(0, 10);
-          form.elements.view_days.value = viewDays;
-          form.elements.ref_days.value = refDays;
-          // Clear the advanced inputs so they don't override.
-          for (const name of ["view_from", "view_to", "ref_from", "ref_to"]) {
-            if (form.elements[name]) form.elements[name].value = "";
-          }
+          if (custom) custom.hidden = true;
           flowmetricsSubmitFilters(form);
         }
       </script>

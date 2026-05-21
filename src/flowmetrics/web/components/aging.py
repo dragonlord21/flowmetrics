@@ -361,6 +361,18 @@ class AgingData:
                 },
             },
         }
+        # No completions in the reference window → percentiles
+        # are 0/0/0. Drop the rule layer entirely; three dashed
+        # rules stacked on y=0 read as a real threshold.
+        if self.percentiles.source_count == 0:
+            spec["layer"] = [
+                lyr
+                for lyr in spec["layer"]
+                if not (
+                    isinstance(lyr.get("mark"), dict)
+                    and lyr["mark"].get("type") == "rule"
+                )
+            ]
         return json.dumps(spec)
 
 
@@ -368,7 +380,8 @@ def render(
     con: duckdb.DuckDBPyConnection,
     contract_name: str,
     *,
-    asof: date | None = None,
+    asof: date,
+    view: Window | None = None,
     contract_start: date | None = None,
     contract_stop: date | None = None,
     states: WorkflowStates | None = None,
@@ -376,9 +389,15 @@ def render(
 ) -> AgingData:
     """Compute the aging-WIP payload for `contract_name` at `asof`.
 
-    `asof` defaults to today (UTC date). Items are in-flight if:
+    `asof` is required — the caller (the one window model) supplies
+    it; the component never invents a date. Items are in-flight if:
       - created_at.date() ≤ asof
       - completed_at is null, OR completed_at.date() > asof
+
+    `view` is the picked view window. When it sits entirely
+    outside the warehouse's data, `render` returns NODATA rather
+    than projecting a stale in-flight snapshot forward into a
+    range with no data behind it.
 
     Current state is the latest transition with entered_at ≤ asof.
     Items with no transitions yet at asof are tagged `"Unknown"`.
@@ -399,9 +418,82 @@ def render(
     outside the contract window is "not missing data, just outside
     scope," not the same as a stale warehouse.
     """
-    if asof is None:
-        asof = datetime.now(UTC).date()
     asof_anchor = datetime(asof.year, asof.month, asof.day, tzinfo=UTC)
+    asof_display = to_utc_display_date(asof_anchor)
+
+    # Warehouse coverage — the completion dates the warehouse
+    # actually holds. Drives both the coverage gate just below
+    # and the empty-state messages further down.
+    coverage_row = con.execute(
+        "SELECT min(CAST(completed_at AS DATE)), "
+        "       max(CAST(completed_at AS DATE)), "
+        "       max(materialised_at) "
+        "FROM work_items WHERE contract_id = ?",
+        [contract_name],
+    ).fetchone()
+    earliest_data_date = coverage_row[0] if coverage_row else None
+    latest_data_date = coverage_row[1] if coverage_row else None
+    last_mat_dt = coverage_row[2] if coverage_row else None
+    if last_mat_dt is not None:
+        last_mat_aware = (
+            last_mat_dt.replace(tzinfo=UTC)
+            if last_mat_dt.tzinfo is None
+            else last_mat_dt
+        )
+        warehouse_last_materialised_iso = (
+            last_mat_aware.astimezone(UTC).date().isoformat()
+        )
+    else:
+        warehouse_last_materialised_iso = None
+
+    def _both(d: date | None) -> tuple[str | None, str | None]:
+        """A date → (ISO, human-display) pair, or (None, None)."""
+        if d is None:
+            return None, None
+        anc = datetime(d.year, d.month, d.day, tzinfo=UTC)
+        return d.isoformat(), to_utc_display_date(anc)
+
+    cov_earliest_iso, cov_earliest_display = _both(earliest_data_date)
+    cov_latest_iso, cov_latest_display = _both(latest_data_date)
+    coverage = WarehouseCoverage(
+        earliest_iso=cov_earliest_iso,
+        latest_iso=cov_latest_iso,
+        earliest_display=cov_earliest_display,
+        latest_display=cov_latest_display,
+        last_materialised_iso=warehouse_last_materialised_iso,
+    )
+
+    # Coverage gate: when the picked view window sits entirely
+    # outside the data the warehouse holds, there is nothing to
+    # render — return NODATA. Never project a stale in-flight
+    # snapshot forward into a range with no data (the phantom
+    # "318 in-flight as of <future>" bug).
+    if view is not None and latest_data_date is not None and (
+        view.from_ > latest_data_date or view.to < earliest_data_date
+    ):
+        return AgingData(
+            items=(),
+            count=0,
+            asof_iso=asof.isoformat(),
+            asof_display=asof_display,
+            headline=(
+                f"No data available for {_both(view.from_)[1]} "
+                f"– {asof_display}"
+            ),
+            empty_state=(
+                "asof_after_coverage"
+                if view.from_ > latest_data_date
+                else "asof_before_coverage"
+            ),
+            percentiles=PercentileProvenance(
+                p50=0.0, p85=0.0, p95=0.0, source_count=0,
+                source_window_earliest_iso=None,
+                source_window_latest_iso=None,
+                source_window_display="no completed items yet",
+                smell=False, smell_text="",
+            ),
+            coverage=coverage,
+        )
 
     # ONE bulk query for in-flight items + their current_state
     # (latest transition at or before asof). The earlier shape
@@ -513,15 +605,26 @@ def render(
         pct_source_earliest_iso = None
         pct_source_latest_iso = None
 
-    asof_display = to_utc_display_date(asof_anchor)
-    headline = (
+    count_part = (
         f"{len(items)} in-flight item{'' if len(items) == 1 else 's'} "
-        f"as of {asof_display} (UTC) · "
-        f"P50 {p50:.1f}d · P85 {p85:.1f}d · P95 {p95:.1f}d "
-        f"from {pct_source_count} completed item"
-        f"{'' if pct_source_count == 1 else 's'}"
-        f" ({pct_source_window_display})"
+        f"as of {asof_display} (UTC)"
     )
+    # When the reference window captures no completions the
+    # percentiles collapse to 0/0/0 — printing "P50 0.0d" reads
+    # as a real threshold. Say so plainly instead.
+    if pct_source_count > 0:
+        pct_part = (
+            f"P50 {p50:.1f}d · P85 {p85:.1f}d · P95 {p95:.1f}d "
+            f"from {pct_source_count} completed item"
+            f"{'' if pct_source_count == 1 else 's'}"
+            f" ({pct_source_window_display})"
+        )
+    else:
+        pct_part = (
+            "no percentile thresholds — no completed items in the "
+            "reference period"
+        )
+    headline = f"{count_part} · {pct_part}"
 
     # Smell ratio: if in-flight ages span far longer than the
     # historical sample window driving the percentiles, the
@@ -539,7 +642,9 @@ def render(
     SMELL_RATIO_THRESHOLD = 3.0
     smell = False
     smell_text = ""
-    if items:
+    # No smell without a sample: a "NNN× wider" callout against
+    # an empty reference window is noise, not signal.
+    if items and pct_source_count > 0:
         if reference is not None:
             window_days = reference.days_inclusive
         elif (
@@ -559,33 +664,6 @@ def render(
                 f"wider. Consider broadening the historical sample for "
                 f"more representative thresholds."
             )
-
-    # Warehouse coverage: what dates of completion data do we have
-    # on hand? Surfaced in the empty-state messages so the operator
-    # sees the actual gap they're asking us to fill, not a vague
-    # "outside window" hand-wave.
-    coverage_row = con.execute(
-        "SELECT min(CAST(completed_at AS DATE)), "
-        "       max(CAST(completed_at AS DATE)), "
-        "       max(materialised_at) "
-        "FROM work_items "
-        "WHERE contract_id = ?",
-        [contract_name],
-    ).fetchone()
-    earliest_data_date = coverage_row[0] if coverage_row else None
-    latest_data_date = coverage_row[1] if coverage_row else None
-    last_mat_dt = coverage_row[2] if coverage_row else None
-    if last_mat_dt is not None:
-        last_mat_aware = (
-            last_mat_dt.replace(tzinfo=UTC)
-            if last_mat_dt.tzinfo is None
-            else last_mat_dt
-        )
-        last_mat_date = last_mat_aware.astimezone(UTC).date()
-        warehouse_last_materialised_iso = last_mat_date.isoformat()
-    else:
-        last_mat_date = None
-        warehouse_last_materialised_iso = None
 
     # Classify empty state. Non-empty → None. Else, action-first:
     # tell the operator what data the warehouse has and what range
@@ -620,17 +698,6 @@ def render(
     else:
         empty_state = "no_work_in_flight"
 
-    # Pre-format coverage bounds as both ISO + human display
-    # strings so the empty-state UI doesn't have to do date math.
-    def _both(d: date | None) -> tuple[str | None, str | None]:
-        if d is None:
-            return None, None
-        anchor = datetime(d.year, d.month, d.day, tzinfo=UTC)
-        return d.isoformat(), to_utc_display_date(anchor)
-
-    coverage_earliest_iso, coverage_earliest_display = _both(earliest_data_date)
-    coverage_latest_iso, coverage_latest_display = _both(latest_data_date)
-
     return AgingData(
         items=tuple(items),
         count=len(items),
@@ -647,11 +714,5 @@ def render(
             smell=smell,
             smell_text=smell_text,
         ),
-        coverage=WarehouseCoverage(
-            earliest_iso=coverage_earliest_iso,
-            latest_iso=coverage_latest_iso,
-            earliest_display=coverage_earliest_display,
-            latest_display=coverage_latest_display,
-            last_materialised_iso=warehouse_last_materialised_iso,
-        ),
+        coverage=coverage,
     )

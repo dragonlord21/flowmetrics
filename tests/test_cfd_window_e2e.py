@@ -153,7 +153,7 @@ class TestCfdAxisDomainMatchesSpecWindow:
     def test_detail_page_renders_chart_svg(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd?view_from=2026-05-04&view_to=2026-05-10")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd?period=custom&anchor=2026-05-10&view_days=7")
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
         expect(page.locator("#cfd-chart svg")).to_be_visible()
 
@@ -163,7 +163,7 @@ class TestCfdAxisDomainMatchesSpecWindow:
         """The headline 'N days (date – date)' must match the
         contract window. A 7-day window must say 7 days; a 90-day
         cap (no bounds) must say at most 90."""
-        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd?view_from=2026-05-04&view_to=2026-05-10")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd?period=custom&anchor=2026-05-10&view_days=7")
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
         # The headline lives in `metric_summary.html.jinja`; pull
         # ALL text from the page and find the range.
@@ -194,7 +194,7 @@ class TestCfdAxisDomainMatchesSpecWindow:
         (e.g. 'May 04', 'May 05'), and assert all fall in the
         7-day window.
         """
-        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd?view_from=2026-05-04&view_to=2026-05-10")
+        page.goto(server_url + "/workflows/astral-uv-week/metrics/cfd?period=custom&anchor=2026-05-10&view_days=7")
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
         page.wait_for_timeout(500)  # let Vega finish drawing axes
 
@@ -241,7 +241,7 @@ class TestCfdAxisDomainMatchesSpecWindow:
         contract window while the detail route keeps it (a real
         regression mode now that both routes load_contract
         independently)."""
-        page.goto(server_url + "/workflows/astral-uv-week?view_from=2026-05-04&view_to=2026-05-10")
+        page.goto(server_url + "/workflows/astral-uv-week?period=custom&anchor=2026-05-10&view_days=7")
         page.wait_for_selector("#cfd-chart svg", timeout=15000)
         page.wait_for_timeout(500)
         svg_texts: list[str] = page.evaluate(

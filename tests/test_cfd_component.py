@@ -395,6 +395,19 @@ class TestCfdShape:
         # that entered before start are already accounted for.
         # (For the fixture, items predate start by some margin.)
 
+    def test_view_window_past_all_data_is_nodata(self, warehouse):
+        """The phantom-projection bug: CFD must not carry a stale
+        cumulative count forward into a view window that has no
+        data. A view entirely outside the transition data →
+        NODATA, not "612 items in the system"."""
+        from flowmetrics.windows import Window
+        data = render(
+            warehouse, "demo",
+            view=Window(from_=date(2030, 1, 1), to=date(2030, 1, 7)),
+        )
+        assert not data.daily, "no daily points for a range with no data"
+        assert "No data available" in data.headline
+
     def test_chart_spec_uses_area_marks_stacked_in_stage_order(
         self, warehouse
     ):

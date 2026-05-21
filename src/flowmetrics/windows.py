@@ -1,21 +1,25 @@
-"""Two user-facing date-range concepts for the dashboard:
+"""Two date-range concepts for the dashboard:
 
-- **View window** — clamps chart x-axes. Display-only; doesn't
-  change what feeds the math.
+- **View window** — navigation. What date range the charts
+  show; anchored to the user's chosen anchor (today by default).
 - **Reference period** — the statistical sample. Drives
-  percentile thresholds (cycle-time, aging) and the Monte Carlo
-  throughput sampling distribution (forecast).
+  percentile thresholds (aging) and the Monte Carlo throughput
+  distribution (forecast). Anchored to the most recent data
+  (`data_max`), NOT the view anchor, so it stays on real data
+  wherever the user scrolls the view.
 
 Both windows are inclusive on both endpoints — the UI labels
 ("From" / "To") match. Same-day is a 1-day window, not 0.
 
-URL state:
+URL state — the filter bar emits a `period` choice and nothing
+more than the data needed to express it:
 
-    ?view_from=YYYY-MM-DD&view_to=YYYY-MM-DD
-    &ref_from=YYYY-MM-DD&ref_to=YYYY-MM-DD
+    ?period=last-30-days                    (a preset)
+    ?period=custom&anchor=YYYY-MM-DD&view_days=N   (Custom)
+    ?ref_days=N                             (Advanced reference)
 
-Missing or invalid params → fall back to defaults anchored to
-today UTC: 30-day view, 14-day reference.
+Missing or invalid params → 30-day view ending today, 30-day
+reference ending on the most recent data.
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ from datetime import date, timedelta
 
 
 DEFAULT_VIEW_DAYS = 30
-DEFAULT_REFERENCE_DAYS = 14
+DEFAULT_REFERENCE_DAYS = 30
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,43 @@ class Window:
     def last_n_days(cls, n: int, *, today: date) -> "Window":
         """Window of `n` inclusive days ending on `today`."""
         return cls(from_=today - timedelta(days=n - 1), to=today)
+
+
+@dataclass(frozen=True)
+class WindowSelection:
+    """The resolved filter state — the single model every view
+    reads. `parse_windows` is the one place that produces it;
+    nothing downstream re-decides dates. Views take the windows
+    they need; the filter bar reads the display properties.
+    """
+
+    view: Window
+    reference: Window
+    # The resolved Period selection — always one of KNOWN_PERIODS.
+    period: str
+
+    @property
+    def anchor(self) -> date:
+        """The view window's end — also aging's 'as of' date."""
+        return self.view.to
+
+    @property
+    def view_days(self) -> int:
+        return self.view.days_inclusive
+
+    @property
+    def ref_days(self) -> int:
+        return self.reference.days_inclusive
+
+    @property
+    def is_custom(self) -> bool:
+        return self.period == "custom"
+
+    @property
+    def is_advanced(self) -> bool:
+        """The Advanced panel is "in use" when the reference
+        period isn't the default length."""
+        return self.ref_days != DEFAULT_REFERENCE_DAYS
 
 
 def last_completed_week(today: date) -> Window:
@@ -68,67 +109,88 @@ def last_completed_week(today: date) -> Window:
     )
 
 
-def parse_windows(
-    query: dict[str, str] | dict, today: date
-) -> tuple[Window, Window]:
-    """Parse window params from a query dict. Returns
-    `(view_window, reference_period)`. Two URL shapes are
-    supported:
+# The view-window presets, keyed by the `period` query value.
+# Day-count presets map to a fixed inclusive length ending today;
+# the two week presets are handled separately (last_completed_week).
+VIEW_PRESET_DAYS: dict[str, int] = {
+    "last-7-days": 7,
+    "last-14-days": 14,
+    "last-30-days": 30,
+    "last-90-days": 90,
+}
+WEEK_PRESETS = ("last-week", "last-2-weeks")
+DEFAULT_PERIOD = "last-30-days"
+# Every period the filter bar may emit. Anything else → default.
+KNOWN_PERIODS = (*VIEW_PRESET_DAYS, *WEEK_PRESETS, "custom")
 
-      1. **Common case** (preset / anchor + durations):
-         `?anchor=YYYY-MM-DD&view_days=N&ref_days=M`
-         Derives both windows as N (and M) inclusive days
-         ending on the anchor. Missing days fall back to
-         DEFAULT_VIEW_DAYS / DEFAULT_REFERENCE_DAYS. Missing
-         anchor falls back to today UTC.
 
-      2. **Advanced / legacy** (explicit dates):
-         `?view_from=YYYY-MM-DD&view_to=YYYY-MM-DD` (and
-         `ref_from`/`ref_to`). Used by the advanced controls
-         and existing shared links.
-
-    Precedence per window: explicit from+to wins over
-    anchor+days. Never raises on user input.
-    """
-    # Resolve the anchor first — common to both windows when
-    # advanced from/to aren't supplied.
-    anchor_str = query.get("anchor")
-    if anchor_str:
+def _parse_date(raw: object, default: date) -> date:
+    """A YYYY-MM-DD string → date; anything malformed → `default`."""
+    if raw:
         try:
-            anchor = date.fromisoformat(str(anchor_str))
+            return date.fromisoformat(str(raw))
         except ValueError:
-            anchor = today
-    else:
-        anchor = today
+            pass
+    return default
 
-    def _parse(prefix: str, default_days: int) -> Window:
-        # Advanced wins first.
-        from_str = query.get(f"{prefix}_from")
-        to_str = query.get(f"{prefix}_to")
-        if from_str and to_str:
-            try:
-                return Window(
-                    from_=date.fromisoformat(str(from_str)),
-                    to=date.fromisoformat(str(to_str)),
-                )
-            except ValueError:
-                pass  # fall through to anchor+days
-        # Anchor + days (common case).
-        days_str = query.get(f"{prefix}_days")
-        if days_str:
-            try:
-                days = int(days_str)
-                if days > 0:
-                    return Window(
-                        from_=anchor - timedelta(days=days - 1),
-                        to=anchor,
-                    )
-            except ValueError:
-                pass
-        # Defaults — anchored at the resolved anchor.
-        return Window.last_n_days(default_days, today=anchor)
 
-    return (
-        _parse("view", DEFAULT_VIEW_DAYS),
-        _parse("ref", DEFAULT_REFERENCE_DAYS),
+def _parse_days(raw: object, default: int) -> int:
+    """A positive-int string → int; anything else → `default`."""
+    if raw:
+        try:
+            n = int(raw)
+            if n > 0:
+                return n
+        except ValueError:
+            pass
+    return default
+
+
+def parse_windows(
+    query: dict[str, str] | dict,
+    today: date,
+    data_max: date | None = None,
+) -> WindowSelection:
+    """The ONE place date math happens. The filter bar emits a
+    `period` choice; this turns it into a `WindowSelection` —
+    the single model every view and the filter bar read.
+
+    **View window** — navigation, driven by `period`:
+      - a preset (`last-7-days` … `last-2-weeks`) → a fixed
+        window relative to `today`;
+      - `custom` → `anchor` (default today) + `view_days`
+        (default 30);
+      - missing / unknown → the default preset (last 30 days).
+
+    **Reference period** — the statistical sample for aging
+    thresholds + forecasts: `ref_days` (default 30) inclusive
+    days ending on `data_max` (the most recent data), or `today`
+    when the warehouse is empty. Anchored to the data, never to
+    the view — so scrolling the view can't strand the percentile
+    sample.
+
+    `period` on the result is always resolved to a value in
+    `KNOWN_PERIODS`. Never raises on user input.
+    """
+    raw = str(query.get("period") or "").strip()
+    period = raw if raw in KNOWN_PERIODS else DEFAULT_PERIOD
+
+    if period in VIEW_PRESET_DAYS:
+        view = Window.last_n_days(VIEW_PRESET_DAYS[period], today=today)
+    elif period == "last-week":
+        view = last_completed_week(today)
+    elif period == "last-2-weeks":
+        end = last_completed_week(today).to
+        view = Window(from_=end - timedelta(days=13), to=end)
+    else:  # "custom" — the only remaining KNOWN_PERIODS value
+        anchor = _parse_date(query.get("anchor"), today)
+        view = Window.last_n_days(
+            _parse_days(query.get("view_days"), DEFAULT_VIEW_DAYS),
+            today=anchor,
+        )
+
+    reference = Window.last_n_days(
+        _parse_days(query.get("ref_days"), DEFAULT_REFERENCE_DAYS),
+        today=data_max or today,
     )
+    return WindowSelection(view=view, reference=reference, period=period)

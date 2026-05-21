@@ -29,7 +29,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
 from .contract import ContractError, load_contract
-from .windows import Window, last_completed_week, parse_windows
+from .windows import DEFAULT_REFERENCE_DAYS, parse_windows
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
 from .web.components.cycle_time import render as render_cycle_time
@@ -163,16 +163,27 @@ class WorkflowView:
         # the old _workflow_slug/_workflow_system_label helpers
         # had.
         self.contract = load_contract(workflow_id, contracts_dir)
-        # Anchor default windows to the data's most recent
-        # completion when available — defaults should produce
-        # non-empty charts even when the contract's data window
-        # is months old. Falls back to today UTC for fresh
-        # installs with no data yet.
         today_utc = datetime.now(UTC).date()
-        self.data_max_date = self._latest_completion_date()
-        anchor = self.data_max_date or today_utc
-        self.view_window, self.reference_period = parse_windows(
-            dict(query or {}), today=anchor,
+        # The completion-data coverage. `data_max_date` anchors
+        # the reference period; both bound the filter-bar date
+        # inputs so the user can't pick a Period Ending with no
+        # data behind it.
+        self.data_min_date, self.data_max_date = (
+            self._completion_date_range()
+        )
+        # `parse_windows` is the single place date math happens —
+        # the filter bar only emits a `period` choice. It returns
+        # the WindowSelection model that every view and the filter
+        # bar read; nothing downstream re-decides dates. The view
+        # anchor defaults to today and is honoured verbatim (a
+        # stale workflow loads on today's empty window; the NODATA
+        # state explains it). The reference is anchored to
+        # `data_max`, independent of the view.
+        self.today = today_utc
+        self.selection = parse_windows(
+            dict(query or {}),
+            today=today_utc,
+            data_max=self.data_max_date,
         )
         # "Data is stale" diagnostic for the template. True when
         # the warehouse's latest completion is meaningfully
@@ -183,23 +194,40 @@ class WorkflowView:
             and (today_utc - self.data_max_date).days >= 2
         )
 
-    def _latest_completion_date(self):
-        """Most recent completed_at in this workflow's warehouse,
-        or None when the warehouse has no completions yet."""
+    def _completion_date_range(self):
+        """`(earliest, latest)` completed_at dates in this
+        workflow's warehouse — the coverage the filter-bar date
+        inputs are bounded to. `(None, None)` when the warehouse
+        has no completions yet."""
         try:
             con = open_warehouse(self._data_dir)
         except duckdb.IOException:
-            return None
+            return None, None
         try:
             row = con.execute(
-                "SELECT max(CAST(completed_at AS DATE)) "
+                "SELECT min(CAST(completed_at AS DATE)), "
+                "       max(CAST(completed_at AS DATE)) "
                 "FROM work_items "
                 "WHERE contract_id = ? AND completed_at IS NOT NULL",
                 [self.id],
             ).fetchone()
-            return row[0] if row and row[0] else None
+            if row and row[1]:
+                return row[0], row[1]
+            return None, None
         finally:
             con.close()
+
+    @property
+    def view_window(self):
+        """The view window — accessor for `self.selection.view`.
+        The model is `self.selection`; this is just ergonomics."""
+        return self.selection.view
+
+    @property
+    def reference_period(self):
+        """The reference period — accessor for the model's
+        `self.selection.reference`."""
+        return self.selection.reference
 
     @contextmanager
     def warehouse(self):
@@ -213,17 +241,14 @@ class WorkflowView:
             con.close()
 
     def template_context(self) -> dict:
-        """Template-side context for "what workflow is this":
-        id, decorative slug, plus the current view/reference
-        windows expressed BOTH as explicit from/to dates AND as
-        anchor+duration. The filter bar's common controls bind
-        to anchor + days; advanced controls bind to from/to.
+        """Context for the filter bar + breadcrumb.
 
-        `is_advanced_window`: True when view and reference don't
-        share a `to` date (advanced mode); False when they do
-        (common case — both end at the same anchor).
+        `window` is the `WindowSelection` model — the filter bar
+        reads its `period` / `anchor` / `view_days` / `ref_days`
+        / `is_advanced` directly, no flattening. The rest is
+        workflow identity + the data-coverage bounds for the
+        Period Ending date input.
         """
-        anchor = self.view_window.to
         return {
             "name": self.id,
             # Human-friendly display name. Templates render
@@ -231,68 +256,22 @@ class WorkflowView:
             # `contract.name` stays the URL-safe routing ID.
             "label": self.contract.label or self.id,
             "slug": self._slug(),
-            # Advanced/legacy form: explicit dates per window.
-            "view_from": self.view_window.from_.isoformat(),
-            "view_to": self.view_window.to.isoformat(),
-            "ref_from": self.reference_period.from_.isoformat(),
-            "ref_to": self.reference_period.to.isoformat(),
-            # Common form: shared anchor + per-window durations.
-            "anchor": anchor.isoformat(),
-            "view_days": self.view_window.days_inclusive,
-            "ref_days": self.reference_period.days_inclusive,
-            # True when view/reference can't be expressed as
-            # shared-anchor + days (i.e. they end on different
-            # dates). The template shows the advanced controls
-            # by default in that case.
-            "is_advanced_window": (
-                self.view_window.to != self.reference_period.to
+            # The one filter model — see flowmetrics.windows.
+            "window": self.selection,
+            "default_ref_days": DEFAULT_REFERENCE_DAYS,
+            # Completion-data coverage. Bounds the Period Ending
+            # date input (min/max) and drives the freshness
+            # banner. None when the warehouse is empty.
+            "data_min_date": (
+                self.data_min_date.isoformat()
+                if self.data_min_date else None
             ),
-            # "Showing data anchored to X — N days ago. Cron
-            # will refresh, or run `flow materialise`." banner
-            # data. None when data is fresh.
             "data_max_date": (
                 self.data_max_date.isoformat()
                 if self.data_max_date else None
             ),
             "data_is_stale": self.data_is_stale,
-            # Quick-range preset that matches the current anchor
-            # + durations, so the dropdown shows the right
-            # selection after a preset round-trip (instead of
-            # reverting to "Custom"). None when no preset
-            # matches (data-max-anchored defaults, manually-set
-            # custom values, advanced mode).
-            "active_preset": self._active_preset(),
         }
-
-    def _active_preset(self) -> str | None:
-        """Map (anchor, view_days, ref_days) → the preset name
-        whose math produces those values, or None for custom.
-
-        Mirrors the preset table in the filter-bar template +
-        the JS `flowmetricsApplyPreset` switch — keep all three
-        in sync when adding a preset."""
-        if self.view_window.to != self.reference_period.to:
-            return None
-        anchor = self.view_window.to
-        v = self.view_window.days_inclusive
-        r = self.reference_period.days_inclusive
-        today_utc = datetime.now(UTC).date()
-        if anchor == today_utc:
-            if v == 7 and r == 7:
-                return "last-7-days"
-            if v == 14 and r == 14:
-                return "last-14-days"
-            if v == 30 and r == 14:
-                return "last-30-days"
-            if v == 90 and r == 14:
-                return "last-90-days"
-        last_sat = last_completed_week(today=today_utc).to
-        if anchor == last_sat:
-            if v == 7 and r == 7:
-                return "last-week"
-            if v == 14 and r == 14:
-                return "last-2-weeks"
-        return None
 
     def _slug(self) -> str:
         c = self.contract
@@ -314,18 +293,25 @@ class WorkflowView:
     def render_aging(self, con, *, asof=None):
         return render_aging(
             con, self.id,
-            asof=asof,
+            # Aging is "in-flight as of the anchor" — the date the
+            # view window ends on. `?asof=` (the backfill flow)
+            # still overrides. `view` lets the component return
+            # NODATA when the picked window has no data behind it.
+            asof=asof or self.selection.anchor,
+            view=self.selection.view,
             contract_start=self.contract.start,
             contract_stop=self.contract.stop,
             states=self.contract.states,
-            reference=self.reference_period,
+            reference=self.selection.reference,
         )
 
     def render_cycle_time(self, con):
         return render_cycle_time(
             con, self.id,
-            view=self.view_window,
-            reference=self.reference_period,
+            # Cycle-time's percentile lines summarise the dots on
+            # screen — so they sample the view window, not the
+            # reference. The reference is for aging + forecasts.
+            view=self.selection.view,
         )
 
     def render_throughput(self, con):
@@ -344,16 +330,20 @@ class WorkflowView:
         return render_forecast_when_done(
             con, self.id,
             items=items,
-            start_date=start_date,
-            reference=self.reference_period,
+            # A forecast runs from "now" by default — `self.today`,
+            # the model's clock, not an ad-hoc now() in a route.
+            start_date=start_date or self.today,
+            reference=self.selection.reference,
         )
 
-    def render_forecast_how_many(self, con, *, start_date, end_date):
+    def render_forecast_how_many(self, con, *, start_date=None, end_date=None):
+        start = start_date or self.today
         return render_forecast_how_many(
             con, self.id,
-            start_date=start_date,
-            end_date=end_date,
-            reference=self.reference_period,
+            start_date=start,
+            # Default horizon: 7 inclusive days from the start.
+            end_date=end_date or (start + timedelta(days=6)),
+            reference=self.selection.reference,
         )
 
     def render_lifecycle(self, con, *, source: str, item_id: str):
@@ -407,9 +397,7 @@ def create_app(
     from urllib.parse import parse_qsl, urlencode
 
     _CARRIED_PARAMS = frozenset({
-        "anchor", "view_days", "ref_days",
-        "view_from", "view_to", "ref_from", "ref_to",
-        "preset", "asof",
+        "period", "anchor", "view_days", "ref_days", "asof",
     })
 
     @pass_context
@@ -618,10 +606,10 @@ def create_app(
     ) -> HTMLResponse:
         """HTMX-served per-metric tile (headline + chart). The
         dashboard renders only stubs; each tile fetches itself.
-        The query string carries `view_from/to` + `ref_from/to`
-        so the windows propagate to the tile's renders."""
+        The query string carries the filter params (period /
+        anchor / view_days / ref_days) so the selected window
+        propagates to the tile's renders."""
         view = _open_view(workflow, request)
-        today_utc = datetime.now(UTC).date()
         ctx: dict = {"contract": view.template_context()}
         with view.warehouse() as con:
             if metric == "cycle-time":
@@ -637,14 +625,12 @@ def create_app(
                 ctx["data"] = view.render_cfd(con)
                 tpl = "_partials/dashboard_tile_cfd.html.jinja"
             elif metric == "forecast":
+                # 20-item / 7-day preview; the forecast clock
+                # (`start_date`) defaults to the model's today.
                 ctx["forecast_when_done"] = view.render_forecast_when_done(
-                    con, items=20, start_date=today_utc,
+                    con, items=20,
                 )
-                ctx["forecast_how_many"] = view.render_forecast_how_many(
-                    con,
-                    start_date=today_utc,
-                    end_date=today_utc + timedelta(days=6),
-                )
+                ctx["forecast_how_many"] = view.render_forecast_how_many(con)
                 tpl = "_partials/dashboard_tile_forecast.html.jinja"
             else:
                 raise HTTPException(
@@ -837,7 +823,9 @@ def create_app(
         Initial render uses sane defaults (20 items, 30 days);
         sliders re-fetch the fragments via HTMX as the user drags."""
         view = _open_view(workflow_id, request)
-        today = datetime.now(UTC).date()
+        # The forecast clock comes from the model, not an ad-hoc
+        # now() in the route.
+        today = view.today
         with view.warehouse() as con:
             when_done = render_forecast_when_done(
                 con, workflow_id, items=max(1, items), start_date=today
@@ -879,7 +867,7 @@ def create_app(
         start: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        start_date = _parse_asof(start) or datetime.now(UTC).date()
+        start_date = _parse_asof(start) or view.today
         try:
             items_int = max(1, int(items))
         except (TypeError, ValueError):
@@ -910,7 +898,7 @@ def create_app(
         start: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        start_date = _parse_asof(start) or datetime.now(UTC).date()
+        start_date = _parse_asof(start) or view.today
         try:
             days_int = max(1, int(days))
         except (TypeError, ValueError):

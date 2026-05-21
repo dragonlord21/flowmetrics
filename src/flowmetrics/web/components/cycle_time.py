@@ -104,16 +104,15 @@ def render(
     contract_name: str,
     *,
     view: Window | None = None,
-    reference: Window | None = None,
 ) -> CycleTimeData:
     """Read the contract's latest work_items partition and produce the
     typed payload.
 
-    `view`: clamps the scatter to items completed inside this
-    inclusive range (display filter).
-    `reference`: drives the P50/P85/P95 threshold lines — they
-    are computed from items completed inside this range only.
-    When either is None the full materialised history is used.
+    `view` clamps the scatter to items completed inside this
+    inclusive range — and the P50/P85/P95 threshold lines are the
+    empirical percentiles of THOSE same items. The lines
+    summarise the dots on screen, nothing else. When `view` is
+    None the full materialised history is used.
     """
     where_clauses = ["contract_id = ?", "completed_at IS NOT NULL"]
     params: list = [contract_name]
@@ -194,15 +193,13 @@ def render(
         )
 
     # Empirical percentiles via DuckDB (single statistical pass).
-    # The reference period — when set — slices the SAMPLE that
-    # feeds P50/P85/P95. The viewer's "ptiles over the last X
-    # days" question is answered by changing this window; the
-    # display (`view`) is independent.
+    # The sample is the SAME items the scatter shows (the view
+    # window) — the threshold lines summarise the dots on screen.
     pct_where = ["contract_id = ?", "cycle_time_days IS NOT NULL"]
     pct_params: list = [contract_name]
-    if reference is not None:
+    if view is not None:
         pct_where.append("CAST(completed_at AS DATE) BETWEEN ? AND ?")
-        pct_params.extend([reference.from_, reference.to])
+        pct_params.extend([view.from_, view.to])
     p50_row, p85_row, p95_row = con.execute(
         f"""
         SELECT

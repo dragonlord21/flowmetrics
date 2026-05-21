@@ -215,20 +215,19 @@ def render_when_done(
     contract_name: str,
     *,
     items: int,
-    start_date: date | None = None,
+    start_date: date,
     runs: int = DEFAULT_RUNS,
     seed: int = 0,
     reference: Window | None = None,
 ) -> WhenDoneData:
     """Run a Monte Carlo simulation: when will `items` be done?
 
-    `start_date` defaults to today (UTC). `reference` clamps
-    the historical-throughput sample to that inclusive window —
-    the "MCS over a specific period" control. Returns a payload
-    with the full histogram + the P50/P85/P95 dates.
+    `start_date` is required — the caller (the one window model)
+    supplies it; the component never invents a date. `reference`
+    clamps the historical-throughput sample to that inclusive
+    window. Returns a payload with the full histogram + the
+    P50/P85/P95 dates.
     """
-    if start_date is None:
-        start_date = datetime.now(UTC).date()
     samples = _daily_throughput(con, contract_name, reference=reference)
     rng = Random(seed)
     if not samples:

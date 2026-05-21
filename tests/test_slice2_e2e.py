@@ -1021,11 +1021,11 @@ class TestAgingOnDashboard:
         self, server_url: str, page: Page
     ):
         """User-pinned distinction: empty answers should be action-
-        first. The fixture's data ends in early May; default
-        asof=today is AFTER the latest data, so the message must
-        name the actual gap (latest data date vs asof) AND offer
-        a concrete way to fill it (button + collapsed CLI fallback).
-        """
+        first. The dashboard's default Period ends today; the
+        fixture's data ends in early May, so aging-as-of-today is
+        past coverage — the empty state must name the gap (latest
+        data vs asof) AND offer a concrete way to fill it (button
+        + collapsed CLI fallback)."""
         page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#aging-tile", timeout=10000)
         empty = page.locator("#aging-tile .aging-empty")
@@ -1036,15 +1036,13 @@ class TestAgingOnDashboard:
             f"empty message must name the latest data date; got {text!r}"
         )
         # The primary action is a button that POSTs to the
-        # materialise endpoint.
+        # materialise endpoint, with the gap window encoded.
         btn = page.locator("#aging-tile .aging-empty button.btn--primary")
         expect(btn).to_be_visible()
         hx_post = btn.get_attribute("hx-post")
         assert hx_post and "/api/internal/materialise" in hx_post, (
             f"button must hx-post to the materialise endpoint; got {hx_post!r}"
         )
-        # Both since and until are encoded in the URL so the backfill
-        # window matches the gap.
         assert "since=" in hx_post and "until=" in hx_post, (
             f"materialise URL must carry since + until; got {hx_post!r}"
         )
@@ -1052,20 +1050,16 @@ class TestAgingOnDashboard:
     def test_real_empty_state_says_warehouse_covers_this_date(
         self, server_url: str, page: Page
     ):
-        """A fragment-endpoint round-trip is the cleanest way to
-        exercise the real-empty branch without needing a fixture
-        date that happens to be in-window AND have zero in-flight.
-        Hit `/api/internal/aging` with no asof (defaults to today
-        UTC) and inspect the HTML — but for the fixture, today is
-        past contract.stop so the empty state is 'outside window'.
-        We can confirm the 'real empty' branch via the rendered
-        text on a synthetic asof if available; otherwise rely on
-        the unit test (TestAgingShape) which pins the component
-        contract directly.
+        """Aging defaults its `asof` to the anchor — and the
+        dashboard anchors to the most recent data date. For the
+        fixture that date is covered by completed-work data but
+        has no open-work snapshot, so one of the empty-state
+        messages must render.
 
         This e2e test just confirms the empty-state machinery
-        EXISTS on the rendered page (one of the four messages),
-        not which branch lit up."""
+        EXISTS on the rendered page (one of the messages), not
+        which branch lit up — the component contract is pinned
+        directly by the unit tests (TestAgingShape)."""
         page.goto(
             server_url + "/workflows/astral-uv-week/metrics/aging"
         )
@@ -1082,6 +1076,8 @@ class TestAgingOnDashboard:
                 "earliest data is from",
                 "no items in flight",
                 "warehouse covers",
+                "completed-work data through",
+                "haven't been captured",
                 "import data",
             )
         ), f"empty-state message must explain why; got {text!r}"

@@ -434,6 +434,33 @@ def render(
     if not first_entries:
         return _empty()
 
+    # Coverage gate: when the picked view window sits entirely
+    # outside the warehouse's data, there is nothing to render —
+    # return NODATA, never a stale cumulative count carried
+    # forward. Coverage is the completion span — the same number
+    # the freshness banner reports, so every metric agrees on
+    # "what data the warehouse has". (Transition timestamps are
+    # not used here: in-flight snapshots get materialise-time
+    # markers that would mask a stale warehouse.)
+    if view is not None:
+        cov = con.execute(
+            "SELECT min(CAST(completed_at AS DATE)), "
+            "       max(CAST(completed_at AS DATE)) "
+            "FROM work_items "
+            "WHERE contract_id = ? AND completed_at IS NOT NULL",
+            [contract_name],
+        ).fetchone()
+        cov_lo = cov[0] if cov else None
+        cov_hi = cov[1] if cov else None
+        if cov_hi is not None and (
+            view.from_ > cov_hi or view.to < cov_lo
+        ):
+            return _empty(
+                "No data available for "
+                f"{to_utc_display_date(datetime(view.from_.year, view.from_.month, view.from_.day, tzinfo=UTC))}"
+                f" – {to_utc_display_date(datetime(view.to.year, view.to.month, view.to.day, tzinfo=UTC))}"
+            )
+
     reached_by_stage = _compute_reached_dates(first_entries, stages)
 
     first_date, last_date = _resolve_window(
