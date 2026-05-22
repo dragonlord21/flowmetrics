@@ -8,7 +8,8 @@
    no-op (so this fragment is safe to embed on any page).
 
    Required context:
-     data           — ThroughputData (provides vega_spec_json())
+     data           — ThroughputModel (rendered to a spec via the
+                      `vega_spec` Jinja global)
      chart_height   — int pixels (~280 for tile, ~440 for detail)
      contract.name  — used to build the work-items endpoint URL
 #}
@@ -43,7 +44,7 @@
       window.__flowmetricsThroughputView = null;
     }
 
-    const spec = {{ data.vega_spec_json() | safe }};
+    const spec = {{ vega_spec(data) | safe }};
     spec.height = {{ _h }};
     vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
       actions: false,

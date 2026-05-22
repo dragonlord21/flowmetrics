@@ -122,9 +122,7 @@ def _collect_component_specs(warehouse) -> list[tuple[str, dict]]:
         ),
         (
             "throughput",
-            json.loads(
-                render_throughput(warehouse, "astral-uv-week").vega_spec_json()
-            ),
+            to_vega(render_throughput(warehouse, "astral-uv-week")),
         ),
         (
             "aging",

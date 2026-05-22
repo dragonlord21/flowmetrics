@@ -342,21 +342,9 @@ class WorkflowView:
         )
 
     def render_throughput(self, con):
-        return render_throughput(
-            con, self.id,
-            view=self.view_window,
-            # Coverage = the completion span the warehouse
-            # actually holds, NOT the contract YAML window. A
-            # Data Source backfill fetches an arbitrary range and
-            # never rewrites the YAML, so `contract.start/stop`
-            # routinely understates coverage — keying off it tags
-            # real completion days as "no data" ("102 items over
-            # 0 days"). A day inside [data_min, data_max] with
-            # zero completions is a true zero; outside it is
-            # genuinely NODATA.
-            warehouse_start=self.data_min_date,
-            warehouse_stop=self.data_max_date,
-        )
+        # The throughput model derives its own coverage from the
+        # observed completion span — caller passes only the view.
+        return render_throughput(con, self.id, view=self.view_window)
 
     def render_forecast_when_done(self, con, *, items: int, start_date=None):
         return render_forecast_when_done(
