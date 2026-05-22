@@ -9,7 +9,7 @@
    confusing blank canvas with just percentile lines.
 
    Required context:
-     data           — AgingData (provides vega_spec_json())
+     data           — AgingModel (rendered via the `vega_spec` global)
      chart_height   — int pixels (~320 for tile, ~480 for detail)
 #}
 {%- set chart_container_id = "aging-chart" -%}
@@ -26,7 +26,7 @@
       <div class="aging-empty aging-empty--gap">
         <p class="aging-empty-headline">
           Most recent data is from
-          <strong>{{ data.coverage.latest_display }}</strong>.
+          <strong>{{ data.coverage_latest_display }}</strong>.
           You're asking about
           <strong>{{ data.asof_display }}</strong>.
         </p>
@@ -39,7 +39,7 @@
       <div class="aging-empty aging-empty--gap">
         <p class="aging-empty-headline">
           Earliest data is from
-          <strong>{{ data.coverage.earliest_display }}</strong>.
+          <strong>{{ data.coverage_earliest_display }}</strong>.
           You're asking about
           <strong>{{ data.asof_display }}</strong>.
         </p>
@@ -55,7 +55,7 @@
         </p>
         <p class="aging-empty-sub">
           The warehouse has completed-work data through
-          <strong>{{ data.coverage.latest_display }}</strong> but
+          <strong>{{ data.coverage_latest_display }}</strong> but
           no snapshot of currently-open work.
         </p>
         <p class="aging-empty-actions">
@@ -71,8 +71,8 @@
           No items in flight on {{ data.asof_display }}.
         </p>
         <p class="aging-empty-sub">
-          The warehouse covers this date{% if data.coverage.earliest_display and data.coverage.latest_display %}
-          ({{ data.coverage.earliest_display }} – {{ data.coverage.latest_display }}){% endif %};
+          The warehouse covers this date{% if data.coverage_earliest_display and data.coverage_latest_display %}
+          ({{ data.coverage_earliest_display }} – {{ data.coverage_latest_display }}){% endif %};
           there genuinely was no open work at that moment.
         </p>
       </div>
@@ -92,7 +92,7 @@
       window.__flowmetricsAgingView = null;
     }
 
-    const spec = {{ data.vega_spec_json() | safe }};
+    const spec = {{ vega_spec(data) | safe }};
     spec.height = {{ _h }};
     vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
       actions: false,

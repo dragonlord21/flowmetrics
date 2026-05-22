@@ -46,8 +46,8 @@ from datetime import date
 from flowmetrics.cli import cli
 from flowmetrics.web.components.aging import render as render_aging
 from flowmetrics.web.components.cfd import render as render_cfd
+from flowmetrics.web.components._vega import to_vega
 from flowmetrics.web.components.cycle_time import render as render_cycle_time
-from flowmetrics.web.components.cycle_time import to_vega as cycle_time_to_vega
 from flowmetrics.web.components.forecast import (
     render_how_many as render_forecast_how_many,
     render_when_done as render_forecast_when_done,
@@ -118,9 +118,7 @@ def _collect_component_specs(warehouse) -> list[tuple[str, dict]]:
     return [
         (
             "cycle_time",
-            cycle_time_to_vega(
-                render_cycle_time(warehouse, "astral-uv-week")
-            ),
+            to_vega(render_cycle_time(warehouse, "astral-uv-week")),
         ),
         (
             "throughput",
@@ -130,15 +128,13 @@ def _collect_component_specs(warehouse) -> list[tuple[str, dict]]:
         ),
         (
             "aging",
-            json.loads(
-                # Pick an asof inside the fixture window so the
-                # in-flight set is non-empty and the spec is
-                # representative of a real render.
+            # Pick an asof inside the fixture window so the
+            # in-flight set is non-empty and the spec is
+            # representative of a real render.
+            to_vega(
                 render_aging(
-                    warehouse,
-                    "astral-uv-week",
-                    asof=date(2026, 5, 6),
-                ).vega_spec_json()
+                    warehouse, "astral-uv-week", asof=date(2026, 5, 6),
+                )
             ),
         ),
         (

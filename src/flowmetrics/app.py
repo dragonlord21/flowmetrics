@@ -328,8 +328,6 @@ class WorkflowView:
         return render_aging(
             con, self.id,
             asof=asof,
-            contract_start=self.contract.start,
-            contract_stop=self.contract.stop,
             states=self.contract.states,
             reference=self.selection.reference,
         )
