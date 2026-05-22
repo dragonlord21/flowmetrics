@@ -452,6 +452,15 @@ def create_app(
 
     templates.env.filters["keep_filters"] = _keep_filters
 
+    # `vega_spec` Jinja global — turns a chart model into its
+    # Vega-Lite spec JSON. The chart fragment templates call
+    # `{{ vega_spec(data) | safe }}`; `to_vega` dispatches on the
+    # model type, so each migrated chart registers its own
+    # translator (see web/components/_vega.py).
+    from .web.components._vega import vega_spec_json
+
+    templates.env.globals["vega_spec"] = vega_spec_json
+
     # Auth dependency — pass-through when no password configured.
     # FastAPI's idiomatic `Depends(...)` lives in the parameter default
     # which trips ruff's B008; bound to a module-level helper here so

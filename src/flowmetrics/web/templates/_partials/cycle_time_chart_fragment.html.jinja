@@ -3,7 +3,8 @@
    from `/api/internal/cycle-time` as the HTMX swap payload.
 
    Required context:
-     data           — CycleTimeData (provides vega_spec_json())
+     data           — CycleTimeModel (rendered to a spec via the
+                      `vega_spec` Jinja global)
      chart_height   — int pixels (default ~320 for tile, ~480 for detail)
 #}
 {%- set chart_container_id = "cycle-time-chart" -%}
@@ -34,7 +35,7 @@
       window.__flowmetricsCycleTimeView = null;
     }
 
-    const spec = {{ data.vega_spec_json() | safe }};
+    const spec = {{ vega_spec(data) | safe }};
     spec.height = {{ _h }};
     vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
       actions: false,
