@@ -18,7 +18,7 @@ percentile extraction, display formatting, and the headline.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from random import Random
 
 from ..forecast import (
@@ -28,6 +28,7 @@ from ..forecast import (
     monte_carlo_how_many,
     monte_carlo_when_done,
 )
+from ..throughput import daily_counts
 from ..utc_dates import attach_utc, to_utc_display_date
 from ..warehouse.queries import CompletedItem
 from ..windows import Window
@@ -115,27 +116,18 @@ def _daily_counts(
     """Daily completion counts across the OBSERVED completion span,
     optionally narrowed to `reference`.
 
-    Returns one entry per calendar date from the first to the last
-    observed completion. Interior zero days (real slow days) stay
-    in; the walk does NOT extend beyond the observed span. Padding
-    with phantom zero days outside the data would feed the Monte
-    Carlo NODATA dressed up as zero throughput — biasing every
-    forecast pessimistically.
+    The walk is bounded by the observed completion span — not by
+    `reference`. Padding with phantom zero days outside the data
+    would feed the Monte Carlo NODATA dressed up as zero throughput,
+    biasing every forecast pessimistically. Reference scopes WHICH
+    completions count; it never extends the sample.
     """
     dates = [_utc_date(it.completed_at) for it in items]
     if reference is not None:
         dates = [d for d in dates if reference.from_ <= d <= reference.to]
     if not dates:
         return []
-    by_date: dict[date, int] = {}
-    for d in dates:
-        by_date[d] = by_date.get(d, 0) + 1
-    cur, last = min(dates), max(dates)
-    out: list[int] = []
-    while cur <= last:
-        out.append(by_date.get(cur, 0))
-        cur += timedelta(days=1)
-    return out
+    return daily_counts(dates, min(dates), max(dates))
 
 
 def build_when_done_model(

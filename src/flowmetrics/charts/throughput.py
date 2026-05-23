@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Literal
 
+from ..throughput import daily_counts
 from ..utc_dates import attach_utc, to_utc_display_date, to_utc_iso_date
 from ..warehouse.queries import CompletedItem
 from ..windows import Window
@@ -89,21 +90,21 @@ def build_throughput_model(
             headline="No completed items in this window.",
         )
 
-    counts: dict[date, int] = {}
-    for d in windowed:
-        counts[d] = counts.get(d, 0) + 1
-
     # Window span: chosen Period when a view is set (Vacanti — the
     # rate divides over the PERIOD, not the observed-completion
     # span); data-derived otherwise.
     if view is not None:
         first_d, last_d = view.from_, view.to
     else:
-        first_d, last_d = min(counts), max(counts)
+        first_d, last_d = min(windowed), max(windowed)
+
+    # Shared per-day count helper — same primitive the forecast's
+    # daily-throughput sample uses.
+    counts_per_day = daily_counts(windowed, first_d, last_d)
 
     daily: list[DailyThroughput] = []
-    cur = first_d
-    while cur <= last_d:
+    for i, count in enumerate(counts_per_day):
+        cur = first_d + timedelta(days=i)
         coverage: Literal["warehouse", "missing", "stale"] = (
             "warehouse" if warehouse_start <= cur <= warehouse_stop else "missing"
         )
@@ -115,12 +116,11 @@ def build_throughput_model(
             DailyThroughput(
                 date_iso=to_utc_iso_date(anchored),
                 date_display=to_utc_display_date(anchored),
-                count=counts.get(cur, 0),
+                count=count,
                 day_type=day_type,
                 data_coverage=coverage,
             )
         )
-        cur += timedelta(days=1)
 
     total = sum(d.count for d in daily)
     span_days = len(daily)

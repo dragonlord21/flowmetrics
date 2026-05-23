@@ -3,7 +3,7 @@
 from datetime import UTC, date, datetime
 
 from flowmetrics.compute import WorkItem
-from flowmetrics.throughput import daily_throughput
+from flowmetrics.throughput import daily_counts, daily_throughput
 
 
 def pr(number: int, completed_at: datetime) -> WorkItem:
@@ -64,3 +64,30 @@ class TestDailyThroughput:
             date(2026, 5, 5),
         )
         assert samples == [1, 0]
+
+
+class TestDailyCounts:
+    """The shared zero-filled-daily-counts primitive both the CLI
+    `daily_throughput` and the web chart-model layer call into.
+    Pure: dates in, counts out — no `WorkItem`, no warehouse."""
+
+    def test_counts_per_day_in_inclusive_window(self):
+        dates = [date(2026, 5, 4), date(2026, 5, 4), date(2026, 5, 6)]
+        assert daily_counts(dates, date(2026, 5, 4), date(2026, 5, 7)) == [2, 0, 1, 0]
+
+    def test_dates_outside_window_are_ignored(self):
+        dates = [date(2026, 5, 3), date(2026, 5, 5), date(2026, 5, 11)]
+        assert daily_counts(dates, date(2026, 5, 4), date(2026, 5, 10)) == [
+            0, 1, 0, 0, 0, 0, 0,
+        ]
+
+    def test_empty_dates_yields_all_zeros(self):
+        assert daily_counts([], date(2026, 5, 4), date(2026, 5, 10)) == [0] * 7
+
+    def test_single_day_window(self):
+        assert daily_counts([date(2026, 5, 4)], date(2026, 5, 4), date(2026, 5, 4)) == [1]
+
+    def test_stop_before_start_raises(self):
+        import pytest
+        with pytest.raises(ValueError):
+            daily_counts([], date(2026, 5, 10), date(2026, 5, 4))
