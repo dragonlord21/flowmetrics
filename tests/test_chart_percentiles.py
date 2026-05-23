@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from flowmetrics.percentiles import chart_percentiles
+from flowmetrics.charts.primitives import chart_percentiles
 
 
 class TestChartPercentiles:

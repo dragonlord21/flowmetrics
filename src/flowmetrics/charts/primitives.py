@@ -11,6 +11,13 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TypeVar
+
+T = TypeVar("T", int, float)
+
+# Vacanti's canonical chart-annotation percentiles — the ceil-index
+# `chart_percentiles` variant returns this set.
+CANONICAL_PERCENTILES = (50, 70, 85, 95)
 
 
 def percentile_cont(values: Sequence[float], p: float) -> float:
@@ -58,6 +65,40 @@ class RangeControl:
     floor: int
     ceiling: int
     default: int
+
+
+def _index_at(percentile: int, n: int) -> int:
+    """Index into a sorted list for the p-th percentile. Uses
+    ceil(p/100*n) so the 50th of 10 → index 5 (value at the 5th
+    position, i.e. 5 in 1..10). Subtract 1 for 0-indexing."""
+    return max(0, math.ceil(percentile / 100 * n) - 1)
+
+
+def chart_percentiles(values: Sequence[T]) -> dict[int, T]:
+    """Vacanti's canonical chart-annotation percentiles —
+    `{50: v50, 70: v70, 85: v85, 95: v95}` from `values`.
+
+    Uses the *ceil-index* rule: the p-th percentile is the
+    smallest value x such that at least p% of the sorted values
+    are <= x. More conservative than linear interpolation for the
+    small sample sizes typical of weekly windows; matches the
+    forward-percentile reading used elsewhere
+    (`forecast.forward_percentile`).
+
+    Note: this is a DIFFERENT method from `percentile_cont` (above)
+    which does linear interpolation. The web chart-model layer
+    uses `percentile_cont` to match DuckDB; the CLI compute path
+    uses `chart_percentiles` for the more conservative reading on
+    small samples.
+    """
+    if not values:
+        raise ValueError("chart_percentiles requires at least one value")
+    sorted_values = sorted(values)
+    n = len(sorted_values)
+    return {
+        p: sorted_values[min(n - 1, max(0, _index_at(p, n)))]
+        for p in CANONICAL_PERCENTILES
+    }
 
 
 def range_control(

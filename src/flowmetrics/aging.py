@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from .compute import FlowEfficiency, WorkItem
-from .percentiles import CANONICAL_PERCENTILES, chart_percentiles
+from .charts.primitives import CANONICAL_PERCENTILES, chart_percentiles
 from .stream import Stream
 
 

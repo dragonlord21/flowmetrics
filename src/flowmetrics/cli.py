@@ -566,7 +566,7 @@ def scatterplot(
     )
 
     def build() -> ScatterplotReport:
-        from .percentiles import chart_percentiles
+        from .charts.primitives import chart_percentiles
         items = src.fetch_for_percentile_training(start_d, stop_d)
         points: list[ScatterplotPoint] = []
         cycle_days: list[float] = []
