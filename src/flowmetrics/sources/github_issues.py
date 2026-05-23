@@ -23,9 +23,9 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from .. import signals
-from ..canonical import StageTransition, WorkflowDef
+from ..canonical import StageTransition
 from ..compute import StatusInterval, WorkItem
-from ..stream import Stream, StreamItem
+from ..stream import StreamItem
 
 ISSUE_SEARCH_QUERY = """
 query($q: String!, $first: Int!, $after: String) {
@@ -420,24 +420,3 @@ def fetch_issues_closed_in_window(
     return entries
 
 
-def build_stream_for_aging(
-    repo: str, start: date, stop: date, *, client, workflow: WorkflowDef,
-) -> Stream:
-    """Build a canonical Stream for the Aging report from a
-    GitHub repo's Issues + their closing PRs.
-
-    Only Issues that closed in [start, stop] are included.
-    Each Issue's terminal Done transition is either:
-      - mergedAt of the closing PR (SIGNAL_GITHUB_PR_CLOSES_ISSUE), or
-      - the Issue's own closedAt (SIGNAL_GITHUB_ISSUE_CLOSED).
-
-    The workflow def is supplied by the caller — typically
-    derived from the repo's label vocabulary.
-    """
-    entries = fetch_issues_closed_in_window(repo, start, stop, client=client)
-    items: list[StreamItem] = []
-    transitions: list[StageTransition] = []
-    for item, txs in entries:
-        items.append(item)
-        transitions.extend(txs)
-    return Stream(items=items, transitions=transitions, workflow=workflow)

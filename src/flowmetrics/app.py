@@ -38,25 +38,31 @@ from .backfill import (
     write_status,
 )
 from .contract import ContractError, load_contract
-from .windows import parse_windows
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
-from .web.components.data_source import render as render_data_source
 from .web.components.cycle_time import render as render_cycle_time
+from .web.components.data_source import render as render_data_source
 from .web.components.forecast import (
     render_how_many as render_forecast_how_many,
+)
+from .web.components.forecast import (
     render_when_done as render_forecast_when_done,
 )
 from .web.components.lifecycle import (
     ItemNotFound,
+)
+from .web.components.lifecycle import (
     render as render_lifecycle,
 )
 from .web.components.throughput import render as render_throughput
 from .web.components.work_items_table import (
     SortDir,
     SortKey,
+)
+from .web.components.work_items_table import (
     render as render_work_items_table,
 )
+from .windows import parse_windows
 
 _TEMPLATES_DIR = Path(__file__).parent / "web" / "templates"
 
@@ -411,8 +417,9 @@ def create_app(
     # query keys. Without the whitelist, internal-endpoint
     # params (`workflow=` on the dashboard-tile route) would
     # leak into every navigation URL.
-    from jinja2 import pass_context
     from urllib.parse import parse_qsl, urlencode
+
+    from jinja2 import pass_context
 
     _CARRIED_PARAMS = frozenset({
         "period", "anchor", "view_days", "ref_days",

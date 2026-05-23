@@ -14,12 +14,12 @@ from typing import Any
 import duckdb
 
 from ...charts.forecast import (
-    DEFAULT_RUNS,
-    HowManyModel,
-    WhenDoneModel,
     _PCT_COLOR_P50,
     _PCT_COLOR_P85,
     _PCT_COLOR_P95,
+    DEFAULT_RUNS,
+    HowManyModel,
+    WhenDoneModel,
     build_how_many_model,
     build_when_done_model,
 )

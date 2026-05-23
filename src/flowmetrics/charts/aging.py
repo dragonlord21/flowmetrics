@@ -27,6 +27,7 @@ from .primitives import (
     range_control,
 )
 
+
 @dataclass(frozen=True)
 class AgingPoint:
     """One in-flight item at the asof date."""

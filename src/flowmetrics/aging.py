@@ -14,8 +14,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
-from .compute import FlowEfficiency, WorkItem
 from .charts.primitives import CANONICAL_PERCENTILES, chart_percentiles
+from .compute import FlowEfficiency, WorkItem
 from .stream import Stream
 
 

@@ -28,7 +28,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-
 DEFAULT_VIEW_DAYS = 30
 
 
@@ -44,7 +43,7 @@ class Window:
         return (self.to - self.from_).days + 1
 
     @classmethod
-    def last_n_days(cls, n: int, *, today: date) -> "Window":
+    def last_n_days(cls, n: int, *, today: date) -> Window:
         """Window of `n` inclusive days ending on `today`."""
         return cls(from_=today - timedelta(days=n - 1), to=today)
 

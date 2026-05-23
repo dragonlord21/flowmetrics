@@ -39,14 +39,6 @@ class ResultsHistogram[X]:
     def max_outcome(self) -> X:
         return self.sorted_keys[-1]
 
-    @property
-    def min_date(self) -> X:  # back-compat alias for date outcomes
-        return self.min_outcome
-
-    @property
-    def max_date(self) -> X:
-        return self.max_outcome
-
 
 # ----------------------------------------------------------------------
 # Simulation
@@ -191,28 +183,6 @@ def forward_percentile[X](hist: ResultsHistogram[X], p: float) -> X:
         if cumulative >= threshold:
             return key
     return hist.sorted_keys[-1]  # pragma: no cover — defensive
-
-
-def render_histogram[X](
-    hist: ResultsHistogram[X],
-    *,
-    width: int = 50,
-    label: str = "outcome",
-) -> str:
-    """Render a Results Histogram as plain ASCII for terminal output.
-
-    Each row: outcome value, bar of `#` proportional to count, count number.
-    """
-    max_count = max(hist.counts.values())
-    label_width = max(len(str(k)) for k in hist.sorted_keys)
-    label_width = max(label_width, len(label))
-    lines = [f"  {label:<{label_width}}  freq  histogram"]
-    for key in hist.sorted_keys:
-        count = hist.counts[key]
-        bar_len = max(1, round(count / max_count * width)) if count > 0 else 0
-        bar = "#" * bar_len
-        lines.append(f"  {key!s:<{label_width}}  {count:>4}  {bar}")
-    return "\n".join(lines)
 
 
 def backward_percentile[X](hist: ResultsHistogram[X], p: float) -> X:

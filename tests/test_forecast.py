@@ -18,7 +18,6 @@ from flowmetrics.forecast import (
     forward_percentile,
     monte_carlo_how_many,
     monte_carlo_when_done,
-    render_histogram,
 )
 
 
@@ -215,23 +214,6 @@ class TestBackwardPercentile:
             backward_percentile(hist, 0)
         with pytest.raises(ValueError):
             backward_percentile(hist, 101)
-
-
-class TestRenderHistogram:
-    def test_renders_each_outcome_on_its_own_line(self):
-        hist = build_histogram([5, 5, 7, 9, 9, 9])
-        out = render_histogram(hist, label="items")
-        lines = out.splitlines()
-        # Header + 3 distinct outcomes
-        assert len(lines) == 4
-        assert "items" in lines[0]
-        assert "5" in lines[1]
-        assert "7" in lines[2]
-        assert "9" in lines[3]
-        # Tallest bar belongs to the most-frequent outcome (9 → count 3)
-        bar_5 = lines[1].count("#")
-        bar_9 = lines[3].count("#")
-        assert bar_9 > bar_5
 
 
 class TestSimulationConvergence:

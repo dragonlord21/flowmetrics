@@ -379,15 +379,6 @@ query($q: String!, $first: Int!, $after: String) {
 """.strip()
 
 
-# Workflow ordering used for charts and CLI defaults. Earliest → latest.
-GITHUB_PR_WORKFLOW: tuple[str, ...] = (
-    "Draft",
-    "Awaiting Review",
-    "Changes Requested",
-    "Approved",
-)
-
-
 def _pr_open_phase(*, is_draft: bool, review_decision: str | None) -> str:
     """Derive a PR's current open-phase from GitHub's two native signals.
 
