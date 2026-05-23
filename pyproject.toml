@@ -37,6 +37,7 @@ select = [
 ignore = [
     "E501",          # long lines (line-length handles most cases)
     "RUF001",        # ambiguous unicode in strings — en-dash + arrows are intentional
+    "RUF002",        # ambiguous unicode in docstrings — same reason
     "RUF003",        # ambiguous unicode in comments — same reason
 ]
 

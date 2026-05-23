@@ -325,7 +325,7 @@ def render(
     )
     offset = (page - 1) * page_size
     rows = con.execute(
-        data_sql, where_params + [page_size, offset]
+        data_sql, [*where_params, page_size, offset]
     ).fetchall()
 
     # Pre-parse the asof date once so we can compute age per row

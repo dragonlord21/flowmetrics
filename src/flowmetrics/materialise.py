@@ -24,9 +24,19 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import duckdb
+
+from .contract import Contract
+from .service import make_github_source, make_jira_source
+from .sources.intervals import (
+    github_workitem_to_transitions,
+    jira_workitem_to_transitions,
+)
 
 # A `.tmp` file from a Parquet/status write is short-lived — it
 # exists only for the few seconds of the `COPY`, then is renamed
@@ -60,21 +70,10 @@ def cleanup_tmp_files(
         except OSError:
             continue
         if now - mtime >= older_than:
-            try:
+            with suppress(OSError):
                 tmp.unlink()
                 deleted += 1
-            except OSError:
-                pass
     return deleted
-
-import duckdb
-
-from .contract import Contract
-from .service import make_github_source, make_jira_source
-from .sources.intervals import (
-    github_workitem_to_transitions,
-    jira_workitem_to_transitions,
-)
 
 
 @dataclass(frozen=True)
@@ -129,10 +128,8 @@ def _compact_one(
     os.replace(tmp_path, out_path)
     # Compacted file is safely in place — now drop the originals.
     for p in originals:
-        try:
+        with suppress(OSError):
             p.unlink()
-        except OSError:
-            pass
 
 
 def compact_contract(

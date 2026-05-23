@@ -67,10 +67,11 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
     for d in model.daily:
         for i, stage in enumerate(model.stages):
             cur = d.counts[stage]
-            if i < len(model.stages) - 1:
-                band_height = cur - d.counts[model.stages[i + 1]]
-            else:
-                band_height = cur
+            band_height = (
+                cur - d.counts[model.stages[i + 1]]
+                if i < len(model.stages) - 1
+                else cur
+            )
             values.append({
                 "date_iso": d.date_iso,
                 "date_display": d.date_display,

@@ -122,7 +122,7 @@ def _duration_display(seconds: float) -> str:
         < 24h        → "Hh Mm"
         ≥ 24h        → "Dd Hh"
     """
-    secs = int(round(seconds))
+    secs = round(seconds)
     if secs < 60:
         return f"{secs}s"
     if secs < 3600:
@@ -157,9 +157,7 @@ def render(
             f"no work item found for contract={contract_name!r} "
             f"source={source!r} item_id={item_id!r}"
         )
-    title, url, header_created_at, header_completed_at, cycle_time_days = (
-        header_row
-    )
+    title, url, _, header_completed_at, cycle_time_days = header_row
 
     rows = con.execute(
         "SELECT entered_at, stage, signal FROM transitions "

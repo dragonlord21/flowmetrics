@@ -11,9 +11,6 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TypeVar
-
-T = TypeVar("T", int, float)
 
 # Vacanti's canonical chart-annotation percentiles — the ceil-index
 # `chart_percentiles` variant returns this set.
@@ -74,7 +71,7 @@ def _index_at(percentile: int, n: int) -> int:
     return max(0, math.ceil(percentile / 100 * n) - 1)
 
 
-def chart_percentiles(values: Sequence[T]) -> dict[int, T]:
+def chart_percentiles[T: (int, float)](values: Sequence[T]) -> dict[int, T]:
     """Vacanti's canonical chart-annotation percentiles —
     `{50: v50, 70: v70, 85: v85, 95: v95}` from `values`.
 
