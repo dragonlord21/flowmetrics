@@ -55,11 +55,12 @@ class TestComputeAgingFromStream:
         # x:2 is in Done (not in WIP) - excluded.
         assert {a.item_id for a in out} == {"x:1"}
 
-    def test_age_days_is_calendar_days_from_created_at_to_asof(self):
+    def test_age_days_is_vacanti_cd_minus_sd_plus_one(self):
         s = _toy_stream()
         out = compute_aging_from_stream(s, asof=date(2026, 5, 10))
         a = next(a for a in out if a.item_id == "x:1")
-        assert a.age_days == (date(2026, 5, 10) - date(2026, 5, 1)).days
+        # CD - SD + 1: (May 10 - May 1) + 1 = 10.
+        assert a.age_days == (date(2026, 5, 10) - date(2026, 5, 1)).days + 1
 
     def test_current_state_is_the_stage_at_asof(self):
         s = _toy_stream()

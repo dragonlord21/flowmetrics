@@ -86,18 +86,23 @@ class TestComputeAgingFiltering:
 
 
 class TestAgeComputation:
-    def test_age_days_is_today_minus_created_date(self):
+    """Age follows Vacanti's CD - SD + 1 rule (whole calendar days,
+    both endpoints inclusive) — same rule the web chart-model uses,
+    same rule cycle time uses."""
+
+    def test_age_days_is_today_minus_created_date_plus_one(self):
         items = [
             _in_flight(
                 "X-1",
-                created=ts(2026, 5, 1),  # 11 days before asof
+                created=ts(2026, 5, 1),  # 11 calendar days before asof
                 intervals=[("Open", ts(2026, 5, 1), ts(2026, 5, 12))],
             )
         ]
         out = compute_aging(items, asof=date(2026, 5, 12))
-        assert out[0].age_days == 11
+        # Vacanti: (May 12 - May 1) + 1 = 12.
+        assert out[0].age_days == 12
 
-    def test_age_is_zero_for_just_created_item(self):
+    def test_same_day_item_ages_as_one_day(self):
         items = [
             _in_flight(
                 "X-2",
@@ -106,7 +111,8 @@ class TestAgeComputation:
             )
         ]
         out = compute_aging(items, asof=date(2026, 5, 12))
-        assert out[0].age_days == 0
+        # A same-day item ages as 1d under CD - SD + 1.
+        assert out[0].age_days == 1
 
 
 class TestCurrentStateDerivation:
@@ -279,10 +285,12 @@ class TestMaxAgeFilter:
         assert all(it.age_days <= 180 for it in out)
 
     def test_max_age_days_boundary_inclusive(self):
-        """An item exactly at max_age_days is kept (≤, not <)."""
+        """An item exactly at max_age_days is kept (≤, not <).
+        Vacanti's `+1` means an item created 179 calendar days ago
+        ages as 180."""
         asof = date(2026, 5, 12)
         created = datetime.combine(
-            asof - timedelta(days=180), datetime.min.time(), tzinfo=UTC
+            asof - timedelta(days=179), datetime.min.time(), tzinfo=UTC
         ) + timedelta(hours=12)
         items = [
             _in_flight(
@@ -301,13 +309,13 @@ class TestMaxAgeFilter:
         out = compute_aging(items, asof=asof, max_age_days=None)
         assert len(out) == 5
 
-    def test_max_age_days_zero_keeps_only_items_created_today(self):
-        """max_age_days=0 is an edge case but should not crash; only
-        items created today (age 0) survive."""
+    def test_max_age_days_zero_keeps_nothing(self):
+        """max_age_days=0 is an edge case — under Vacanti `+1` every
+        item ages as ≥ 1d, so no item survives a zero cap."""
         asof = date(2026, 5, 12)
         items = self._items_at_various_ages(asof)
         out = compute_aging(items, asof=asof, max_age_days=0)
-        assert out == []  # the youngest item in the fixture is age=1
+        assert out == []
 
 
 class TestComputeAgingDistribution:

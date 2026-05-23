@@ -43,6 +43,10 @@ def compute_aging(
     they have a Cycle Time, not an Age. Current state is read from the
     last status_interval; if there are none, falls back to ``"Unknown"``.
 
+    Age uses Vacanti's `CD - SD + 1` rule (whole calendar days, both
+    endpoints inclusive) — the same rule cycle time uses, so the two
+    metrics speak the same units. A same-day item ages as 1d.
+
     Per-item drill-down URLs are read directly from `WorkItem.url`,
     which the source populated at fetch time (GitHub PR URL or Jira
     browse URL).
@@ -55,7 +59,7 @@ def compute_aging(
     for item in items:
         if item.completed_at is not None:
             continue
-        age_days = (asof - item.created_at.date()).days
+        age_days = (asof - item.created_at.date()).days + 1
         if max_age_days is not None and age_days > max_age_days:
             continue
         current = item.status_intervals[-1].status if item.status_intervals else "Unknown"
@@ -80,9 +84,10 @@ def compute_aging_from_stream(
     """Canonical-stream version of compute_aging.
 
     Same return shape as `compute_aging` so renderers don't change.
-    Inputs differ: this reads the two-table Stream so the same
-    code path handles a pure-PR flow, a pure-Issue flow, and an
-    Issue+PR stitched flow without per-source branching.
+    Same Vacanti `CD - SD + 1` age rule, too. Inputs differ: this
+    reads the two-table Stream so the same code path handles a
+    pure-PR flow, a pure-Issue flow, and an Issue+PR stitched flow
+    without per-source branching.
 
     `asof` selects the snapshot date. An item appears in the result
     iff its current stage (per the Stream) is in the workflow's
@@ -93,7 +98,7 @@ def compute_aging_from_stream(
         stage = stream.current_stage_at(item.item_id, asof)
         if stage is None or stage not in stream.workflow.wip_set:
             continue
-        age_days = (asof - item.created_at.date()).days
+        age_days = (asof - item.created_at.date()).days + 1
         if max_age_days is not None and age_days > max_age_days:
             continue
         out.append(
