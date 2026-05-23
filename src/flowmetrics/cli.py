@@ -1211,6 +1211,31 @@ def materialise(
 # ---------------------------------------------------------------------------
 
 
+def _assert_port_available(host: str, port: int) -> None:
+    """Check the port is free BEFORE handing off to uvicorn so an
+    already-bound port surfaces as a readable message naming the
+    port + the `--port N` escape hatch — not uvicorn's raw
+    `[Errno 48] Address already in use` traceback."""
+    import errno
+    import socket as _socket
+
+    probe = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    try:
+        probe.bind((host, port))
+    except OSError as exc:
+        if exc.errno in (errno.EADDRINUSE, errno.EACCES):
+            raise click.ClickException(
+                f"port {port} on {host} is already in use.\n"
+                f"  - find what is holding it:  lsof -ti:{port}\n"
+                f"  - free it:                  kill $(lsof -ti:{port})\n"
+                f"  - or pick another port:     "
+                f"flow serve --port {port + 1}"
+            ) from exc
+        raise
+    finally:
+        probe.close()
+
+
 @cli.command(short_help="Serve the warehouse-backed web UI")
 @click.option(
     "--port",
@@ -1271,6 +1296,8 @@ def serve(
             err=True,
         )
         sys.exit(2)
+
+    _assert_port_available(host, port)
 
     app = create_app(
         data_dir=data_dir,
