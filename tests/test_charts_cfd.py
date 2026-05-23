@@ -13,6 +13,7 @@ from datetime import date
 
 from flowmetrics.charts.cfd import (
     build_cfd_model,
+    cumulative_arrivals_by_stage,
     infer_stage_order,
 )
 from flowmetrics.warehouse.queries import StageEntry
@@ -43,6 +44,43 @@ class TestInferStageOrder:
             ["A", "B", "C"],
         )
         assert order == ("A", "B", "C")
+
+
+class TestCumulativeArrivalsByStage:
+    """The shared cumulative-counting primitive both `build_cfd_model`
+    (web) and `flowmetrics.cfd.build_cfd` (CLI) call into."""
+
+    def test_counts_arrivals_per_date_per_stage(self):
+        # #1 enters A on Jan 1, B on Jan 3. #2 enters A on Jan 2.
+        entries = [
+            _entry("#1", "A", date(2026, 1, 1)),
+            _entry("#1", "B", date(2026, 1, 3)),
+            _entry("#2", "A", date(2026, 1, 2)),
+        ]
+        out = cumulative_arrivals_by_stage(
+            entries, ("A", "B"),
+            sample_dates=[date(2026, 1, i) for i in (1, 2, 3)],
+        )
+        assert out == [
+            {"A": 1, "B": 0},  # only #1 entered A
+            {"A": 2, "B": 0},  # #1 + #2 entered A
+            {"A": 2, "B": 1},  # #1 reached B
+        ]
+
+    def test_items_that_skip_an_early_stage_propagate_backward(self):
+        # #1 only ever entered B — must be counted in A from B-date.
+        out = cumulative_arrivals_by_stage(
+            [_entry("#1", "B", date(2026, 1, 5))],
+            ("A", "B"),
+            sample_dates=[date(2026, 1, 5)],
+        )
+        assert out == [{"A": 1, "B": 1}]
+
+    def test_empty_entries_yields_zeros(self):
+        out = cumulative_arrivals_by_stage(
+            [], ("A", "B"), sample_dates=[date(2026, 1, 1)],
+        )
+        assert out == [{"A": 0, "B": 0}]
 
 
 class TestBuildCfdModel:

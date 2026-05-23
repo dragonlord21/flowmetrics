@@ -14,7 +14,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from flowmetrics.cfd import CfdPoint, build_cfd
+from flowmetrics.cfd import CfdPoint, build_cfd, workitem_stage_entries
 from flowmetrics.compute import StatusInterval, WorkItem
 
 
@@ -343,3 +343,77 @@ class TestEmptyInputs:
                 start=date(2026, 5, 5), stop=date(2026, 5, 1),
                 interval=timedelta(days=1),
             )
+
+
+class TestWorkItemStageEntries:
+    """The adapter that flattens `WorkItem`s into the same
+    `StageEntry` rows the warehouse query emits. Lets the CLI and
+    the web layer share `cumulative_arrivals_by_stage`."""
+
+    def test_status_intervals_become_stage_entries(self):
+        item = _item(
+            item_id="#1",
+            created=ts(2026, 5, 1),
+            merged=None,
+            intervals=[("Review", ts(2026, 5, 3), ts(2026, 5, 4))],
+        )
+        entries = workitem_stage_entries(
+            [item], workflow=["Open", "Review", "Merged"],
+        )
+        # We emit Open (from created_at) and Review (from interval).
+        by_stage = {e.stage: e.entered_date for e in entries}
+        assert by_stage["Review"] == date(2026, 5, 3)
+
+    def test_created_at_seeds_the_first_stage(self):
+        item = _item(
+            item_id="#1",
+            created=ts(2026, 5, 1),
+            merged=None,
+            intervals=[],
+        )
+        entries = workitem_stage_entries(
+            [item], workflow=["Open", "Merged"],
+        )
+        by_stage = {e.stage: e.entered_date for e in entries}
+        assert by_stage["Open"] == date(2026, 5, 1)
+
+    def test_completed_at_seeds_the_terminal_stage(self):
+        item = _item(
+            item_id="#1",
+            created=ts(2026, 5, 1),
+            merged=ts(2026, 5, 7),
+            intervals=[],
+        )
+        entries = workitem_stage_entries(
+            [item], workflow=["Open", "Merged"],
+        )
+        by_stage = {e.stage: e.entered_date for e in entries}
+        assert by_stage["Merged"] == date(2026, 5, 7)
+
+    def test_keeps_the_earliest_when_multiple_candidates_share_a_stage(self):
+        # A status_interval AND created_at both feed workflow[0].
+        item = _item(
+            item_id="#1",
+            created=ts(2026, 5, 1),
+            merged=None,
+            intervals=[("Open", ts(2026, 5, 3), ts(2026, 5, 4))],
+        )
+        entries = workitem_stage_entries(
+            [item], workflow=["Open", "Merged"],
+        )
+        # created_at (May 1) is earlier than the interval start (May 3).
+        opens = [e for e in entries if e.stage == "Open"]
+        assert len(opens) == 1
+        assert opens[0].entered_date == date(2026, 5, 1)
+
+    def test_intervals_not_in_workflow_are_ignored(self):
+        item = _item(
+            item_id="#1",
+            created=ts(2026, 5, 1),
+            merged=None,
+            intervals=[("Backlog", ts(2026, 5, 2), ts(2026, 5, 3))],
+        )
+        entries = workitem_stage_entries(
+            [item], workflow=["Open", "Merged"],
+        )
+        assert all(e.stage in {"Open", "Merged"} for e in entries)

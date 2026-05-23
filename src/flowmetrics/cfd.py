@@ -1,8 +1,16 @@
 """Cumulative Flow Diagram (CFD) construction per Vacanti.
 
-For each sample date T and each workflow state S, count items that have
-entered S or any later workflow state by T. Stacking those counts yields
-Vacanti's six CFD properties:
+This module is the CLI surface for the CFD math. The actual
+cumulative-by-stage algorithm lives in `flowmetrics.charts.cfd`
+and is shared with the web layer; this module only adapts CLI
+inputs (`WorkItem` lists) into the warehouse `StageEntry` rows
+the shared primitive consumes, and adapts the daily counts back
+into the `CfdPoint` shape the CLI renderers expect.
+
+For each sample date T and each workflow state S, plot the
+cumulative count of items that have entered S or any later
+workflow state by T. Stacking those counts yields Vacanti's six
+CFD properties:
 
   #1  Top line = cumulative arrivals; bottom = cumulative departures.
   #2  No line decreases (always cumulative).
@@ -16,15 +24,58 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
+from .charts.cfd import cumulative_arrivals_by_stage
 from .compute import WorkItem
+from .warehouse.queries import StageEntry
 
 
 @dataclass(frozen=True)
 class CfdPoint:
     sampled_on: date
     counts_by_state: dict[str, int] = field(default_factory=dict)
+
+
+def workitem_stage_entries(
+    items: Sequence[WorkItem], workflow: Sequence[str],
+) -> list[StageEntry]:
+    """Flatten `WorkItem`s into the same `StageEntry` rows the
+    warehouse query emits.
+
+    Three sources of evidence per item, all collapsed to the
+    EARLIEST date per (item, stage):
+
+      1. Each `status_intervals` row whose status appears in the
+         workflow — direct evidence the item visited that stage.
+      2. `created_at` seeds the first workflow stage (a GitHub PR
+         that has only review-decision intervals is still "Open"
+         from creation).
+      3. `completed_at` seeds the terminal stage (an item that
+         merged without an explicit Done interval still reached
+         the terminal state).
+    """
+    workflow_set = set(workflow)
+    earliest: dict[tuple[str, str], date] = {}
+
+    def _record(item_id: str, stage: str, d: date) -> None:
+        key = (item_id, stage)
+        existing = earliest.get(key)
+        if existing is None or d < existing:
+            earliest[key] = d
+
+    for item in items:
+        for iv in item.status_intervals:
+            if iv.status in workflow_set:
+                _record(item.item_id, iv.status, iv.start.date())
+        if item.created_at is not None:
+            _record(item.item_id, workflow[0], item.created_at.date())
+        if item.completed_at is not None:
+            _record(item.item_id, workflow[-1], item.completed_at.date())
+    return [
+        StageEntry(item_id=item_id, stage=stage, entered_date=d)
+        for (item_id, stage), d in earliest.items()
+    ]
 
 
 def build_cfd(
@@ -35,11 +86,13 @@ def build_cfd(
     stop: date,
     interval: timedelta,
 ) -> list[CfdPoint]:
-    """Build a CFD for `items` sampled from `start` to `stop` inclusive.
+    """Build a CFD for `items` sampled from `start` to `stop` (inclusive).
 
-    `workflow` lists states in flow order, earliest to latest. The top
-    line of the resulting CFD is the workflow[0] count (cumulative
-    arrivals); the bottom is workflow[-1] (cumulative departures).
+    `workflow` lists states in flow order, earliest to latest. The
+    top line is the workflow[0] count (cumulative arrivals); the
+    bottom is workflow[-1] (cumulative departures). The math is
+    delegated to `flowmetrics.charts.cfd.cumulative_arrivals_by_stage`
+    — shared with the web layer.
     """
     if not workflow:
         raise ValueError("workflow must contain at least one state")
@@ -47,63 +100,17 @@ def build_cfd(
         raise ValueError(f"stop ({stop}) precedes start ({start})")
 
     step = timedelta(days=max(1, interval.days))
+    sample_dates: list[date] = []
+    cur = start
+    while cur <= stop:
+        sample_dates.append(cur)
+        cur += step
 
-    # Precompute each item's entry date into each workflow position. An
-    # item's "entry date" at state[i] is the earliest date it visited
-    # state[i] or any later workflow state — that's what makes the line
-    # cumulative-by-state-or-later (Vacanti property #2).
-    entry_by_item: list[list[date | None]] = [
-        [_entry_date(item, workflow, i) for i in range(len(workflow))]
-        for item in items
+    entries = workitem_stage_entries(items, workflow)
+    counts_per_date = cumulative_arrivals_by_stage(
+        entries, tuple(workflow), sample_dates=sample_dates,
+    )
+    return [
+        CfdPoint(sampled_on=d, counts_by_state=dict(c))
+        for d, c in zip(sample_dates, counts_per_date, strict=True)
     ]
-
-    points: list[CfdPoint] = []
-    current = start
-    while current <= stop:
-        counts: dict[str, int] = {}
-        for i, state in enumerate(workflow):
-            n = 0
-            for per_state in entry_by_item:
-                d = per_state[i]
-                if d is not None and d <= current:
-                    n += 1
-            counts[state] = n
-        points.append(CfdPoint(sampled_on=current, counts_by_state=counts))
-        current = current + step
-    return points
-
-
-def _entry_date(item: WorkItem, workflow: Sequence[str], idx: int) -> date | None:
-    """Earliest date `item` entered workflow[idx] or any later state.
-
-    Three independent sources of evidence:
-
-      1. **status_intervals** whose status is in `workflow[idx:]` —
-         direct evidence.
-      2. **completed_at** when `workflow[-1]` is in `workflow[idx:]` —
-         the item reached the terminal state at merge time, even
-         without an explicit Done interval.
-      3. **created_at** when `idx == 0` — the item exists in the
-         system from its creation date, so it's in the first
-         workflow step from that date forward. This applies whether
-         or not the item has `status_intervals`: GitHub PRs fetched
-         in default mode have review-decision intervals (Awaiting
-         Review, Approved, …) that DON'T match a simple
-         `--workflow Open,Merged` chart, but the item is still in
-         "Open" from creation. Without this rule, source #2 would
-         propagate completed_at backward to idx=0 and the Open and
-         Merged lines would collapse onto each other.
-
-    The entry date is the *earliest* of all available evidence.
-    """
-    later: set[str] = set(workflow[idx:])
-    candidates: list[datetime] = [
-        iv.start for iv in item.status_intervals if iv.status in later
-    ]
-    if workflow[-1] in later and item.completed_at is not None:
-        candidates.append(item.completed_at)
-    if idx == 0:
-        candidates.append(item.created_at)
-    if not candidates:
-        return None
-    return min(candidates).date()

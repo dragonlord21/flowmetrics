@@ -76,6 +76,32 @@ def infer_stage_order(
     return tuple(sorted(all_stages, key=lambda s: (-precedes[s], s)))
 
 
+def cumulative_arrivals_by_stage(
+    entries: list[StageEntry],
+    stages: tuple[str, ...],
+    *,
+    sample_dates: list[date],
+) -> list[dict[str, int]]:
+    """For each date in `sample_dates`, the cumulative count of
+    items that have entered each stage OR any later stage by that
+    date. Returns one dict per sample date, keyed by stage.
+
+    The Vacanti CFD core — both `build_cfd_model` (the web layer)
+    and `flowmetrics.cfd.build_cfd` (the CLI surface) call into
+    this. Items that skipped an early stage are propagated backward
+    so the bands never cross (#3 in the CFD invariants).
+    """
+    if not stages or not entries or not sample_dates:
+        return [{s: 0 for s in stages} for _ in sample_dates]
+    reached = _reached_dates(entries, stages)
+    for s in reached:
+        reached[s].sort()
+    return [
+        {stage: bisect_right(reached[stage], d) for stage in stages}
+        for d in sample_dates
+    ]
+
+
 def _reached_dates(
     entries: list[StageEntry], stages: tuple[str, ...],
 ) -> dict[str, list[date]]:
@@ -133,10 +159,6 @@ def build_cfd_model(
     if not stages or not entries:
         return _empty()
 
-    reached = _reached_dates(entries, stages)
-    for s in reached:
-        reached[s].sort()
-
     all_dates = [e.entered_date for e in entries]
     data_min, data_max = min(all_dates), max(all_dates)
     if view is not None:
@@ -147,20 +169,22 @@ def build_cfd_model(
     if first_date > last_date:
         return _empty("No transitions in the selected period.")
 
-    daily: list[CfdDailyPoint] = []
+    sample_dates: list[date] = []
     cur = first_date
     while cur <= last_date:
-        counts: dict[str, int] = {}
-        for stage in stages:
-            counts[stage] = bisect_right(reached[stage], cur)
-        daily.append(
-            CfdDailyPoint(
-                date_iso=cur.isoformat(),
-                date_display=_display(cur),
-                counts=counts,
-            )
-        )
+        sample_dates.append(cur)
         cur += timedelta(days=1)
+    counts_per_date = cumulative_arrivals_by_stage(
+        entries, stages, sample_dates=sample_dates,
+    )
+    daily: list[CfdDailyPoint] = [
+        CfdDailyPoint(
+            date_iso=d.isoformat(),
+            date_display=_display(d),
+            counts=counts,
+        )
+        for d, counts in zip(sample_dates, counts_per_date, strict=True)
+    ]
 
     terminal = stages[-1]
     departures = daily[-1].counts[terminal]
