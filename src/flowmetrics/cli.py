@@ -1333,6 +1333,109 @@ def materialise_all(
 
 
 # ---------------------------------------------------------------------------
+# `flow backup` / `flow restore` — warehouse portability.
+# ---------------------------------------------------------------------------
+
+
+@cli.command(short_help="Snapshot the warehouse into a single .tar.gz")
+@click.option(
+    "--data-dir",
+    type=click.Path(path_type=Path),
+    default=Path("./data"),
+    show_default=True,
+    help="Warehouse to back up.",
+)
+@click.option(
+    "--output",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Where to write the tarball. Defaults to "
+        "<data-dir>/_backups/flowmetrics-<UTC-timestamp>.tar.gz."
+    ),
+)
+@click.option(
+    "--include-cache/--no-include-cache",
+    default=False,
+    help=(
+        "Include the source-API response cache. Off by default — "
+        "the cache is regenerable and bloats the archive."
+    ),
+)
+def backup(
+    data_dir: Path,
+    output: Path | None,
+    include_cache: bool,
+) -> None:
+    """Snapshot the warehouse into a single timestamped .tar.gz.
+
+    The archive carries every Parquet table + run manifest under
+    `--data-dir` plus a `flowmetrics-backup.json` header with a
+    SHA-256 of every payload file. `flow restore` verifies the
+    header + checksums before extracting.
+    """
+    from .backup import write_backup
+
+    if output is None:
+        ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        output = data_dir / "_backups" / f"flowmetrics-{ts}.tar.gz"
+
+    header = write_backup(data_dir, output, include_cache=include_cache)
+    size_mb = output.stat().st_size / (1024 * 1024)
+    click.echo(
+        f"wrote {output} ({size_mb:.1f} MB, "
+        f"{len(header.files)} files, schema={header.schema})"
+    )
+
+
+@cli.command(short_help="Restore a warehouse from a flow backup tarball")
+@click.option(
+    "--input",
+    "input_path",
+    type=click.Path(path_type=Path, exists=True, dir_okay=False),
+    required=True,
+    help="Path to the .tar.gz written by `flow backup`.",
+)
+@click.option(
+    "--data-dir",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Target directory to restore into.",
+)
+@click.option(
+    "--force/--no-force",
+    default=False,
+    help=(
+        "Overwrite a non-empty target. Off by default so a typo "
+        "doesn't clobber a working warehouse."
+    ),
+)
+def restore(
+    input_path: Path,
+    data_dir: Path,
+    force: bool,
+) -> None:
+    """Verify + extract a `flow backup` tarball into --data-dir.
+
+    Refuses to touch a non-empty target without --force. Verifies
+    every file's SHA-256 against the header before writing anything,
+    so a corrupted or tampered archive fails before it can damage
+    a half-restored warehouse.
+    """
+    from .backup import BackupError, restore_backup
+
+    try:
+        header = restore_backup(input_path, data_dir, force=force)
+    except BackupError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(
+        f"restored {len(header.files)} files into {data_dir} "
+        f"(from {input_path}, written {header.created_at})"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Warehouse: `flow serve` — Slice 2.
 # ---------------------------------------------------------------------------
 
