@@ -76,6 +76,65 @@ from .windows import parse_windows
 _TEMPLATES_DIR = Path(__file__).parent / "web" / "templates"
 
 
+def _default_probe_source(kind: str, target: dict) -> dict:
+    """Production source-existence probe. GitHub: HEAD the repo
+    page; Jira: GET the project endpoint. Returns the
+    {ok, label?, error?} contract the wizard expects.
+
+    Kept module-level (not closed-over) so the test suite can stub
+    it via `app.state.probe_source` without owning a network mock."""
+    import httpx
+
+    if kind == "github":
+        repo = (target or {}).get("repo") or ""
+        if "/" not in repo:
+            return {"ok": False, "error": "repo must be OWNER/NAME"}
+        url = f"https://api.github.com/repos/{repo}"
+        try:
+            r = httpx.get(url, timeout=10.0)
+        except httpx.HTTPError as exc:
+            return {"ok": False, "error": str(exc)}
+        if r.status_code == 404:
+            return {"ok": False, "error": "repo not found (404)"}
+        if r.status_code >= 400:
+            return {
+                "ok": False,
+                "error": f"{url} returned {r.status_code}",
+            }
+        return {
+            "ok": True,
+            "label": r.json().get("description") or repo,
+        }
+    if kind == "jira":
+        base = (target or {}).get("jira_url") or ""
+        project = (target or {}).get("jira_project") or ""
+        if not (base and project):
+            return {
+                "ok": False,
+                "error": "jira needs both jira_url and jira_project",
+            }
+        url = f"{base.rstrip('/')}/rest/api/3/project/{project}"
+        try:
+            r = httpx.get(url, timeout=10.0)
+        except httpx.HTTPError as exc:
+            return {"ok": False, "error": str(exc)}
+        if r.status_code == 404:
+            return {
+                "ok": False,
+                "error": f"project {project!r} not found",
+            }
+        if r.status_code >= 400:
+            return {
+                "ok": False,
+                "error": f"{url} returned {r.status_code}",
+            }
+        body = r.json() if r.headers.get("content-type", "").startswith(
+            "application/json"
+        ) else {}
+        return {"ok": True, "label": body.get("name", project)}
+    return {"ok": False, "error": f"unknown source {kind!r}"}
+
+
 # `subprocess.CREATE_NEW_PROCESS_GROUP` is the Win32 flag value
 # 0x00000200 — only attached to the `subprocess` module on Windows.
 # We hard-code the constant so the helper is testable on POSIX too;
@@ -670,6 +729,50 @@ def create_app(
             "yaml": raw or "",
             "materialise": _materialise_status(contract_id),
         }
+
+    @app.get(
+        "/admin/contracts/new",
+        response_class=HTMLResponse,
+        dependencies=auth_dep,
+    )
+    def new_contract_wizard(request: Request) -> HTMLResponse:
+        """The new-contract wizard. Pure form + JS — the actual
+        write goes through PUT /api/internal/contracts/{id}."""
+        return templates.TemplateResponse(
+            request,
+            "contracts_new.html.jinja",
+            {
+                "title": "New workflow · flowmetrics",
+                "contract": None,
+                "contracts_dir_display": str(contracts_dir.resolve()),
+            },
+        )
+
+    @app.post(
+        "/api/internal/contracts/_probe-source", dependencies=write_dep,
+    )
+    def probe_source(payload: dict) -> dict:
+        """Check whether the named source target (GitHub repo or
+        Jira project) actually exists. The probe callable is
+        injected via `app.state.probe_source` so tests can avoid
+        real network calls; production wiring uses a small httpx
+        helper (see `_default_probe_source`)."""
+        source = payload.get("source")
+        if source not in ("github", "jira"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"unknown source {source!r}; pick github or jira.",
+            )
+        target = {
+            "repo": payload.get("repo"),
+            "jira_url": payload.get("jira_url"),
+            "jira_project": payload.get("jira_project"),
+        }
+        probe = getattr(app.state, "probe_source", _default_probe_source)
+        try:
+            return probe(source, target)
+        except Exception as exc:
+            return {"ok": False, "error": f"probe failed: {exc}"}
 
     @app.post(
         "/api/internal/contracts/_validate", dependencies=write_dep,

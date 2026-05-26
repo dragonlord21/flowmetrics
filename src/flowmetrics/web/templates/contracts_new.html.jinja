@@ -1,0 +1,233 @@
+{% extends "_base.html.jinja" %}
+
+{# New-contract wizard. Three fieldsets visible at once (no
+   navigation between steps) — name + source + window. Source
+   probe fires on blur of the repo / jira_project field. Save
+   validates, PUTs, and redirects to the new dashboard. #}
+
+{% block filter_bar %}{% endblock %}
+{% block data_source_strip %}{% endblock %}
+
+{% block content %}
+<style>
+  .wizard {
+    max-width: 38rem;
+    margin: 1.5rem 0;
+  }
+  .wizard fieldset {
+    border: 0.0625rem solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem 0.5rem 1.25rem;
+    margin: 0 0 1.25rem 0;
+  }
+  .wizard legend {
+    font-family: var(--head-font);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--p-600);
+    padding: 0 0.4rem;
+  }
+  .wizard label {
+    display: block;
+    margin: 0.4rem 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+  .wizard label > input,
+  .wizard label > select {
+    display: block;
+    width: 100%;
+    margin-top: 0.2rem;
+    padding: 0.4rem 0.5rem;
+    border: 0.0625rem solid var(--border);
+    border-radius: 0.25rem;
+    font-size: 1rem;
+    color: var(--fg);
+    background: var(--white);
+  }
+  .source-fields[data-source="jira"] .source-github,
+  .source-fields[data-source="github"] .source-jira {
+    display: none;
+  }
+  .probe-status {
+    font-size: 0.8125rem;
+    margin-top: 0.3rem;
+    min-height: 1.1rem;
+  }
+  .probe-status--ok { color: var(--p-600); }
+  .probe-status--fail { color: var(--t-700); }
+  .wizard-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0 0 1rem 0;
+  }
+  .wizard-actions button[type="submit"] {
+    background: var(--p-500);
+    color: var(--white);
+    border: 0;
+    padding: 0.45rem 1.1rem;
+    border-radius: 0.3rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .wizard-actions button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .wizard-errors {
+    color: var(--t-700);
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0 0;
+    min-height: 1.2rem;
+  }
+</style>
+
+<h1>New workflow</h1>
+<p class="muted">
+  A workflow is a YAML file under <code>contracts/</code>. Fill in the
+  fields below; we'll write it for you and open the dashboard.
+</p>
+
+<form class="wizard" id="wizard">
+  <fieldset>
+    <legend>Identity</legend>
+    <label>Routing ID (lowercase, dashes only)
+      <input type="text" name="name" required pattern="[a-z0-9-]+"
+             placeholder="astral-uv-week">
+    </label>
+    <label>Display label (optional)
+      <input type="text" name="label" placeholder="Astral uv weekly">
+    </label>
+  </fieldset>
+
+  <fieldset class="source-fields" data-source="github" id="source-fieldset">
+    <legend>Source</legend>
+    <label>Source kind
+      <select name="source" onchange="document.getElementById('source-fieldset').dataset.source=this.value">
+        <option value="github" selected>GitHub</option>
+        <option value="jira">Jira</option>
+      </select>
+    </label>
+
+    <div class="source-github">
+      <label>Repository (owner/name)
+        <input type="text" name="repo" placeholder="astral-sh/uv"
+               onblur="probeSource()">
+      </label>
+    </div>
+
+    <div class="source-jira">
+      <label>Jira base URL
+        <input type="text" name="jira_url"
+               placeholder="https://issues.apache.org/jira"
+               onblur="probeSource()">
+      </label>
+      <label>Project key
+        <input type="text" name="jira_project" placeholder="BIGTOP"
+               onblur="probeSource()">
+      </label>
+    </div>
+
+    <div class="probe-status" id="probe-status"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Window (optional)</legend>
+    <label>Start (YYYY-MM-DD)
+      <input type="date" name="start">
+    </label>
+    <label>Stop (YYYY-MM-DD)
+      <input type="date" name="stop">
+    </label>
+  </fieldset>
+
+  <div class="wizard-actions">
+    <button type="submit">Save &amp; open</button>
+    <a href="/" class="filter-reset">Cancel</a>
+  </div>
+  <p class="wizard-errors" id="wizard-errors"></p>
+</form>
+
+<script>
+  function buildYaml(data) {
+    // Compose the YAML body from the form fields. The server's
+    // PUT endpoint re-parses this against parse_contract_text, so
+    // anything malformed surfaces as a 422.
+    var lines = ["contract:"];
+    lines.push("  name: " + data.name);
+    if (data.label) lines.push("  label: " + JSON.stringify(data.label));
+    lines.push("  source: " + data.source);
+    if (data.source === "github" && data.repo) {
+      lines.push("  repo: " + data.repo);
+    }
+    if (data.source === "jira") {
+      if (data.jira_url) lines.push("  jira_url: " + data.jira_url);
+      if (data.jira_project) lines.push("  jira_project: " + data.jira_project);
+    }
+    if (data.start) lines.push("  start: " + data.start);
+    if (data.stop) lines.push("  stop: " + data.stop);
+    return lines.join("\n") + "\n";
+  }
+
+  function readForm() {
+    var f = document.getElementById("wizard");
+    var data = {};
+    new FormData(f).forEach(function (v, k) { data[k] = v; });
+    return data;
+  }
+
+  function probeSource() {
+    var data = readForm();
+    if (!data.source) return;
+    var status = document.getElementById("probe-status");
+    status.textContent = "Checking…";
+    status.className = "probe-status";
+    fetch("/api/internal/contracts/_probe-source", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
+      body: JSON.stringify(data),
+    }).then(function (r) { return r.json(); }).then(function (body) {
+      if (body.ok) {
+        status.textContent = "✓ " + (body.label || "target reachable");
+        status.className = "probe-status probe-status--ok";
+      } else {
+        status.textContent = "✗ " + (body.error || "target not reachable");
+        status.className = "probe-status probe-status--fail";
+      }
+    }).catch(function (err) {
+      status.textContent = "probe failed: " + err;
+      status.className = "probe-status probe-status--fail";
+    });
+  }
+
+  document.getElementById("wizard").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var errs = document.getElementById("wizard-errors");
+    errs.textContent = "";
+    var data = readForm();
+    var yamlText = buildYaml(data);
+    fetch("/api/internal/contracts/" + encodeURIComponent(data.name), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
+      body: JSON.stringify({ yaml: yamlText }),
+    }).then(function (r) {
+      if (r.ok) {
+        window.location.href = "/workflows/" + encodeURIComponent(data.name);
+        return;
+      }
+      return r.json().then(function (body) {
+        var msg = (body.detail && body.detail.message) || body.detail || "save failed";
+        errs.textContent = msg;
+      });
+    });
+  });
+</script>
+{% endblock %}
