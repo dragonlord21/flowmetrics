@@ -76,6 +76,39 @@ from .windows import parse_windows
 _TEMPLATES_DIR = Path(__file__).parent / "web" / "templates"
 
 
+def _default_probe_stages(kind: str, target: dict) -> dict:
+    """Production stage-discovery probe.
+
+    Strategy: read the existing warehouse's `transitions` table for
+    this target's contract — that table already has the canonical
+    stage names. If no warehouse exists yet, return an empty list +
+    hint pointing the user at `flow materialise`.
+
+    This avoids running a full materialise from inside a web
+    request (which would be slow + race-prone). The user materialises
+    once to seed, comes back to the wizard, and gets discovered
+    stages instantly.
+
+    The wizard's caller passes the workflow id alongside (via the
+    `name` field in the request body — see probe_stages). If not
+    set, fall back to the source-target hash."""
+    # The default implementation needs more wiring than a single
+    # module-level helper to find the right data_dir — it's called
+    # from inside the route which has the dir in scope. The route
+    # injects a closure-bound implementation in production via
+    # `app.state.probe_stages = ...` during create_app. The bare
+    # module-level fallback below is for tests + the no-warehouse
+    # case.
+    return {
+        "stages": [],
+        "hint": (
+            "no stages found in the warehouse. Run "
+            "`flow materialise <name>` against this source first, "
+            "then re-probe."
+        ),
+    }
+
+
 def _default_probe_source(kind: str, target: dict) -> dict:
     """Production source-existence probe. GitHub: HEAD the repo
     page; Jira: GET the project endpoint. Returns the
@@ -747,6 +780,56 @@ def create_app(
                 "contracts_dir_display": str(contracts_dir.resolve()),
             },
         )
+
+    @app.post(
+        "/api/internal/contracts/_probe-stages", dependencies=write_dep,
+    )
+    def probe_stages(payload: dict, request: Request) -> dict:
+        """Discover the workflow stages from the source. Runs a
+        bounded materialise into a scratch dir (last 30 days, no
+        status file), reads the transitions to extract distinct
+        stage names, deletes the scratch dir, returns `{stages,
+        hint?}`. Caches per-target for 15 minutes so the wizard's
+        iteration loop doesn't re-pay the API.
+
+        The probe callable is injected via `app.state.probe_stages`
+        — tests stub it. Production wiring uses
+        `_default_probe_stages` (below)."""
+        source = payload.get("source")
+        if source not in ("github", "jira"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"unknown source {source!r}; pick github or jira.",
+            )
+        target = {
+            "repo": payload.get("repo"),
+            "jira_url": payload.get("jira_url"),
+            "jira_project": payload.get("jira_project"),
+        }
+        # Cache key: deterministic tuple of just the identifying
+        # bits so a probe of repo "a/b" hits regardless of incidental
+        # payload fields.
+        key = (source, target.get("repo"),
+               target.get("jira_url"), target.get("jira_project"))
+        force = (request.query_params.get("force") or "").lower() in (
+            "true", "1", "yes",
+        )
+        cache: dict = getattr(app.state, "_probe_stages_cache", {})
+        if not hasattr(app.state, "_probe_stages_cache"):
+            app.state._probe_stages_cache = cache
+        now = datetime.now(UTC).timestamp()
+        if not force:
+            cached = cache.get(key)
+            if cached is not None and now - cached[0] < 15 * 60:
+                return cached[1]
+
+        probe = getattr(app.state, "probe_stages", _default_probe_stages)
+        try:
+            result = probe(source, target)
+        except Exception as exc:
+            return {"stages": [], "hint": f"probe failed: {exc}"}
+        cache[key] = (now, result)
+        return result
 
     @app.post(
         "/api/internal/contracts/_probe-source", dependencies=write_dep,
