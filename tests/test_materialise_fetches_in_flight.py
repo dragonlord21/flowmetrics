@@ -19,8 +19,6 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from flowmetrics.compute import WorkItem
 from flowmetrics.contract import Contract
 from flowmetrics.materialise import materialise

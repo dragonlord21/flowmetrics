@@ -165,6 +165,7 @@ class TestWorkItemsTableShape:
         points but a full table"). `view` clamps completed_at
         to the inclusive [from_, to] range."""
         from datetime import date
+
         from flowmetrics.windows import Window
         # Fixture completions span May 4-10, 2026. A window of
         # just May 4 should match the 19 May-4 completions.

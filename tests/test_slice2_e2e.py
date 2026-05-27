@@ -374,7 +374,7 @@ class TestDetailPageCycleTime:
         # compare case-insensitively so the assertion survives
         # display-case changes.
         text = page.locator("body").inner_text().lower()
-        assert "how to read" in text, f"missing 'How to read' section"
+        assert "how to read" in text, "missing 'How to read' section"
         assert "caveats" in text, "missing 'Caveats' section"
         assert "methodology" in text, "missing 'Methodology' section"
         assert "actions" in text, "missing 'Actions' section"

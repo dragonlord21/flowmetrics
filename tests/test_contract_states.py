@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from flowmetrics.contract import Contract, ContractError, load_contract
+from flowmetrics.contract import ContractError, load_contract
 
 
 def _write(tmp: Path, name: str, body: dict) -> Path:

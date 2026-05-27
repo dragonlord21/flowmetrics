@@ -13,8 +13,6 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from flowmetrics.charts.forecast import (
-    HowManyModel,
-    WhenDoneModel,
     build_how_many_model,
     build_when_done_model,
 )

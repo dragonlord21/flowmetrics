@@ -25,7 +25,7 @@ import pytest
 import uvicorn
 import yaml
 from click.testing import CliRunner
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 
 from flowmetrics.cli import cli
 

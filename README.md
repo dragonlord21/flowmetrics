@@ -7,22 +7,28 @@ flow-metrics framework as laid out in Daniel Vacanti's
 and [*When Will It Be Done?*](https://leanpub.com/whenwillitbedone) —
 assumptions are surfaced on the page itself, not buried in docs.
 
-**Live site:** <https://dvhthomas.github.io/flowmetrics/> · 
-**Browse live sample reports →** <https://dvhthomas.github.io/flowmetrics/samples/>
+**Live site:** <https://dvhthomas.github.io/flowmetrics/>
 
 ## What it looks like
 
-A Cumulative Flow Diagram against Apache CASSANDRA's Jira changelog —
-113 issues, seven workflow states stacked by the standard CFD properties:
+The dashboard splits into a **Current state** snapshot (Aging WIP,
+pinned to the latest data) and a **Time slice** (Throughput, Cycle
+Time, CFD, Forecast — all driven by the Period picker). Same shape
+for every workflow:
 
-[![Cumulative Flow Diagram for Apache CASSANDRA](samples/preview.png)](https://dvhthomas.github.io/flowmetrics/samples/ASF_CASSANDRA/cfd.html)
+**GitHub — `astral-sh/uv`** (PR review cycle)
 
-### **[Browse all seven sample reports →](https://dvhthomas.github.io/flowmetrics/samples/)**
+[![flowmetrics dashboard against the astral-sh/uv repo](docs/screenshots/github-dashboard.png)](docs/SCREENSHOTS.md)
 
-Seven public sources — five GitHub repos (`astral-sh/uv`,
-`pytest-dev/pytest`, `huggingface/transformers`, `pre-commit/pre-commit`,
-`CalcMark/go-calcmark`) and two Apache Jira projects (`CASSANDRA`,
-`BIGTOP`) — each rendered as HTML, plain text, and agent-readable JSON.
+**Jira — Apache CASSANDRA** (richer multi-stage workflow)
+
+[![flowmetrics dashboard against Apache CASSANDRA](docs/screenshots/jira-dashboard.png)](docs/SCREENSHOTS.md)
+
+[**More screenshots →**](docs/SCREENSHOTS.md) — per-metric detail
+pages, the contract builder, and the data-source page.
+
+[**Example workflow YAMLs →**](samples/) — copy-paste starters for
+GitHub PR cycles, label-driven workflows, and Apache Jira projects.
 
 ## Two ways to use it
 
@@ -85,6 +91,8 @@ be misread. It's a learning artifact, not a product.
   workflow, ad-hoc CLI commands, output formats, testing.
 - **[Operations](docs/OPERATIONS.md)** — scheduled ingest on every
   major OS, backup + restore, Docker + GH Actions, troubleshooting.
+- **[Screenshots](docs/SCREENSHOTS.md)** — every page, both source
+  types (GitHub PRs + Apache Jira), captured against live data.
 - **[Metrics](docs/METRICS.md)** — how cycle / active / wait time and
   flow efficiency are computed; the clustering algorithm; assumptions.
 - **[Forecasting](docs/FORECAST.md)** — Monte Carlo when-done and

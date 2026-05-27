@@ -25,9 +25,9 @@ from click.testing import CliRunner
 
 from flowmetrics.cli import cli
 from flowmetrics.web.components.work_items_table import (
-    Column,
     DEFAULT_COLUMNS,
     IN_FLIGHT_COLUMNS,
+    Column,
     render,
 )
 

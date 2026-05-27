@@ -22,7 +22,6 @@ from __future__ import annotations
 import tempfile
 from datetime import UTC, date, datetime
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 import yaml
@@ -30,7 +29,6 @@ from click.testing import CliRunner
 
 from flowmetrics.app import WorkflowView
 from flowmetrics.cli import cli
-
 from tests._window_helpers import window_query
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"

@@ -103,7 +103,6 @@ def synth_warehouse() -> duckdb.DuckDBPyConnection:
     case where a PR is re-labeled after merge. Lets us exercise
     the post-completion truncation logic without depending on the
     offline fixture cache (which doesn't include this case)."""
-    from datetime import datetime as _dt
     con = duckdb.connect(":memory:")
     con.execute(
         """
@@ -210,7 +209,6 @@ class TestLifecyclePostCompletionTruncation:
         Compare at second-precision instead. Pin a synthetic item
         where the resolved transition is 37µs after completed_at;
         the lifecycle must still record 2 events / 1 stage."""
-        from datetime import datetime as _dt
         synth_warehouse.execute(
             "INSERT INTO work_items VALUES "
             "('demo', 'jira', '#x1', 'Test', NULL,"

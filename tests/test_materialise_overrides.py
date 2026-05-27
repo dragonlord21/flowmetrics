@@ -28,12 +28,10 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 import yaml
 from click.testing import CliRunner
 
 from flowmetrics.cli import cli
-
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
@@ -65,7 +63,8 @@ def _capture(captured: dict):
     contract it produced — the fetch + Parquet write is the
     materialise unit's responsibility, separately tested."""
 
-    from datetime import UTC, datetime as _dt
+    from datetime import UTC
+    from datetime import datetime as _dt
 
     from flowmetrics.materialise import RunManifest
 

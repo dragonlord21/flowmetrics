@@ -32,8 +32,8 @@ both rules for that component automatically.
 
 from __future__ import annotations
 
-import json
 import tempfile
+from datetime import date
 from pathlib import Path
 
 import duckdb
@@ -41,15 +41,15 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from datetime import date
-
 from flowmetrics.cli import cli
+from flowmetrics.web.components._vega import to_vega
 from flowmetrics.web.components.aging import render as render_aging
 from flowmetrics.web.components.cfd import render as render_cfd
-from flowmetrics.web.components._vega import to_vega
 from flowmetrics.web.components.cycle_time import render as render_cycle_time
 from flowmetrics.web.components.forecast import (
     render_how_many as render_forecast_how_many,
+)
+from flowmetrics.web.components.forecast import (
     render_when_done as render_forecast_when_done,
 )
 from flowmetrics.web.components.throughput import render as render_throughput
@@ -287,7 +287,7 @@ class TestNoBrowserLocalTimeFormatters:
             "chart partial templates contain literal HSL/HSLA colors. "
             "Replace with `__theme:<token>__` placeholders that the "
             "client-side theme helper substitutes at embed time. "
-            f"Offenders:\n"
+            "Offenders:\n"
             + "\n".join(f"  {n}:{ln}: {ll}" for n, ln, ll in offenders)
         )
 

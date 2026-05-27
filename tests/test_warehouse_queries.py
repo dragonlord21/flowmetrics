@@ -16,7 +16,6 @@ import duckdb
 from flowmetrics.warehouse.queries import (
     CompletedItem,
     InFlightItem,
-    StageEntry,
     completed_items,
     completion_date_range,
     count_open_items,
