@@ -134,17 +134,5 @@ class TestProbeStagesCache:
         assert len(calls) == 2
 
 
-class TestWizardStagesUI:
-    def test_wizard_renders_stage_builder_fieldset(self, workspace):
-        contracts, data = workspace
-        app = create_app(data_dir=data, contracts_dir=contracts)
-        with TestClient(app) as client:
-            html = client.get("/admin/contracts/new").text
-        # The Stages fieldset is on the wizard.
-        assert ">Stages<" in html or "stages-fieldset" in html
-        # The three buckets are addressable.
-        assert "stage-bucket-backlog" in html or 'data-bucket="backlog"' in html
-        assert "stage-bucket-wip" in html or 'data-bucket="wip"' in html
-        assert "stage-bucket-done" in html or 'data-bucket="done"' in html
-        # Trigger to call the probe endpoint.
-        assert "_probe-stages" in html
+# TestWizardStagesUI removed in C3 — the three-bucket Stages UI is
+# gone. test_steps_editor.py asserts the new Steps editor DOM.
