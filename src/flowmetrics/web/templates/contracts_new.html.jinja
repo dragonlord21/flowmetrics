@@ -1,16 +1,18 @@
 {% extends "_base.html.jinja" %}
 
-{# Contract builder. One scrolling form, sections gated so the user
-   can't reach an action before its preconditions are met:
-     Identity + Source are required → unlock Steps → unlock Save.
-   `wizard_mode` is "new" or "edit"; `edit_id` is the locked id in
-   edit mode. #}
+{# Contract builder — an Alpine component. All client state (steps,
+   matches, validity gating, suggestions) lives in `contractBuilder`;
+   the markup is declarative (x-model / x-for / x-show / :disabled).
+   htmx is intentionally NOT used here — this is a stateful client
+   widget, not a server-rendered fragment swap. Server round-trips
+   (probe, dry-run, save, archive) are plain fetch() calls. #}
 
 {% block filter_bar %}{% endblock %}
 {% block data_source_strip %}{% endblock %}
 
 {% block content %}
 <style>
+  [x-cloak] { display: none !important; }
   .wizard { max-width: 42rem; margin: 1.5rem 0; }
 
   .wizard fieldset {
@@ -31,13 +33,7 @@
 
   /* A section that's locked until its preconditions are met. */
   .wizard fieldset[data-locked="true"] { opacity: 0.55; }
-  .wizard fieldset[data-locked="true"] .lock-note { display: block; }
-  .lock-note {
-    display: none;
-    font-size: 0.8125rem;
-    color: var(--t-700);
-    margin: 0 0 0.5rem 0;
-  }
+  .lock-note { font-size: 0.8125rem; color: var(--t-700); margin: 0 0 0.5rem 0; }
 
   /* Consistent field grouping + inputs. */
   .field { margin: 0 0 0.75rem 0; }
@@ -99,9 +95,6 @@
   .probe-status--ok { color: var(--p-600); }
   .probe-status--fail { color: var(--t-700); }
 
-  .source-fields[data-source="jira"] .source-github,
-  .source-fields[data-source="github"] .source-jira { display: none; }
-
   /* Steps editor. */
   .steps-list {
     list-style: none; padding: 0; margin: 0 0 0.75rem 0;
@@ -117,7 +110,6 @@
     background: var(--white);
   }
   .step-row:last-child { border-bottom: 0; }
-  /* The step chips will bind to. */
   .step-row--active {
     background: var(--p-50);
     box-shadow: inset 0.1875rem 0 0 var(--p-500);
@@ -208,764 +200,560 @@
   }
 </style>
 
-{% if wizard_mode == "edit" %}
-<h1>Edit workflow: {{ edit_id }}</h1>
-{% else %}
-<h1>New workflow</h1>
-<p class="wizard-hint">
-  Fields marked <span class="req">*</span> are required. Define the
-  source, then build the workflow's steps.
-</p>
-{% endif %}
+<div x-data='contractBuilder({mode: {{ wizard_mode | tojson }}, editId: {{ edit_id | tojson }}})'
+     x-cloak>
+  {% if wizard_mode == "edit" %}
+  <h1>Edit workflow: {{ edit_id }}</h1>
+  {% else %}
+  <h1>New workflow</h1>
+  <p class="wizard-hint">
+    Fields marked <span class="req">*</span> are required. Define the
+    source, then build the workflow's steps.
+  </p>
+  {% endif %}
 
-<form class="wizard" id="wizard">
-  <fieldset>
-    <legend>Identity</legend>
-    <div class="field">
-      <label class="field-label" for="f-name">
-        Routing ID <span class="req" aria-hidden="true">*</span>
-        <span class="field-hint">— lowercase, dashes only; can't change later</span>
-      </label>
-      <input class="field-input" id="f-name" type="text" name="name"
-             required aria-required="true" pattern="[a-z0-9-]+"
-             placeholder="astral-uv-week">
-    </div>
-    <div class="field">
-      <label class="field-label" for="f-label">
-        Display label
-        <span class="field-hint">— optional; shown in the dashboard</span>
-      </label>
-      <input class="field-input" id="f-label" type="text" name="label"
-             placeholder="Astral uv weekly">
-    </div>
-  </fieldset>
-
-  <fieldset class="source-fields" data-source="github" id="source-fieldset">
-    <legend>Source</legend>
-    <div class="field">
-      <label class="field-label" for="f-source">
-        Source kind <span class="req" aria-hidden="true">*</span>
-      </label>
-      <select class="field-input" id="f-source" name="source"
-              aria-required="true" onchange="onSourceKindChange()">
-        <option value="github" selected>GitHub</option>
-        <option value="jira">Jira</option>
-      </select>
-    </div>
-
-    <div class="source-github">
+  <form class="wizard" id="wizard" @submit.prevent="save()">
+    <fieldset>
+      <legend>Identity</legend>
       <div class="field">
-        <label class="field-label" for="f-repo">
-          Repository <span class="req" aria-hidden="true">*</span>
-          <span class="field-hint">— owner/name</span>
+        <label class="field-label" for="f-name">
+          Routing ID <span class="req" aria-hidden="true">*</span>
+          <span class="field-hint">— lowercase, dashes only; can't change later</span>
         </label>
-        <input class="field-input" id="f-repo" type="text" name="repo"
-               aria-required="true" placeholder="astral-sh/uv"
-               oninput="updateValidity()" onblur="probeSource()">
-      </div>
-    </div>
-
-    <div class="source-jira">
-      <div class="field">
-        <label class="field-label" for="f-jira-url">
-          Jira base URL <span class="req" aria-hidden="true">*</span>
-        </label>
-        <input class="field-input" id="f-jira-url" type="text" name="jira_url"
-               aria-required="true"
-               placeholder="https://issues.apache.org/jira"
-               oninput="updateValidity()" onblur="probeSource()">
+        <input class="field-input" id="f-name" name="name" type="text"
+               x-model="name" :readonly="mode === 'edit'"
+               required aria-required="true" pattern="[a-z0-9-]+"
+               placeholder="astral-uv-week">
       </div>
       <div class="field">
-        <label class="field-label" for="f-jira-project">
-          Project key <span class="req" aria-hidden="true">*</span>
+        <label class="field-label" for="f-label">
+          Display label
+          <span class="field-hint">— optional; shown in the dashboard</span>
         </label>
-        <input class="field-input" id="f-jira-project" type="text"
-               name="jira_project" aria-required="true" placeholder="CASSANDRA"
-               oninput="updateValidity()" onblur="probeSource()">
+        <input class="field-input" id="f-label" name="label" type="text"
+               x-model="label" placeholder="Astral uv weekly">
       </div>
-    </div>
+    </fieldset>
 
-    <div class="probe-status" id="probe-status"></div>
-  </fieldset>
+    <fieldset>
+      <legend>Source</legend>
+      <div class="field">
+        <label class="field-label" for="f-source">
+          Source kind <span class="req" aria-hidden="true">*</span>
+        </label>
+        <select class="field-input" id="f-source" name="source"
+                x-model="source" aria-required="true"
+                @change="onSourceKindChange()">
+          <option value="github">GitHub</option>
+          <option value="jira">Jira</option>
+        </select>
+      </div>
 
-  <fieldset id="steps-fieldset">
-    <legend>Steps</legend>
-    <p class="lock-note" id="steps-lock-note">
-      Define a valid source above first — steps map to that source's data.
-    </p>
-    <p class="field-hint" style="margin: 0 0 0.75rem 0;">
-      A step is a stage in your workflow. By default a step captures
-      items whose source stage matches the step's name; add explicit
-      matches (chips below) to capture other labels / statuses / events.
-      Toggle WIP per step.
-    </p>
+      <div x-show="source === 'github'">
+        <div class="field">
+          <label class="field-label" for="f-repo">
+            Repository <span class="req" aria-hidden="true">*</span>
+            <span class="field-hint">— owner/name</span>
+          </label>
+          <input class="field-input" id="f-repo" name="repo" type="text"
+                 x-model="repo" aria-required="true"
+                 placeholder="astral-sh/uv" @blur="probeSource()">
+        </div>
+      </div>
 
-    <ol class="steps-list" id="steps-list"></ol>
+      <div x-show="source === 'jira'">
+        <div class="field">
+          <label class="field-label" for="f-jira-url">
+            Jira base URL <span class="req" aria-hidden="true">*</span>
+          </label>
+          <input class="field-input" id="f-jira-url" name="jira_url" type="text"
+                 x-model="jiraUrl" aria-required="true"
+                 placeholder="https://issues.apache.org/jira" @blur="probeSource()">
+        </div>
+        <div class="field">
+          <label class="field-label" for="f-jira-project">
+            Project key <span class="req" aria-hidden="true">*</span>
+          </label>
+          <input class="field-input" id="f-jira-project" name="jira_project" type="text"
+                 x-model="jiraProject" aria-required="true"
+                 placeholder="CASSANDRA" @blur="probeSource()">
+        </div>
+      </div>
 
-    <div class="add-step-row">
-      <input class="field-input" id="new-step-name" type="text"
-             placeholder="New step name (e.g. In Progress)"
-             oninput="updateValidity()"
-             onkeydown="if(event.key==='Enter'){event.preventDefault();addStep();}">
-      <label class="step-wip-label">
-        <input type="checkbox" id="new-step-wip" checked> WIP
-      </label>
-      <button type="button" class="btn btn--sm" id="add-step"
-              disabled onclick="addStep()">+ Add step</button>
-      <span class="probe-status" id="stages-status"></span>
-    </div>
+      <div class="probe-status" id="probe-status"
+           :class="probeClass" x-text="probeStatus"></div>
+    </fieldset>
 
-    <div id="suggestions-panel" style="margin-top: 1rem;" hidden>
-      <p class="field-hint" id="binding-target" style="margin: 0 0 0.5rem 0;">
-        Click a chip to add it to the selected step.
+    <fieldset :data-locked="!sourceComplete">
+      <legend>Steps</legend>
+      <p class="lock-note" x-show="!sourceComplete">
+        Define a valid source above first — steps map to that source's data.
       </p>
+      <p class="field-hint" style="margin: 0 0 0.75rem 0;">
+        A step is a stage in your workflow. By default a step captures
+        items whose source stage matches the step's name; add explicit
+        matches (chips below) to capture other labels / statuses /
+        events. Toggle WIP per step.
+      </p>
+
+      <ol class="steps-list" id="steps-list">
+        <template x-for="(step, idx) in steps" :key="idx">
+          <li class="step-row" :class="{ 'step-row--active': idx === activeIdx }"
+              @click="activeIdx = idx">
+            <span class="step-badge"
+                  :style="`color: ${badge(idx).color}`"
+                  x-text="badge(idx).text"></span>
+            <div class="step-center">
+              <input class="step-name-input" type="text" x-model="step.name"
+                     @focus="activeIdx = idx">
+              <div class="step-matches">
+                <template x-if="step.matches.length === 0">
+                  <span class="step-by-name"
+                        x-text="`captures source stage “${step.name || '(unnamed)'}”`"></span>
+                </template>
+                <template x-for="(m, mi) in step.matches" :key="mi">
+                  <span class="match-pill">
+                    <span x-text="m"></span>
+                    <button type="button" title="Remove this match"
+                            @click="step.matches.splice(mi, 1)">×</button>
+                  </span>
+                </template>
+              </div>
+            </div>
+            <label class="step-wip-label">
+              <input type="checkbox" x-model="step.wip"> WIP
+            </label>
+            <button type="button" class="btn btn--sm" title="Move up"
+                    @click="moveStep(idx, -1)">↑</button>
+            <button type="button" class="btn btn--sm" title="Move down"
+                    @click="moveStep(idx, 1)">↓</button>
+            <button type="button" class="btn btn--sm" title="Remove step"
+                    @click="removeStep(idx)">×</button>
+          </li>
+        </template>
+      </ol>
+
+      <div class="add-step-row">
+        <input class="field-input" id="new-step-name" type="text"
+               x-model="newStepName"
+               placeholder="New step name (e.g. In Progress)"
+               @focus="showSuggestions = true"
+               @keydown.enter.prevent="addStep()">
+        <label class="step-wip-label">
+          <input type="checkbox" x-model="newStepWip"> WIP
+        </label>
+        <button type="button" class="btn btn--sm" id="add-step"
+                :disabled="!canAddStep" @click="addStep()">+ Add step</button>
+        <span class="probe-status" id="stages-status"
+              :class="vocabClass" x-text="vocabStatus"></span>
+      </div>
+
+      <div id="suggestions-panel" style="margin-top: 1rem;" x-show="showSuggestions">
+        <p class="field-hint" id="binding-target"
+           :style="bindingTargetWarn ? 'color: var(--t-700)' : ''"
+           x-text="bindingTarget"></p>
+        {% if wizard_mode == "edit" %}
+        <div class="sugg-group">
+          <div class="sugg-group-title">Stages seen in imported data</div>
+          <div id="sugg-warehouse" class="sugg-chips">
+            <template x-for="item in vocab.warehouse" :key="item.name">
+              <button type="button" class="sugg-chip"
+                      @click="addMatch(item.name)" x-text="`+ ${item.name}`"></button>
+            </template>
+            <span class="sugg-empty" x-show="vocab.warehouse.length === 0">appears after this workflow imports data</span>
+          </div>
+        </div>
+        {% endif %}
+        <div class="sugg-group">
+          <div class="sugg-group-title" x-text="labelsTitle"></div>
+          <div id="sugg-labels" class="sugg-chips">
+            <template x-for="item in vocab.labels" :key="item.name">
+              <button type="button" class="sugg-chip"
+                      @click="addMatch(item.name)" x-text="`+ ${item.name}`"></button>
+            </template>
+            <span class="sugg-empty" x-show="vocab.labels.length === 0"
+                  x-text="vocabHint || 'none found for this source'"></span>
+          </div>
+        </div>
+        <div class="sugg-group">
+          <div class="sugg-group-title">Lifecycle events</div>
+          <div id="sugg-lifecycle" class="sugg-chips">
+            <template x-for="item in lifecycleChips" :key="item.name">
+              <button type="button" class="sugg-chip"
+                      @click="addMatch(item.name)" x-text="`+ ${item.name}`"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset id="dry-run-panel" :data-locked="!canDryRun">
+      <legend>Preview against live source</legend>
+      <p class="lock-note" x-show="!canDryRun">
+        Add at least one step (and a valid source) to preview.
+      </p>
+      <p class="field-hint" style="margin: 0 0 0.75rem 0;">
+        Test the workflow against real items — up to 200 (or 30 days).
+        Nothing is written to the warehouse.
+      </p>
+      <div class="add-step-row" style="align-items: end;">
+        <div class="field" style="margin: 0;">
+          <label class="field-label" for="dry-run-since">From date</label>
+          <input class="field-input" id="dry-run-since" type="date"
+                 x-model="drySince" style="width: auto; flex: none; min-width: 0;">
+        </div>
+        <button type="button" class="btn" id="dry-run-btn"
+                :disabled="!canDryRun" @click="dryRun()">Dry run</button>
+        <span class="probe-status" id="dry-run-status"
+              :class="dryClass" x-text="dryStatus"></span>
+      </div>
+      <div id="dry-run-results">
+        <template x-for="bucket in (dryResults || [])" :key="bucket.step_name">
+          <section class="dr-section">
+            <div class="dr-head">
+              <strong :style="bucket.step_name === '_unmatched' ? 'color: var(--t-700)' : (bucket.wip ? 'color: var(--p-700)' : '')"
+                      x-text="bucket.step_name === '_unmatched' ? 'Unmatched' : bucket.step_name"></strong>
+              <span style="color: var(--muted); font-size: 0.8125rem;"
+                    x-text="`${bucket.count} item${bucket.count === 1 ? '' : 's'}`"></span>
+              <em x-show="bucket.step_name === '_unmatched' && bucket.count > 0"
+                  style="color: var(--muted); font-size: 0.75rem; margin-left: auto;">your workflow may be missing a step</em>
+            </div>
+            <ul class="dr-list" x-show="bucket.count > 0">
+              <template x-for="it in bucket.items.slice(0, 10)" :key="it.id">
+                <li class="dr-item">
+                  <code class="dr-stage" x-text="it.current_stage"></code>
+                  <span style="flex: 1;" x-text="it.title || it.id"></span>
+                </li>
+              </template>
+              <li class="dr-item" x-show="bucket.items.length > 10"
+                  style="color: var(--muted);"
+                  x-text="`… and ${bucket.items.length - 10} more`"></li>
+            </ul>
+          </section>
+        </template>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Window (optional)</legend>
+      <p class="field-hint" style="margin: 0 0 0.75rem 0;">
+        Limit the date range materialise fetches. Leave blank for the
+        source's full history.
+      </p>
+      <div class="field">
+        <label class="field-label" for="f-start">Start</label>
+        <input class="field-input" id="f-start" name="start" type="date"
+               x-model="start" style="width: auto;">
+      </div>
+      <div class="field">
+        <label class="field-label" for="f-stop">Stop</label>
+        <input class="field-input" id="f-stop" name="stop" type="date"
+               x-model="stop" style="width: auto;">
+      </div>
+    </fieldset>
+
+    <div class="wizard-actions">
+      <button type="submit" class="btn btn--primary" id="save-btn" :disabled="!canSave">
+        {% if wizard_mode == "edit" %}Save{% else %}Save &amp; open{% endif %}
+      </button>
+      <a href="/" class="btn">Cancel</a>
       {% if wizard_mode == "edit" %}
-      <div class="sugg-group">
-        <div class="sugg-group-title">Stages seen in imported data</div>
-        <div id="sugg-warehouse" class="sugg-chips"></div>
-      </div>
+      <a id="download-yaml-btn" class="btn" style="margin-left: auto;"
+         href="/api/internal/contracts/{{ edit_id }}/yaml">Download YAML</a>
+      <button type="button" class="btn" id="copy-yaml-btn" @click="copyYaml()"
+              x-text="copied ? 'Copied ✓' : 'Copy YAML'">Copy YAML</button>
+      <button type="button" class="btn btn--danger" id="archive-btn"
+              @click="archive()">Archive</button>
       {% endif %}
-      <div class="sugg-group">
-        <div class="sugg-group-title" id="sugg-labels-label">Labels in the repo</div>
-        <div id="sugg-labels" class="sugg-chips"></div>
-      </div>
-      <div class="sugg-group">
-        <div class="sugg-group-title">Lifecycle events</div>
-        <div id="sugg-lifecycle" class="sugg-chips"></div>
-      </div>
     </div>
-  </fieldset>
-
-  <fieldset id="dry-run-panel">
-    <legend>Preview against live source</legend>
-    <p class="lock-note" id="dry-run-lock-note">
-      Add at least one step (and a valid source) to preview.
-    </p>
-    <p class="field-hint" style="margin: 0 0 0.75rem 0;">
-      Test the workflow against real items — up to 200 (or 30 days).
-      Nothing is written to the warehouse.
-    </p>
-    <div class="add-step-row" style="align-items: end;">
-      <div class="field" style="margin: 0;">
-        <label class="field-label" for="dry-run-since">From date</label>
-        <input class="field-input" id="dry-run-since" type="date"
-               style="width: auto; flex: none; min-width: 0;">
-      </div>
-      <button type="button" class="btn" id="dry-run-btn"
-              disabled onclick="dryRun()">Dry run</button>
-      <span class="probe-status" id="dry-run-status"></span>
-    </div>
-    <div id="dry-run-results"></div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Window (optional)</legend>
-    <p class="field-hint" style="margin: 0 0 0.75rem 0;">
-      Limit the date range materialise fetches. Leave blank for the
-      source's full history.
-    </p>
-    <div class="field">
-      <label class="field-label" for="f-start">Start</label>
-      <input class="field-input" id="f-start" type="date" name="start"
-             style="width: auto;">
-    </div>
-    <div class="field">
-      <label class="field-label" for="f-stop">Stop</label>
-      <input class="field-input" id="f-stop" type="date" name="stop"
-             style="width: auto;">
-    </div>
-  </fieldset>
-
-  <div class="wizard-actions">
-    <button type="submit" class="btn btn--primary" id="save-btn" disabled>
-      {% if wizard_mode == "edit" %}Save{% else %}Save &amp; open{% endif %}
-    </button>
-    <a href="/" class="btn">Cancel</a>
-    {% if wizard_mode == "edit" %}
-    <a id="download-yaml-btn" class="btn" style="margin-left: auto;"
-       href="/api/internal/contracts/{{ edit_id }}/yaml">Download YAML</a>
-    <button type="button" class="btn" id="copy-yaml-btn"
-            onclick="copyYaml()">Copy YAML</button>
-    <button type="button" class="btn btn--danger" id="archive-btn"
-            onclick="confirmArchive()">Archive</button>
-    {% endif %}
-  </div>
-  <p class="wizard-hint" id="save-blocker"></p>
-  <p class="wizard-errors" id="wizard-errors"></p>
-</form>
+    <p class="wizard-hint" x-text="blocker"></p>
+    <p class="wizard-errors" x-text="errors"></p>
+  </form>
+</div>
 
 <script>
-  var WIZARD_MODE = {{ wizard_mode | tojson }};
-  var EDIT_ID = {{ edit_id | tojson }};
+  const GH_LIFECYCLE = [
+    {name: 'PR opened', wip: false},
+    {name: 'Marked ready for review', wip: true},
+    {name: 'Changes requested', wip: true},
+    {name: 'Review approved', wip: true},
+    {name: 'PR merged', wip: false},
+    {name: 'PR closed without merge', wip: false},
+    {name: 'Issue opened', wip: false},
+    {name: 'Issue closed', wip: false},
+  ];
+  const JIRA_LIFECYCLE = [
+    {name: 'Issue created', wip: false},
+    {name: 'Assigned', wip: true},
+    {name: 'Resolved', wip: false},
+    {name: 'Reopened', wip: true},
+    {name: 'Closed', wip: false},
+  ];
+  const HEADERS = {
+    'Content-Type': 'application/json', 'X-Requested-With': 'fetch',
+  };
 
-  function readForm() {
-    var f = document.getElementById("wizard");
-    var data = {};
-    new FormData(f).forEach(function (v, k) { data[k] = v; });
-    return data;
-  }
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('contractBuilder', (cfg) => ({
+      mode: cfg.mode,
+      editId: cfg.editId,
+      // form state
+      name: '', label: '', source: 'github',
+      repo: '', jiraUrl: '', jiraProject: '', start: '', stop: '',
+      steps: [],                 // [{name, wip, matches: []}]
+      activeIdx: null,
+      newStepName: '', newStepWip: true,
+      showSuggestions: false,
+      // probe state
+      probeStatus: '', probeClass: 'probe-status',
+      vocab: { labels: [], warehouse: [] },
+      vocabStatus: '', vocabClass: 'probe-status', vocabHint: '',
+      // dry-run
+      drySince: '', dryStatus: '', dryClass: 'probe-status', dryResults: null,
+      // misc
+      errors: '', copied: false,
 
-  // -----------------------------------------------------------------
-  // Validity gating — never let the user reach an impossible action.
-  // -----------------------------------------------------------------
-  function sourceTargetComplete(data) {
-    if (data.source === "github") return !!(data.repo && data.repo.indexOf("/") > 0);
-    if (data.source === "jira") return !!(data.jira_url && data.jira_project);
-    return false;
-  }
-
-  function updateValidity() {
-    var data = readForm();
-    var nameOk = /^[a-z0-9-]+$/.test(data.name || "");
-    var srcOk = sourceTargetComplete(data);
-    var steps = readSteps();
-
-    document.getElementById("steps-fieldset").dataset.locked = srcOk ? "false" : "true";
-
-    var newName = (document.getElementById("new-step-name").value || "").trim();
-    document.getElementById("add-step").disabled = !(srcOk && newName);
-
-    document.getElementById("dry-run-panel").dataset.locked =
-      (srcOk && steps.length) ? "false" : "true";
-    document.getElementById("dry-run-btn").disabled = !(srcOk && steps.length);
-
-    var saveOk = nameOk && srcOk && steps.length > 0;
-    document.getElementById("save-btn").disabled = !saveOk;
-
-    var missing = [];
-    if (!nameOk) missing.push("a routing id (lowercase, dashes)");
-    if (!srcOk) missing.push(
-      data.source === "jira" ? "a Jira URL + project key"
-                             : "a repository (owner/name)"
-    );
-    if (steps.length === 0) missing.push("at least one step");
-    document.getElementById("save-blocker").textContent =
-      missing.length ? "To save, add: " + missing.join(", ") + "." : "";
-  }
-
-  // -----------------------------------------------------------------
-  // Steps editor.
-  // -----------------------------------------------------------------
-  function readSteps() {
-    var rows = document.querySelectorAll('#steps-list li[data-step]');
-    var out = [];
-    rows.forEach(function (li) {
-      var name = li.querySelector('input.step-name').value.trim();
-      if (!name) return;
-      var matches = [];
-      try { matches = JSON.parse(li.dataset.matches || '[]'); } catch (e) {}
-      out.push({
-        name: name,
-        wip: li.querySelector('input.step-wip').checked,
-        matches: matches,
-      });
-    });
-    return out;
-  }
-
-  function categoryBadge(idx, steps) {
-    var seenWip = false;
-    for (var i = 0; i <= idx; i++) { if (steps[i].wip) seenWip = true; }
-    if (steps[idx].wip) return { text: 'WIP', color: 'var(--p-600)' };
-    return seenWip ? { text: 'DONE', color: 'var(--muted)' }
-                   : { text: 'READY', color: 'var(--muted)' };
-  }
-
-  function refreshBadges() {
-    var steps = readSteps();
-    var rows = document.querySelectorAll('#steps-list li[data-step]');
-    rows.forEach(function (li, idx) {
-      var span = li.querySelector('.step-badge');
-      if (!span || idx >= steps.length) return;
-      var b = categoryBadge(idx, steps);
-      span.textContent = b.text;
-      span.style.color = b.color;
-    });
-  }
-
-  function renderMatchPills(li, matches) {
-    var holder = li.querySelector('.step-matches');
-    if (!holder) return;
-    holder.innerHTML = '';
-    if (!matches || matches.length === 0) {
-      // No explicit matches → the step captures items whose source
-      // stage equals the step NAME. Informational, not an error.
-      var name = li.querySelector('input.step-name').value.trim() || '(unnamed)';
-      var note = document.createElement('span');
-      note.className = 'step-by-name';
-      note.textContent = 'captures source stage “' + name + '”';
-      holder.appendChild(note);
-      return;
-    }
-    matches.forEach(function (m, idx) {
-      var pill = document.createElement('span');
-      pill.className = 'match-pill';
-      pill.appendChild(document.createTextNode(m));
-      var x = document.createElement('button');
-      x.type = 'button';
-      x.textContent = '×';
-      x.title = 'Remove this match';
-      x.onclick = function () {
-        var ms = JSON.parse(li.dataset.matches || '[]');
-        ms.splice(idx, 1);
-        li.dataset.matches = JSON.stringify(ms);
-        renderMatchPills(li, ms);
-        updateValidity();
-      };
-      pill.appendChild(x);
-      holder.appendChild(pill);
-    });
-  }
-
-  function renderStepRow(name, wip, matches) {
-    var li = document.createElement('li');
-    li.dataset.step = '1';
-    li.dataset.matches = JSON.stringify(matches || []);
-    li.className = 'step-row';
-
-    var badge = document.createElement('span');
-    badge.className = 'step-badge';
-    li.appendChild(badge);
-
-    var center = document.createElement('div');
-    center.className = 'step-center';
-    var nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.className = 'step-name step-name-input';
-    nameInput.value = name;
-    nameInput.addEventListener('input', function () {
-      if (JSON.parse(li.dataset.matches || '[]').length === 0) {
-        renderMatchPills(li, []);
-      }
-      if (li === ACTIVE_STEP) setActiveStep(li);  // refresh the indicator
-      updateValidity();
-    });
-    center.appendChild(nameInput);
-    var matchHolder = document.createElement('div');
-    matchHolder.className = 'step-matches';
-    center.appendChild(matchHolder);
-    li.appendChild(center);
-
-    var wipLabel = document.createElement('label');
-    wipLabel.className = 'step-wip-label';
-    var wipInput = document.createElement('input');
-    wipInput.type = 'checkbox';
-    wipInput.className = 'step-wip';
-    wipInput.checked = !!wip;
-    wipInput.addEventListener('change', refreshBadges);
-    wipLabel.appendChild(wipInput);
-    wipLabel.appendChild(document.createTextNode('WIP'));
-    li.appendChild(wipLabel);
-
-    function mkBtn(text, title, click) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'btn btn--sm';
-      b.textContent = text; b.title = title; b.onclick = click;
-      return b;
-    }
-    li.appendChild(mkBtn('↑', 'Move up', function () {
-      var prev = li.previousElementSibling;
-      if (prev) li.parentElement.insertBefore(li, prev);
-      refreshBadges();
-    }));
-    li.appendChild(mkBtn('↓', 'Move down', function () {
-      var next = li.nextElementSibling;
-      if (next) li.parentElement.insertBefore(next, li);
-      refreshBadges();
-    }));
-    li.appendChild(mkBtn('×', 'Remove step', function () {
-      var wasActive = li === ACTIVE_STEP;
-      li.parentElement.removeChild(li);
-      if (wasActive) {
-        var rows = document.querySelectorAll('#steps-list li[data-step]');
-        setActiveStep(rows.length ? rows[rows.length - 1] : null);
-      }
-      refreshBadges();
-      updateValidity();
-    }));
-
-    renderMatchPills(li, matches || []);
-    return li;
-  }
-
-  var ACTIVE_STEP = null;
-  function revealSuggestions() {
-    document.getElementById('suggestions-panel').hidden = false;
-  }
-  function setActiveStep(li) {
-    ACTIVE_STEP = li;
-    document.querySelectorAll('#steps-list li[data-step]').forEach(function (row) {
-      row.classList.toggle('step-row--active', row === li);
-    });
-    var ind = document.getElementById('binding-target');
-    if (li) {
-      var nm = li.querySelector('input.step-name').value.trim() || '(unnamed step)';
-      ind.textContent = 'Chips add to the selected step: “' + nm + '”.';
-    } else {
-      ind.textContent = 'Add a step, then click chips to bind source data to it.';
-    }
-  }
-  // The Suggestions panel is contextual help for binding source
-  // identifiers to a step — keep it out of sight until the user is
-  // actually working in the Steps area. Focusing a step row (or its
-  // name input) makes that row the active binding target.
-  document.addEventListener('focusin', function (ev) {
-    if (ev.target.closest && ev.target.closest('#steps-fieldset')) revealSuggestions();
-    var li = ev.target.closest && ev.target.closest('#steps-list li[data-step]');
-    if (li) setActiveStep(li);
-  });
-
-  function addStep(name, wip, matches) {
-    if (name === undefined) {
-      var input = document.getElementById('new-step-name');
-      name = (input.value || '').trim();
-      if (!name) return;
-      wip = document.getElementById('new-step-wip').checked;
-      input.value = '';
-      matches = [];
-    }
-    var li = renderStepRow(name, !!wip, matches || []);
-    document.getElementById('steps-list').appendChild(li);
-    refreshBadges();
-    setActiveStep(li);
-    revealSuggestions();
-    updateValidity();
-  }
-
-  function addMatchToActiveStep(match) {
-    // Chips ONLY bind data to the step you're working on. They never
-    // create a step (steps come from "+ Add step"). If no step is
-    // selected, guide the user instead of guessing.
-    if (!(ACTIVE_STEP && ACTIVE_STEP.parentElement)) {
-      var ind = document.getElementById('binding-target');
-      ind.textContent = '⚠ Add a step first — chips bind to the selected step.';
-      ind.style.color = 'var(--t-700)';
-      document.getElementById('new-step-name').focus();
-      return;
-    }
-    document.getElementById('binding-target').style.color = '';
-    var existing = JSON.parse(ACTIVE_STEP.dataset.matches || '[]');
-    if (existing.indexOf(match) === -1) existing.push(match);
-    ACTIVE_STEP.dataset.matches = JSON.stringify(existing);
-    renderMatchPills(ACTIVE_STEP, existing);
-    updateValidity();
-  }
-
-  function renderChip(container, item) {
-    // One action: add this identifier to the active step.
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'sugg-chip';
-    btn.textContent = '+ ' + item.name;
-    btn.title = 'Add to the selected step';
-    btn.onclick = function () { addMatchToActiveStep(item.name); };
-    container.appendChild(btn);
-  }
-
-  function probeVocab() {
-    var data = readForm();
-    if (!sourceTargetComplete(data)) return;
-    var status = document.getElementById('stages-status');
-    status.textContent = 'Discovering…';
-    status.className = 'probe-status';
-    fetch('/api/internal/contracts/_probe-source-vocab', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
-      body: JSON.stringify(data),
-    }).then(function (r) { return r.json(); }).then(function (body) {
-      var labelsDiv = document.getElementById('sugg-labels');
-      var lifecycleDiv = document.getElementById('sugg-lifecycle');
-      labelsDiv.innerHTML = '';
-      lifecycleDiv.innerHTML = '';
-      var warehouse = body.warehouse_stages || [];
-      var labels = body.labels || [];
-      var lifecycle = body.lifecycle_events || [];
-
-      var whDiv = document.getElementById('sugg-warehouse');
-      if (whDiv) {
-        whDiv.innerHTML = '';
-        warehouse.forEach(function (it) { renderChip(whDiv, it); });
-        if (warehouse.length === 0) {
-          whDiv.innerHTML = '<span class="sugg-empty">appears after this ' +
-            'workflow imports data</span>';
+      // ---- computed ----
+      get sourceComplete() {
+        if (this.source === 'github') return this.repo.includes('/');
+        if (this.source === 'jira') return !!(this.jiraUrl && this.jiraProject);
+        return false;
+      },
+      get nameOk() { return /^[a-z0-9-]+$/.test(this.name); },
+      get canAddStep() { return this.sourceComplete && !!this.newStepName.trim(); },
+      get canDryRun() { return this.sourceComplete && this.steps.length > 0; },
+      get canSave() { return this.nameOk && this.sourceComplete && this.steps.length > 0; },
+      get blocker() {
+        const missing = [];
+        if (!this.nameOk) missing.push('a routing id (lowercase, dashes)');
+        if (!this.sourceComplete) missing.push(
+          this.source === 'jira' ? 'a Jira URL + project key' : 'a repository (owner/name)');
+        if (this.steps.length === 0) missing.push('at least one step');
+        return missing.length ? 'To save, add: ' + missing.join(', ') + '.' : '';
+      },
+      get bindingTargetWarn() { return this._warn || false; },
+      get bindingTarget() {
+        if (this.activeIdx === null || !this.steps[this.activeIdx]) {
+          return 'Add a step, then click chips to bind source data to it.';
         }
-      }
-      labels.forEach(function (it) { renderChip(labelsDiv, it); });
-      lifecycle.forEach(function (it) { renderChip(lifecycleDiv, it); });
-      if (labels.length === 0) {
-        labelsDiv.innerHTML = '<span class="sugg-empty">' +
-          (body.hint || 'none found for this source') + '</span>';
-      }
+        const nm = this.steps[this.activeIdx].name.trim() || '(unnamed step)';
+        return `Chips add to the selected step: “${nm}”.`;
+      },
+      get lifecycleChips() {
+        return this.source === 'jira' ? JIRA_LIFECYCLE : GH_LIFECYCLE;
+      },
+      get labelsTitle() {
+        return this.source === 'jira' ? 'Statuses in the project' : 'Labels in the repo';
+      },
 
-      var total = warehouse.length + labels.length + lifecycle.length;
-      status.textContent = '✓ ' + total + ' suggestion' + (total === 1 ? '' : 's');
-      status.className = 'probe-status probe-status--ok';
-    }).catch(function (err) {
-      status.textContent = 'probe failed: ' + err;
-      status.className = 'probe-status probe-status--fail';
-    });
-  }
+      // ---- lifecycle ----
+      init() {
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() - 30);
+        this.drySince = d.toISOString().slice(0, 10);
+        if (this.mode === 'edit' && this.editId) this.hydrate();
+      },
 
-  function showLifecycleChips() {
-    var div = document.getElementById('sugg-lifecycle');
-    if (div.children.length) return;
-    var data = readForm();
-    var gh = [
-      {name:'PR opened',wip:false},{name:'Marked ready for review',wip:true},
-      {name:'Changes requested',wip:true},{name:'Review approved',wip:true},
-      {name:'PR merged',wip:false},{name:'PR closed without merge',wip:false},
-      {name:'Issue opened',wip:false},{name:'Issue closed',wip:false},
-    ];
-    var jira = [
-      {name:'Issue created',wip:false},{name:'Assigned',wip:true},
-      {name:'Resolved',wip:false},{name:'Reopened',wip:true},{name:'Closed',wip:false},
-    ];
-    (data.source === 'jira' ? jira : gh).forEach(function (it) { renderChip(div, it); });
-  }
+      badge(idx) {
+        let seenWip = false;
+        for (let i = 0; i <= idx; i++) if (this.steps[i].wip) seenWip = true;
+        if (this.steps[idx].wip) return { text: 'WIP', color: 'var(--p-600)' };
+        return seenWip
+          ? { text: 'DONE', color: 'var(--muted)' }
+          : { text: 'READY', color: 'var(--muted)' };
+      },
 
-  function buildYaml(data) {
-    var lines = ["contract:"];
-    lines.push("  name: " + data.name);
-    if (data.label) lines.push("  label: " + JSON.stringify(data.label));
-    lines.push("  source: " + data.source);
-    if (data.source === "github" && data.repo) lines.push("  repo: " + data.repo);
-    if (data.source === "jira") {
-      if (data.jira_url) lines.push("  jira_url: " + data.jira_url);
-      if (data.jira_project) lines.push("  jira_project: " + data.jira_project);
-    }
-    if (data.start) lines.push("  start: " + data.start);
-    if (data.stop) lines.push("  stop: " + data.stop);
-    var steps = readSteps();
-    if (steps.length) {
-      lines.push("  steps:");
-      steps.forEach(function (s) {
-        lines.push("    - name: " + JSON.stringify(s.name));
-        lines.push("      wip: " + (s.wip ? "true" : "false"));
-        if (s.matches && s.matches.length) {
-          lines.push("      matches:");
-          s.matches.forEach(function (m) { lines.push("        - " + JSON.stringify(m)); });
+      // ---- steps ----
+      addStep() {
+        const name = this.newStepName.trim();
+        if (!name) return;
+        this.steps.push({ name, wip: this.newStepWip, matches: [] });
+        this.newStepName = '';
+        this.activeIdx = this.steps.length - 1;
+        this.showSuggestions = true;
+        this._warn = false;
+      },
+      removeStep(idx) {
+        this.steps.splice(idx, 1);
+        if (this.activeIdx === idx) {
+          this.activeIdx = this.steps.length ? this.steps.length - 1 : null;
+        } else if (this.activeIdx > idx) {
+          this.activeIdx -= 1;
         }
-      });
-    }
-    return lines.join("\n") + "\n";
-  }
-
-  function onSourceKindChange() {
-    var data = readForm();
-    document.getElementById('source-fieldset').dataset.source = data.source;
-    document.getElementById('sugg-labels-label').textContent =
-      data.source === 'jira' ? 'Statuses in the project' : 'Labels in the repo';
-    document.getElementById('sugg-lifecycle').innerHTML = '';
-    showLifecycleChips();
-    updateValidity();
-    if (sourceTargetComplete(data)) probeVocab();
-  }
-
-  function probeSource() {
-    var data = readForm();
-    if (!sourceTargetComplete(data)) return;
-    var status = document.getElementById("probe-status");
-    status.textContent = "Checking…";
-    status.className = "probe-status";
-    fetch("/api/internal/contracts/_probe-source", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-      body: JSON.stringify(data),
-    }).then(function (r) { return r.json(); }).then(function (body) {
-      if (body.ok) {
-        status.textContent = "✓ " + (body.label || "source reachable");
-        status.className = "probe-status probe-status--ok";
-        probeVocab();
-      } else {
-        status.textContent = "✗ " + (body.error || "source not reachable");
-        status.className = "probe-status probe-status--fail";
-      }
-    }).catch(function (err) {
-      status.textContent = "check failed: " + err;
-      status.className = "probe-status probe-status--fail";
-    });
-  }
-
-  function hydrateFromExisting(id) {
-    fetch("/api/internal/contracts/" + encodeURIComponent(id))
-      .then(function (r) { return r.json(); })
-      .then(function (body) {
-        var form = document.getElementById("wizard");
-        var p = body.parsed || {};
-        function setField(name, value) {
-          var el = form.elements[name];
-          if (el && value !== null && value !== undefined) el.value = value;
+      },
+      moveStep(idx, dir) {
+        const j = idx + dir;
+        if (j < 0 || j >= this.steps.length) return;
+        const [row] = this.steps.splice(idx, 1);
+        this.steps.splice(j, 0, row);
+        this.activeIdx = j;
+      },
+      // Chips ONLY bind to the active step. They never create one.
+      addMatch(name) {
+        if (this.activeIdx === null || !this.steps[this.activeIdx]) {
+          this._warn = true;
+          this.$nextTick(() => document.getElementById('new-step-name').focus());
+          return;
         }
-        setField("name", p.name);
-        setField("label", p.label);
-        setField("source", p.source);
-        setField("repo", p.repo);
-        setField("jira_url", p.jira_url);
-        setField("jira_project", p.jira_project);
-        setField("start", p.start);
-        setField("stop", p.stop);
-        document.getElementById("source-fieldset").dataset.source = p.source || "github";
-        document.getElementById('sugg-labels-label').textContent =
-          p.source === 'jira' ? 'Statuses in the project' : 'Labels in the repo';
-        if (Array.isArray(p.steps) && p.steps.length) {
-          p.steps.forEach(function (s) { addStep(s.name, !!s.wip, s.matches || []); });
-        } else if (p.states) {
-          (p.states.backlog || []).forEach(function (n) { addStep(n, false, [n]); });
-          (p.states.wip || []).forEach(function (n) { addStep(n, true, [n]); });
-          (p.states.done || []).forEach(function (n) { addStep(n, false, [n]); });
+        this._warn = false;
+        const m = this.steps[this.activeIdx].matches;
+        if (!m.includes(name)) m.push(name);
+      },
+
+      // ---- source probing ----
+      async onSourceKindChange() {
+        this.vocab = { labels: [], warehouse: [] };
+        if (this.sourceComplete) this.probeSource();
+      },
+      async probeSource() {
+        if (!this.sourceComplete) return;
+        this.probeStatus = 'Checking…'; this.probeClass = 'probe-status';
+        try {
+          const r = await fetch('/api/internal/contracts/_probe-source', {
+            method: 'POST', headers: HEADERS, body: JSON.stringify(this._target()),
+          });
+          const body = await r.json();
+          if (body.ok) {
+            this.probeStatus = '✓ ' + (body.label || 'source reachable');
+            this.probeClass = 'probe-status probe-status--ok';
+            this.probeVocab();
+          } else {
+            this.probeStatus = '✗ ' + (body.error || 'source not reachable');
+            this.probeClass = 'probe-status probe-status--fail';
+          }
+        } catch (e) {
+          this.probeStatus = 'check failed: ' + e;
+          this.probeClass = 'probe-status probe-status--fail';
         }
-        if (WIZARD_MODE === "edit") form.elements.name.readOnly = true;
-        showLifecycleChips();
-        updateValidity();
-        if (sourceTargetComplete(readForm())) probeVocab();
-      });
-  }
+      },
+      async probeVocab() {
+        if (!this.sourceComplete) return;
+        this.vocabStatus = 'Discovering…'; this.vocabClass = 'probe-status';
+        try {
+          const r = await fetch('/api/internal/contracts/_probe-source-vocab', {
+            method: 'POST', headers: HEADERS, body: JSON.stringify(this._target()),
+          });
+          const body = await r.json();
+          this.vocab.labels = body.labels || [];
+          this.vocab.warehouse = body.warehouse_stages || [];
+          this.vocabHint = body.hint || '';
+          const total = this.vocab.labels.length + this.vocab.warehouse.length +
+                        this.lifecycleChips.length;
+          this.vocabStatus = `✓ ${total} suggestion${total === 1 ? '' : 's'}`;
+          this.vocabClass = 'probe-status probe-status--ok';
+        } catch (e) {
+          this.vocabStatus = 'probe failed: ' + e;
+          this.vocabClass = 'probe-status probe-status--fail';
+        }
+      },
 
-  function copyYaml() {
-    fetch("/api/internal/contracts/" + encodeURIComponent(EDIT_ID) + "/yaml")
-      .then(function (r) { return r.text(); })
-      .then(function (text) {
-        if (navigator.clipboard) navigator.clipboard.writeText(text);
-        var btn = document.getElementById("copy-yaml-btn");
-        var orig = btn.textContent;
-        btn.textContent = "Copied ✓";
-        setTimeout(function () { btn.textContent = orig; }, 1500);
-      });
-  }
-
-  function confirmArchive() {
-    var reason = window.prompt(
-      "Archive '" + EDIT_ID + "'? Optional reason for the audit log:", ""
-    );
-    if (reason === null) return;
-    fetch("/api/internal/contracts/" + encodeURIComponent(EDIT_ID) + "/archive", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-      body: JSON.stringify({ reason: reason || null }),
-    }).then(function (r) {
-      if (r.ok) { window.location.href = "/"; return; }
-      r.json().then(function (body) {
-        document.getElementById("wizard-errors").textContent =
-          (body.detail && body.detail.message) || body.detail || "archive failed";
-      });
-    });
-  }
-
-  (function () {
-    var d = new Date();
-    d.setUTCDate(d.getUTCDate() - 30);
-    document.getElementById("dry-run-since").value = d.toISOString().slice(0, 10);
-  })();
-
-  function dryRun() {
-    var data = readForm();
-    var status = document.getElementById("dry-run-status");
-    status.textContent = "Running…";
-    status.className = "probe-status";
-    var since = document.getElementById("dry-run-since").value;
-    var contractBody = {
-      name: data.name || "tmp", source: data.source,
-      repo: data.repo || null, jira_url: data.jira_url || null,
-      jira_project: data.jira_project || null, steps: readSteps(),
-    };
-    fetch("/api/internal/contracts/_dry-run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-      body: JSON.stringify({ contract: contractBody, since: since, items_cap: 200 }),
-    }).then(function (r) { return r.json(); }).then(function (body) {
-      renderDryRunResults(body);
-      if (body.error) {
-        status.textContent = "✗ " + body.error;
-        status.className = "probe-status probe-status--fail";
-      } else {
-        status.textContent = "✓ " + body.items_fetched +
-          " items (stopped by " + body.stopped_by + ")";
-        status.className = "probe-status probe-status--ok";
-      }
-    });
-  }
-
-  function renderDryRunResults(body) {
-    var container = document.getElementById("dry-run-results");
-    container.innerHTML = "";
-    if (!body.per_step) return;
-    body.per_step.forEach(function (bucket) {
-      var section = document.createElement("section");
-      section.className = "dr-section";
-      var head = document.createElement("div");
-      head.className = "dr-head";
-      var label = document.createElement("strong");
-      if (bucket.step_name === "_unmatched") {
-        label.textContent = "Unmatched"; label.style.color = "var(--t-700)";
-      } else {
-        label.textContent = bucket.step_name;
-        label.style.color = bucket.wip ? "var(--p-700)" : "var(--fg)";
-      }
-      head.appendChild(label);
-      var count = document.createElement("span");
-      count.textContent = bucket.count + " item" + (bucket.count === 1 ? "" : "s");
-      count.style.cssText = "color: var(--muted); font-size: 0.8125rem;";
-      head.appendChild(count);
-      if (bucket.step_name === "_unmatched" && bucket.count > 0) {
-        var hint = document.createElement("em");
-        hint.textContent = "your workflow may be missing a step";
-        hint.style.cssText = "color: var(--muted); font-size: 0.75rem; margin-left: auto;";
-        head.appendChild(hint);
-      }
-      section.appendChild(head);
-      if (bucket.count > 0) {
-        var list = document.createElement("ul");
-        list.className = "dr-list";
-        bucket.items.slice(0, 10).forEach(function (it) {
-          var li = document.createElement("li");
-          li.className = "dr-item";
-          var stage = document.createElement("code");
-          stage.className = "dr-stage";
-          stage.textContent = it.current_stage;
-          li.appendChild(stage);
-          var title = document.createElement("span");
-          title.textContent = it.title || it.id;
-          title.style.flex = "1";
-          li.appendChild(title);
-          list.appendChild(li);
+      // ---- save / dry-run / archive ----
+      _target() {
+        return {
+          source: this.source, repo: this.repo || null,
+          jira_url: this.jiraUrl || null, jira_project: this.jiraProject || null,
+        };
+      },
+      _contractBody() {
+        return { name: this.name || 'tmp', ...this._target(), steps: this.steps };
+      },
+      buildYaml() {
+        const q = (s) => JSON.stringify(s);
+        const lines = ['contract:', `  name: ${this.name}`];
+        if (this.label) lines.push(`  label: ${q(this.label)}`);
+        lines.push(`  source: ${this.source}`);
+        if (this.source === 'github' && this.repo) lines.push(`  repo: ${this.repo}`);
+        if (this.source === 'jira') {
+          if (this.jiraUrl) lines.push(`  jira_url: ${this.jiraUrl}`);
+          if (this.jiraProject) lines.push(`  jira_project: ${this.jiraProject}`);
+        }
+        if (this.start) lines.push(`  start: ${this.start}`);
+        if (this.stop) lines.push(`  stop: ${this.stop}`);
+        if (this.steps.length) {
+          lines.push('  steps:');
+          for (const s of this.steps) {
+            lines.push(`    - name: ${q(s.name)}`);
+            lines.push(`      wip: ${s.wip ? 'true' : 'false'}`);
+            if (s.matches.length) {
+              lines.push('      matches:');
+              for (const m of s.matches) lines.push(`        - ${q(m)}`);
+            }
+          }
+        }
+        return lines.join('\n') + '\n';
+      },
+      async save() {
+        this.errors = '';
+        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.name), {
+          method: 'PUT', headers: HEADERS, body: JSON.stringify({ yaml: this.buildYaml() }),
         });
-        if (bucket.items.length > 10) {
-          var more = document.createElement("li");
-          more.className = "dr-item";
-          more.textContent = "… and " + (bucket.items.length - 10) + " more";
-          more.style.color = "var(--muted)";
-          list.appendChild(more);
+        if (r.ok) { window.location.href = '/workflows/' + encodeURIComponent(this.name); return; }
+        const body = await r.json();
+        this.errors = (body.detail && body.detail.message) || body.detail || 'save failed';
+      },
+      async dryRun() {
+        this.dryStatus = 'Running…'; this.dryClass = 'probe-status';
+        const r = await fetch('/api/internal/contracts/_dry-run', {
+          method: 'POST', headers: HEADERS,
+          body: JSON.stringify({ contract: this._contractBody(), since: this.drySince, items_cap: 200 }),
+        });
+        const body = await r.json();
+        this.dryResults = body.per_step || [];
+        if (body.error) {
+          this.dryStatus = '✗ ' + body.error;
+          this.dryClass = 'probe-status probe-status--fail';
+        } else {
+          this.dryStatus = `✓ ${body.items_fetched} items (stopped by ${body.stopped_by})`;
+          this.dryClass = 'probe-status probe-status--ok';
         }
-        section.appendChild(list);
-      }
-      container.appendChild(section);
-    });
-  }
+      },
+      async copyYaml() {
+        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.editId) + '/yaml');
+        const text = await r.text();
+        if (navigator.clipboard) await navigator.clipboard.writeText(text);
+        this.copied = true;
+        setTimeout(() => { this.copied = false; }, 1500);
+      },
+      async archive() {
+        const reason = window.prompt(
+          `Archive '${this.editId}'? Optional reason for the audit log:`, '');
+        if (reason === null) return;
+        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.editId) + '/archive', {
+          method: 'POST', headers: HEADERS, body: JSON.stringify({ reason: reason || null }),
+        });
+        if (r.ok) { window.location.href = '/'; return; }
+        const body = await r.json();
+        this.errors = (body.detail && body.detail.message) || body.detail || 'archive failed';
+      },
 
-  // ---- init ----
-  document.getElementById("f-name").addEventListener("input", updateValidity);
-  onSourceKindChange();
-  showLifecycleChips();
-  setActiveStep(null);  // binding indicator starts in "add a step" state
-  if (WIZARD_MODE === "edit" && EDIT_ID) hydrateFromExisting(EDIT_ID);
-  updateValidity();
-
-  document.getElementById("wizard").addEventListener("submit", function (ev) {
-    ev.preventDefault();
-    var errs = document.getElementById("wizard-errors");
-    errs.textContent = "";
-    var data = readForm();
-    fetch("/api/internal/contracts/" + encodeURIComponent(data.name), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-      body: JSON.stringify({ yaml: buildYaml(data) }),
-    }).then(function (r) {
-      if (r.ok) { window.location.href = "/workflows/" + encodeURIComponent(data.name); return; }
-      return r.json().then(function (body) {
-        var msg = (body.detail && body.detail.message) || body.detail || "save failed";
-        errs.textContent = msg;
-      });
-    });
+      // ---- edit-mode hydration ----
+      async hydrate() {
+        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.editId));
+        const body = await r.json();
+        const p = body.parsed || {};
+        this.name = p.name || '';
+        this.label = p.label || '';
+        this.source = p.source || 'github';
+        this.repo = p.repo || '';
+        this.jiraUrl = p.jira_url || '';
+        this.jiraProject = p.jira_project || '';
+        this.start = p.start || '';
+        this.stop = p.stop || '';
+        if (Array.isArray(p.steps) && p.steps.length) {
+          this.steps = p.steps.map((s) => ({
+            name: s.name, wip: !!s.wip, matches: (s.matches || []).slice(),
+          }));
+        } else if (p.states) {
+          const add = (names, wip) => (names || []).forEach(
+            (n) => this.steps.push({ name: n, wip, matches: [n] }));
+          add(p.states.backlog, false);
+          add(p.states.wip, true);
+          add(p.states.done, false);
+        }
+        if (this.steps.length) { this.activeIdx = 0; this.showSuggestions = true; }
+        if (this.sourceComplete) this.probeVocab();
+      },
+    }));
   });
 </script>
 {% endblock %}

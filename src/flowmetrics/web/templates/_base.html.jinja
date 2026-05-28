@@ -1106,6 +1106,10 @@
   <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <!-- Alpine: declarative client-side state for the rich forms
+       (the contract builder). htmx drives the server-rendered
+       dashboard tiles; Alpine drives stateful client widgets. -->
+  <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
     /* Theme bridge — single source of truth for chart colors.
        The CSS at `:root` defines tokens (--p-500, --t-500, etc.)

@@ -53,20 +53,22 @@ class TestRequiredFieldsMarked:
         assert "aria-required" in html
 
 
-class TestGatedButtonsStartDisabled:
-    def test_save_button_starts_disabled(self, workspace):
+class TestGatedButtonsAreReactivelyDisabled:
+    """The builder is an Alpine component — the gated buttons carry
+    an Alpine `:disabled` binding so they enable/disable as the
+    component's state (name / source / steps) changes."""
+
+    def test_save_button_has_disabled_binding(self, workspace):
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             html = _new(client)
-        # The submit button renders disabled; JS enables it once the
-        # required fields validate.
         import re
         m = re.search(r"<button[^>]*type=\"submit\"[^>]*>", html)
         assert m is not None
-        assert "disabled" in m.group(0)
+        assert ":disabled" in m.group(0)
 
-    def test_add_step_button_starts_disabled(self, workspace):
+    def test_add_step_button_has_disabled_binding(self, workspace):
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
@@ -74,9 +76,9 @@ class TestGatedButtonsStartDisabled:
         import re
         m = re.search(r"<button[^>]*id=\"add-step\"[^>]*>", html)
         assert m is not None
-        assert "disabled" in m.group(0)
+        assert ":disabled" in m.group(0)
 
-    def test_dry_run_button_starts_disabled(self, workspace):
+    def test_dry_run_button_has_disabled_binding(self, workspace):
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
@@ -84,24 +86,22 @@ class TestGatedButtonsStartDisabled:
         import re
         m = re.search(r"<button[^>]*id=\"dry-run-btn\"[^>]*>", html)
         assert m is not None
-        assert "disabled" in m.group(0)
+        assert ":disabled" in m.group(0)
 
 
 class TestSuggestionsHiddenUntilActive:
-    def test_suggestions_panel_starts_hidden(self, workspace):
-        """The Suggestions panel (warehouse / labels / lifecycle
-        chips) shouldn't clutter the form — it's revealed only when
-        the user is actually adding/editing a step."""
+    def test_suggestions_panel_is_x_show_gated(self, workspace):
+        """The Suggestions panel (labels / lifecycle chips) is
+        revealed reactively (Alpine x-show) only once the user has
+        a step to bind to — it doesn't clutter the initial form."""
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             html = _new(client)
         import re
-        # The panel renders with a `hidden` attribute (JS reveals it
-        # on focus within the steps area).
         m = re.search(r'<div[^>]*id="suggestions-panel"[^>]*>', html)
         assert m is not None
-        assert "hidden" in m.group(0)
+        assert "x-show" in m.group(0)
 
 
 class TestChipsBindToCurrentStep:
