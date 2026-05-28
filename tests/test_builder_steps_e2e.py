@@ -171,6 +171,35 @@ class TestChipsLiveInsideActiveStep:
         assert not any("in-review" in t for t in done_pills), done_pills
 
 
+class TestSaveProposesFetchData:
+    def test_save_shows_a_fetch_data_panel_not_an_empty_dashboard(
+        self, server_url: str, page: Page
+    ):
+        """Saving a new contract only writes the definition — the
+        warehouse is still empty. Instead of dropping the user on an
+        empty dashboard, the builder confirms the save and offers to
+        fetch data via the Data Source page (whose backfill picks the
+        date range)."""
+        page.goto(server_url + "/admin/contracts/new")
+        page.fill("#f-name", "fetch-me")
+        _verify_source(page)
+        _add_step(page, "Ready")
+
+        page.click("#save-btn")
+        # The form is replaced by the saved panel — no navigation away.
+        panel = page.wait_for_selector(".saved-panel", state="visible", timeout=5000)
+        assert "saved" in panel.inner_text().lower()
+        # A primary "Fetch data" CTA links to the Data Source backfill.
+        fetch = page.query_selector(
+            ".saved-panel a[href$='/workflows/fetch-me/data-source']"
+        )
+        assert fetch is not None and "fetch data" in fetch.inner_text().lower()
+        # And a secondary link opens the dashboard.
+        assert page.query_selector(
+            ".saved-panel a[href$='/workflows/fetch-me']"
+        ) is not None
+
+
 class TestAddStepIsVisuallyDistinct:
     def test_add_step_control_is_labelled(
         self, server_url: str, page: Page

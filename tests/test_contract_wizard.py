@@ -1,14 +1,15 @@
 """New-contract wizard — UI + probe-source endpoint.
 
-The wizard lives at `/admin/contracts/new`. Three steps in a single
-form (no navigation between): name + label, source picker, date
-window. The source field's on-blur fires `POST
+The wizard lives at `/admin/contracts/new`. A single form: name +
+label, source picker, and the steps editor (there is no date-window
+field — data is fetched via the Data Source page's backfill after
+save). The source field's on-blur fires `POST
 /api/internal/contracts/_probe-source` to confirm the repo / project
 actually exists at the source.
 
 These tests cover the page render + the probe endpoint. The full
-end-to-end save flow (form → validate → PUT → redirect) is exercised
-in the slice B3 Playwright E2E (separate file).
+end-to-end save flow (form → validate → PUT → "fetch data" panel) is
+exercised in the builder Playwright E2E (separate file).
 """
 
 from __future__ import annotations

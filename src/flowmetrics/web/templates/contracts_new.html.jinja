@@ -206,6 +206,13 @@
     margin: 0.25rem 0 0 0; min-height: 1.2rem;
   }
 
+  .saved-panel {
+    max-width: 42rem; margin: 1.5rem 0;
+    border: 0.0625rem solid var(--p-200); border-radius: 0.5rem;
+    background: var(--p-50); padding: 1.25rem;
+  }
+  .saved-panel__msg { margin: 0 0 0.9rem 0; color: var(--fg); }
+
   /* Dry-run results. */
   .dr-section {
     margin: 0.6rem 0; border: 0.0625rem solid var(--border);
@@ -240,7 +247,7 @@
   </p>
   {% endif %}
 
-  <form class="wizard" id="wizard" @submit.prevent="save()">
+  <form class="wizard" id="wizard" x-show="!saved" @submit.prevent="save()">
     <fieldset>
       <legend>Identity</legend>
       <div class="field">
@@ -479,24 +486,6 @@
       </div>
     </fieldset>
 
-    <fieldset>
-      <legend>Window (optional)</legend>
-      <p class="field-hint" style="margin: 0 0 0.75rem 0;">
-        Limit the date range materialise fetches. Leave blank for the
-        source's full history.
-      </p>
-      <div class="field">
-        <label class="field-label" for="f-start">Start</label>
-        <input class="field-input" id="f-start" name="start" type="date"
-               x-model="start" style="width: auto;">
-      </div>
-      <div class="field">
-        <label class="field-label" for="f-stop">Stop</label>
-        <input class="field-input" id="f-stop" name="stop" type="date"
-               x-model="stop" style="width: auto;">
-      </div>
-    </fieldset>
-
     <div class="wizard-actions">
       <button type="submit" class="btn btn--primary" id="save-btn" :disabled="!canSave">
         {% if wizard_mode == "edit" %}Save{% else %}Save &amp; open{% endif %}
@@ -514,6 +503,25 @@
     <p class="wizard-hint" x-text="blocker"></p>
     <p class="wizard-errors" x-text="errors"></p>
   </form>
+
+  {# Post-save: the contract is defined but the warehouse is empty. Send
+     the user to the Data Source page to fetch data (its backfill picks
+     the date range), rather than dropping them on an empty dashboard. #}
+  <div class="saved-panel" x-show="saved" x-cloak>
+    <p class="saved-panel__msg">
+      ✓ Workflow “<span x-text="savedName"></span>” saved.
+      No data has been imported yet.
+    </p>
+    <div class="wizard-actions">
+      <a class="btn btn--primary"
+         :href="`/workflows/${encodeURIComponent(savedName)}/data-source`">
+        Fetch data →
+      </a>
+      <a class="btn" :href="`/workflows/${encodeURIComponent(savedName)}`">
+        Open dashboard
+      </a>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -544,8 +552,9 @@
       editId: cfg.editId,
       // form state
       name: '', label: '', source: 'github',
-      repo: '', jiraUrl: '', jiraProject: '', start: '', stop: '',
+      repo: '', jiraUrl: '', jiraProject: '',
       steps: [],                 // [{name, wip, matches: []}]
+      saved: false, savedName: '',   // post-save "fetch data" panel
       activeIdx: null,
       flashIdx: null,            // step row to pulse after a chip click
       // probe state
@@ -731,8 +740,6 @@
           if (this.jiraUrl) lines.push(`  jira_url: ${this.jiraUrl}`);
           if (this.jiraProject) lines.push(`  jira_project: ${this.jiraProject}`);
         }
-        if (this.start) lines.push(`  start: ${this.start}`);
-        if (this.stop) lines.push(`  stop: ${this.stop}`);
         if (this.steps.length) {
           lines.push('  steps:');
           for (const s of this.steps) {
@@ -751,7 +758,7 @@
         const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.name), {
           method: 'PUT', headers: HEADERS, body: JSON.stringify({ yaml: this.buildYaml() }),
         });
-        if (r.ok) { window.location.href = '/workflows/' + encodeURIComponent(this.name); return; }
+        if (r.ok) { this.savedName = this.name; this.saved = true; return; }
         const body = await r.json();
         this.errors = (body.detail && body.detail.message) || body.detail || 'save failed';
       },
@@ -801,8 +808,6 @@
         this.repo = p.repo || '';
         this.jiraUrl = p.jira_url || '';
         this.jiraProject = p.jira_project || '';
-        this.start = p.start || '';
-        this.stop = p.stop || '';
         if (Array.isArray(p.steps) && p.steps.length) {
           this.steps = p.steps.map((s) => ({
             name: s.name, wip: !!s.wip, matches: (s.matches || []).slice(),

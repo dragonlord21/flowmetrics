@@ -26,7 +26,7 @@ import os
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -44,6 +44,22 @@ from .sources.intervals import (
 # interrupted write and is safe to delete; a fresh `.tmp` from a
 # write in flight is always younger and is never touched.
 _STALE_TMP_AFTER = timedelta(minutes=30)
+
+# A contract may omit start/stop (the web builder no longer asks for a
+# window — data is fetched via the Data Source page's backfill, which
+# passes its own range). When neither is set, fetch the most recent
+# window of this many days up to today so the scheduled import still has
+# a bounded, sensible default rather than the source's full history.
+DEFAULT_FETCH_WINDOW_DAYS = 90
+
+
+def _resolve_window(contract: Contract, *, today: date) -> tuple[date, date]:
+    """The fetch window for this run: the contract's explicit start/stop
+    when present, otherwise a rolling `DEFAULT_FETCH_WINDOW_DAYS` window
+    ending today. Each bound defaults independently."""
+    stop = contract.stop or today
+    start = contract.start or (stop - timedelta(days=DEFAULT_FETCH_WINDOW_DAYS))
+    return start, stop
 
 
 def cleanup_tmp_files(
@@ -206,12 +222,13 @@ def materialise(
             read_only=offline,
         )
 
-    assert contract.start and contract.stop, (
-        "Slice 1 contract requires explicit start/stop dates; "
-        "richer scoping arrives in later slices."
+    # The contract window is optional; fall back to a rolling default
+    # so a UI-built (windowless) contract still materialises.
+    window_start, window_stop = _resolve_window(
+        contract, today=started_at.date()
     )
     completed = list(
-        source.fetch_completed_in_window(contract.start, contract.stop)
+        source.fetch_completed_in_window(window_start, window_stop)
     )
     # Also capture in-flight items (started but not yet completed)
     # so the aging-WIP chart has data to plot. Without this the
