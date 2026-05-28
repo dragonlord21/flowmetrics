@@ -340,7 +340,9 @@
                     x-text="badge(idx).text"></span>
               <div class="step-center">
                 <input class="step-name-input" type="text" x-model="step.name"
-                       @focus="activeIdx = idx">
+                       placeholder="Name this step (e.g. In Progress)"
+                       @focus="activeIdx = idx"
+                       @keydown.enter.prevent="addStep()">
                 <div class="step-matches">
                   <template x-if="step.matches.length === 0">
                     <span class="step-by-name"
@@ -415,15 +417,14 @@
       <div class="add-step-panel">
         <div class="add-step-panel__title">Add a step</div>
         <div class="add-step-row">
-          <input class="field-input" id="new-step-name" type="text"
-                 x-model="newStepName"
-                 placeholder="Name a new step (e.g. In Progress), then Add"
-                 @keydown.enter.prevent="addStep()">
-          <label class="step-wip-label">
-            <input type="checkbox" x-model="newStepWip"> WIP
-          </label>
-          <button type="button" class="btn btn--sm" id="add-step"
+          <button type="button" class="btn" id="add-step"
                   :disabled="!canAddStep" @click="addStep()">+ Add step</button>
+          <span class="field-hint" x-show="steps.length === 0">
+            Adds a row below — name it and tag its labels &amp; events right there.
+          </span>
+          <span class="field-hint" x-show="steps.length > 0 && !canAddStep">
+            Name the current step before adding another.
+          </span>
           <span class="probe-status" id="stages-status"
                 :class="vocabClass" x-text="vocabStatus"></span>
         </div>
@@ -547,7 +548,6 @@
       steps: [],                 // [{name, wip, matches: []}]
       activeIdx: null,
       flashIdx: null,            // step row to pulse after a chip click
-      newStepName: '', newStepWip: true,
       // probe state
       sourceVerified: false,     // source actually resolved (not just well-formed)
       probeStatus: '', probeClass: 'probe-status',
@@ -565,7 +565,13 @@
         return false;
       },
       get nameOk() { return /^[a-z0-9-]+$/.test(this.name); },
-      get canAddStep() { return this.sourceVerified && !!this.newStepName.trim(); },
+      // A new (blank) step row can be added once the source resolves; but
+      // don't stack blank rows — the last step must be named first.
+      get canAddStep() {
+        if (!this.sourceVerified) return false;
+        if (this.steps.length === 0) return true;
+        return this.steps[this.steps.length - 1].name.trim() !== '';
+      },
       get canDryRun() { return this.sourceVerified && this.steps.length > 0; },
       get canSave() { return this.nameOk && this.sourceVerified && this.steps.length > 0; },
       get blocker() {
@@ -603,12 +609,18 @@
       },
 
       // ---- steps ----
+      // "+ Add step" appends a fresh, blank row and makes it active so the
+      // user names it and tags its labels / events inline. Everything about
+      // a step happens in the step's own row.
       addStep() {
-        const name = this.newStepName.trim();
-        if (!name) return;
-        this.steps.push({ name, wip: this.newStepWip, matches: [] });
-        this.newStepName = '';
+        if (!this.canAddStep) return;
+        this.steps.push({ name: '', wip: true, matches: [] });
         this.activeIdx = this.steps.length - 1;
+        this.$nextTick(() => {
+          const inputs = document.querySelectorAll('#steps-list .step-name-input');
+          const el = inputs[this.activeIdx];
+          if (el) { el.focus(); el.scrollIntoView({ block: 'nearest' }); }
+        });
       },
       removeStep(idx) {
         this.steps.splice(idx, 1);

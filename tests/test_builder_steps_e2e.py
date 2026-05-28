@@ -92,8 +92,12 @@ def _verify_source(page: Page) -> None:
 
 
 def _add_step(page: Page, name: str) -> None:
-    page.fill("#new-step-name", name)
+    """The new flow: '+ Add step' appends a blank, active row; you then
+    name it (and tag it) inline."""
     page.click("#add-step")
+    page.wait_for_selector("#steps-list .step-row .step-name-input", timeout=4000)
+    inputs = page.query_selector_all("#steps-list .step-name-input")
+    inputs[-1].fill(name)
     page.wait_for_function(
         "n => [...document.querySelectorAll('#steps-list .step-name-input')]"
         ".some(i => i.value === n)",
