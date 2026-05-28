@@ -1271,25 +1271,29 @@ def materialise_all(
     holds per-workflow detail for finer-grained alerting.
     """
 
-    from .contract import ContractError, load_contract
+    from .contract import ContractError
+    from .contracts_db import ContractsDB, ensure_initialized
     from .materialise import materialise as run_materialise
 
+    # Read contracts from the DB. Any leftover YAMLs in the dir
+    # get migrated first so this single command handles both the
+    # first-boot case AND the steady-state cron path.
+    ensure_initialized(contracts_dir)
+    db = ContractsDB(contracts_dir / "contracts.db")
+
     started = _materialise_all_now()
-    yaml_paths = []
-    if contracts_dir.is_dir():
-        yaml_paths = sorted(
-            p for p in contracts_dir.iterdir()
-            if p.suffix in (".yaml", ".yml") and p.is_file()
-        )
+
+    # Skip archived rows so a retired workflow doesn't accidentally
+    # get re-imported by the daily cron.
+    live = [m for m in db.list() if m.archived_at is None]
 
     results: list[dict] = []
-    for path in yaml_paths:
-        name = path.stem
+    for meta in live:
+        name = meta.contract.name
         entry: dict = {"workflow": name, "status": "failed", "error": ""}
         try:
-            contract = load_contract(name, contracts_dir)
             manifest = run_materialise(
-                contract=contract,
+                contract=meta.contract,
                 data_dir=data_dir,
                 cache_dir=cache_dir,
                 offline=offline,

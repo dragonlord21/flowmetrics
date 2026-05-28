@@ -254,36 +254,43 @@ class TestDeleteContract:
             f"/api/internal/contracts/{contract_id}", **kwargs
         )
 
-    def test_removes_yaml_when_no_warehouse_data(self, workspace):
-        contracts, data = workspace
-        _write(contracts, "alpha")
-        app = create_app(data_dir=data, contracts_dir=contracts)
-        with TestClient(app) as client:
-            r = self._delete(client, "alpha")
-            assert r.status_code == 200, r.text
-            assert client.get("/api/internal/contracts/alpha").status_code == 404
-
-    def test_refuses_when_warehouse_data_exists(self, workspace):
-        contracts, data = workspace
-        _write(contracts, "alpha")
-        # Synthesise a Parquet leaf for this contract.
-        work = (
-            data / "work_items" / "contract_id=alpha"
-            / "year=2026" / "month=05" / "day=10"
+    def _archive(self, client, contract_id):
+        return client.post(
+            f"/api/internal/contracts/{contract_id}/archive",
+            json={}, headers={"X-Requested-With": "fetch"},
         )
-        work.mkdir(parents=True)
-        (work / "items-r1.parquet").write_bytes(b"fake")
+
+    def test_delete_on_live_row_refuses(self, workspace):
+        """C2 invariant: DELETE requires the contract to already be
+        archived. A live DELETE returns 409."""
+        contracts, data = workspace
+        _write(contracts, "alpha")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = self._delete(client, "alpha")
             assert r.status_code == 409
-            body = r.json()
-            assert "purge" in str(body).lower()
-            # Contract still in the DB; warehouse still on disk.
-            assert client.get("/api/internal/contracts/alpha").status_code == 200
-        assert work.exists()
+            # Still visible.
+            assert client.get(
+                "/api/internal/contracts/alpha"
+            ).status_code == 200
 
-    def test_purge_data_true_clears_warehouse_alongside_yaml(self, workspace):
+    def test_delete_after_archive_removes_row(self, workspace):
+        """Archive first, then delete — the canonical two-step
+        teardown."""
+        contracts, data = workspace
+        _write(contracts, "alpha")
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        with TestClient(app) as client:
+            self._archive(client, "alpha")
+            r = self._delete(client, "alpha")
+            assert r.status_code == 200, r.text
+            assert client.get(
+                "/api/internal/contracts/alpha"
+            ).status_code == 404
+
+    def test_delete_leaves_warehouse_data_alone_without_purge(self, workspace):
+        """DELETE removes the contract row; the warehouse partitions
+        stay on disk unless purge_data=true."""
         contracts, data = workspace
         _write(contracts, "alpha")
         work = (
@@ -294,6 +301,24 @@ class TestDeleteContract:
         (work / "items-r1.parquet").write_bytes(b"fake")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
+            self._archive(client, "alpha")
+            r = self._delete(client, "alpha")
+            assert r.status_code == 200
+        # Warehouse intact.
+        assert work.exists()
+
+    def test_purge_data_true_clears_warehouse_alongside_row(self, workspace):
+        contracts, data = workspace
+        _write(contracts, "alpha")
+        work = (
+            data / "work_items" / "contract_id=alpha"
+            / "year=2026" / "month=05" / "day=10"
+        )
+        work.mkdir(parents=True)
+        (work / "items-r1.parquet").write_bytes(b"fake")
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        with TestClient(app) as client:
+            self._archive(client, "alpha")
             r = client.request(
                 "DELETE",
                 "/api/internal/contracts/alpha",
@@ -301,9 +326,10 @@ class TestDeleteContract:
                 headers={"X-Requested-With": "fetch"},
             )
             assert r.status_code == 200, r.text
-            assert client.get("/api/internal/contracts/alpha").status_code == 404
-        # The contract's partition is gone; other partitions would
-        # be untouched (there are none in this test).
+            assert client.get(
+                "/api/internal/contracts/alpha"
+            ).status_code == 404
+        # Warehouse partition gone.
         assert not (data / "work_items" / "contract_id=alpha").exists()
 
 

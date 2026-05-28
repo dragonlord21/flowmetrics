@@ -94,11 +94,14 @@ class TestHappyPath:
 
 
 class TestMixedOutcomes:
-    def test_one_bad_contract_does_not_block_the_others(self, workspace):
+    def test_unparseable_yaml_is_skipped_at_import_time(self, workspace):
+        """A YAML that fails parse never enters the DB (per the C1
+        migration semantics); materialise-all therefore doesn't
+        attempt to run it. The good contract still processes; the
+        bad YAML is left in the dir for the user to fix."""
         contracts, data = workspace
         _write_contract(contracts, "astral-uv-week", "astral-sh/uv")
-        # A second contract whose YAML is intentionally broken — no
-        # `source:` field, so load_contract raises ContractError.
+        # Intentionally broken — no `source:`.
         (contracts / "broken.yaml").write_text("contract: {name: broken}\n")
         res = CliRunner().invoke(cli, [
             "materialise-all",
@@ -107,24 +110,30 @@ class TestMixedOutcomes:
             "--cache-dir", str(FIXTURE_CACHE),
             "--offline",
         ], catch_exceptions=False)
-        # At least one contract succeeded → exit 0; monitoring reads
-        # the manifest for per-contract detail.
         assert res.exit_code == 0
         m = json.loads(
             next((data / "_status").glob("daily-*.json")).read_text()
         )
         statuses = {r["workflow"]: r["status"] for r in m["results"]}
         assert statuses["astral-uv-week"] == "ok"
-        assert statuses["broken"] == "failed"
-        failed = next(r for r in m["results"] if r["workflow"] == "broken")
-        assert failed["error"]  # has an error message
+        # The broken YAML does NOT appear in the manifest — it was
+        # never imported into the DB.
+        assert "broken" not in statuses
+        # The broken YAML is still on disk for the user to fix.
+        assert (contracts / "broken.yaml").exists()
         # The good contract still wrote Parquet despite the bad one.
         assert (data / "work_items").exists()
 
-    def test_all_failing_exits_non_zero(self, workspace):
+    def test_all_materialise_failures_exit_non_zero(self, workspace):
+        """When every DB-row workflow's materialise call fails (e.g.
+        cache miss in offline mode), the exit code is non-zero so
+        on-call gets paged. Contrast with the empty-dir case
+        (no rows → exit 0)."""
         contracts, data = workspace
-        (contracts / "a.yaml").write_text("contract: {name: a}\n")
-        (contracts / "b.yaml").write_text("contract: {name: b}\n")
+        # Valid YAML but the cache won't carry data for these
+        # synthetic repos → materialise() raises (offline+miss).
+        _write_contract(contracts, "alpha-only", "no-such/repo-alpha")
+        _write_contract(contracts, "beta-only", "no-such/repo-beta")
         res = CliRunner().invoke(cli, [
             "materialise-all",
             "--workflows-dir", str(contracts),
@@ -132,10 +141,10 @@ class TestMixedOutcomes:
             "--cache-dir", str(FIXTURE_CACHE),
             "--offline",
         ], catch_exceptions=False)
-        # Total failure pages on-call; manifest still gets written.
         assert res.exit_code != 0
         manifest_path = next((data / "_status").glob("daily-*.json"))
         m = json.loads(manifest_path.read_text())
+        assert m["results"]  # not empty
         assert all(r["status"] == "failed" for r in m["results"])
 
 

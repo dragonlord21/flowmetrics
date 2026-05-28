@@ -735,23 +735,52 @@ def create_app(
     write_dep = [Depends(_require_csrf), *auth_dep]
 
     @app.get("/api/internal/contracts", dependencies=auth_dep)
-    def list_contracts() -> list[dict]:
-        """List every workflow YAML under contracts_dir.
+    def list_contracts(include_archived: bool = False) -> list[dict]:
+        """List contracts in the live store.
 
-        Tolerates malformed YAML — broken entries still appear in the
-        list (with source=null) so the user can find and fix them
-        through the UI; the detail endpoint surfaces the parser error.
+        Default: archived rows are excluded. Pass
+        `?include_archived=true` to surface them — each entry then
+        carries an `archived: bool` flag.
         """
-        return [_contract_summary(name) for name in _available_contracts()]
+        out = []
+        for meta in contracts_db.list(include_archived=include_archived):
+            entry = {
+                "id": meta.contract.name,
+                "label": meta.contract.label or meta.contract.name,
+                "source": meta.contract.source,
+            }
+            if include_archived:
+                entry["archived"] = meta.archived_at is not None
+                entry["archived_at"] = meta.archived_at
+                entry["archived_reason"] = meta.archived_reason
+            out.append(entry)
+        return out
 
     @app.get("/api/internal/contracts/{contract_id}", dependencies=auth_dep)
-    def get_contract(contract_id: str) -> dict:
-        """Full detail for one contract: parsed dataclass fields,
-        the original YAML text, and the most recent materialise
-        status. 404 if the file is missing; 422 if it's malformed."""
-        _ensure_contract_exists(contract_id)
-        raw = _raw_yaml_text(contract_id)
-        c = _load_contract_for_request(contract_id)
+    def get_contract(
+        contract_id: str, include_archived: bool = False,
+    ) -> dict:
+        """Full detail for one contract.
+
+        Default: archived rows return 404. Pass
+        `?include_archived=true` to fetch an archived row; the
+        response carries `archived: true` + `archived_at` +
+        `archived_reason`."""
+        meta = contracts_db.get_meta(contract_id)
+        if meta is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"contract {contract_id!r} not found",
+            )
+        if meta.archived_at is not None and not include_archived:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"contract {contract_id!r} is archived. "
+                    "Pass ?include_archived=true to fetch."
+                ),
+            )
+        c = meta.contract
         parsed: dict = {
             "name": c.name,
             "source": c.source,
@@ -772,8 +801,11 @@ def create_app(
             "id": c.name,
             "label": c.label or c.name,
             "parsed": parsed,
-            "yaml": raw or "",
+            "yaml": meta.yaml,
             "materialise": _materialise_status(contract_id),
+            "archived": meta.archived_at is not None,
+            "archived_at": meta.archived_at,
+            "archived_reason": meta.archived_reason,
         }
 
     @app.get(
@@ -935,22 +967,78 @@ def create_app(
             ) from exc
         return get_contract(contract_id)
 
+    @app.post(
+        "/api/internal/contracts/{contract_id}/archive",
+        dependencies=write_dep,
+    )
+    def archive_contract(contract_id: str, payload: dict | None = None) -> dict:
+        """Soft-delete: sets `archived_at` (and an optional reason).
+        Idempotent — re-archiving a row keeps the original timestamp;
+        only the reason rolls forward."""
+        from .contracts_db import ContractsDBError
+
+        meta = contracts_db.get_meta(contract_id)
+        if meta is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"contract {contract_id!r} not found",
+            )
+        reason = (payload or {}).get("reason")
+        try:
+            contracts_db.archive(contract_id, reason=reason)
+        except ContractsDBError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"id": contract_id, "archived": True, "reason": reason}
+
+    @app.post(
+        "/api/internal/contracts/{contract_id}/restore",
+        dependencies=write_dep,
+    )
+    def restore_contract(contract_id: str) -> dict:
+        """Undo archive. No-op when the row is already live."""
+        from .contracts_db import ContractsDBError
+
+        meta = contracts_db.get_meta(contract_id)
+        if meta is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"contract {contract_id!r} not found",
+            )
+        try:
+            contracts_db.restore(contract_id)
+        except ContractsDBError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"id": contract_id, "archived": False}
+
     @app.delete(
         "/api/internal/contracts/{contract_id}", dependencies=write_dep,
     )
     async def delete_contract(
         contract_id: str, request: Request,
     ) -> dict:
-        """Remove a contract YAML. Refuses if Parquet exists for that
-        contract unless `?purge_data=true` (or a JSON body
-        `{"purge_data": true}`) is passed — the flag also wipes
-        `<data-dir>/work_items/contract_id=<id>` and the matching
-        `transitions/` + `runs/` directories."""
-        _ensure_contract_exists(contract_id)
+        """**Hard delete.** Refuses unless the contract is already
+        archived (the two-step delete invariant — POST to /archive
+        first). Independent of `purge_data`, which controls whether
+        the warehouse partitions get wiped alongside the row."""
+        from .contracts_db import ContractsDBError
 
-        # Accept the flag from EITHER the query string (the standard
-        # DELETE-with-no-body shape) OR a JSON body (what fetch()
-        # callers naturally send). Whichever the UI chooses works.
+        meta = contracts_db.get_meta(contract_id)
+        if meta is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"contract {contract_id!r} not found",
+            )
+        if meta.archived_at is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"contract {contract_id!r} is live; archive it "
+                    "first (POST /api/internal/contracts/"
+                    f"{contract_id}/archive) before hard-deleting."
+                ),
+            )
+
+        # Read purge_data from either the query string OR a JSON body.
         purge = (request.query_params.get("purge_data") or "").lower() in (
             "true", "1", "yes",
         )
@@ -963,36 +1051,19 @@ def create_app(
             except (ValueError, TypeError):
                 purge = False
 
-        from .contracts_db import ContractsDBError
-
-        partition_dirs = [
-            data_dir / "work_items" / f"contract_id={contract_id}",
-            data_dir / "transitions" / f"contract_id={contract_id}",
-            data_dir / "runs" / contract_id,
-        ]
-        has_data = any(p.exists() and any(p.rglob("*")) for p in partition_dirs)
-        if has_data and not purge:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"contract {contract_id!r} has warehouse data on "
-                    "disk. Pass `{\"purge_data\": true}` to delete "
-                    "the contract AND the partitioned Parquet."
-                ),
-            )
-
-        # DB delete: archive first (idempotent), then hard-delete to
-        # satisfy the two-step delete invariant.
         try:
-            if not _is_archived(contract_id):
-                contracts_db.archive(contract_id, reason="api DELETE")
             contracts_db.hard_delete(contract_id)
-        except ContractsDBError:
-            # Already gone — fine, the user got what they asked for.
-            pass
+        except ContractsDBError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
         if purge:
             import shutil
 
+            partition_dirs = [
+                data_dir / "work_items" / f"contract_id={contract_id}",
+                data_dir / "transitions" / f"contract_id={contract_id}",
+                data_dir / "runs" / contract_id,
+            ]
             for d in partition_dirs:
                 if d.exists():
                     shutil.rmtree(d)
