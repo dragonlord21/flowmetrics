@@ -122,7 +122,7 @@ def _default_probe_source_vocab(kind: str, target: dict) -> dict:
         if "/" in repo:
             url = f"https://api.github.com/repos/{repo}/labels?per_page=100"
             try:
-                r = httpx.get(url, timeout=10.0)
+                r = httpx.get(url, timeout=10.0, headers=_github_headers())
                 if r.status_code == 200:
                     for label in r.json():
                         name = label.get("name")
@@ -155,6 +155,24 @@ def _default_probe_source_vocab(kind: str, target: dict) -> dict:
         "lifecycle_events": lifecycle,
         "warehouse_stages": [],
     }
+
+
+def _github_headers() -> dict[str, str]:
+    """Auth headers for GitHub REST calls from the builder's probe +
+    dry-run paths. Uses the same token the rest of the app uses
+    ($GITHUB_TOKEN or `gh auth token`) so these calls get the
+    5000/hour authenticated limit (and can read private repos)
+    instead of the 60/hour anonymous limit. Degrades to anonymous
+    when no token is configured."""
+    headers = {"Accept": "application/vnd.github+json"}
+    try:
+        from .sources.github import resolve_token
+        token = resolve_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    except Exception:
+        pass  # anonymous — rate-limited but functional
+    return headers
 
 
 def _bucket_items_by_step(
@@ -254,7 +272,7 @@ def _default_dry_run_fetch(
             f"{min(items_cap, 100)}"
         )
         try:
-            r = httpx.get(url, timeout=10.0)
+            r = httpx.get(url, timeout=10.0, headers=_github_headers())
             if r.status_code == 200:
                 for it in r.json().get("items", [])[:items_cap]:
                     state = "PR closed"
@@ -366,7 +384,7 @@ def _default_probe_source(kind: str, target: dict) -> dict:
             return {"ok": False, "error": "repo must be OWNER/NAME"}
         url = f"https://api.github.com/repos/{repo}"
         try:
-            r = httpx.get(url, timeout=10.0)
+            r = httpx.get(url, timeout=10.0, headers=_github_headers())
         except httpx.HTTPError as exc:
             return {"ok": False, "error": str(exc)}
         if r.status_code == 404:

@@ -117,6 +117,11 @@
     background: var(--white);
   }
   .step-row:last-child { border-bottom: 0; }
+  /* The step chips will bind to. */
+  .step-row--active {
+    background: var(--p-50);
+    box-shadow: inset 0.1875rem 0 0 var(--p-500);
+  }
   .step-badge {
     font-size: 0.625rem; font-weight: 600;
     letter-spacing: 0.08em; text-transform: uppercase;
@@ -163,18 +168,12 @@
     margin-top: 0.3rem; min-height: 1.4rem;
   }
   .sugg-chip {
-    display: inline-flex; align-items: center;
     border: 0.0625rem solid var(--border); border-radius: 0.6rem;
-    background: var(--surface); overflow: hidden;
+    background: var(--surface); cursor: pointer;
+    font-size: 0.75rem; padding: 0.2rem 0.6rem;
+    font-family: var(--body-font); color: var(--fg);
   }
-  .sugg-chip button {
-    border: 0; background: transparent; cursor: pointer;
-    font-size: 0.75rem; padding: 0.2rem 0.55rem;
-  }
-  .sugg-chip .sugg-chip__step {
-    border-left: 0.0625rem solid var(--border);
-    color: var(--muted); font-size: 0.7rem; padding: 0.2rem 0.45rem;
-  }
+  .sugg-chip:hover { border-color: var(--p-500); background: var(--p-50); }
   .sugg-empty { font-size: 0.75rem; color: var(--muted); font-style: italic; }
 
   .wizard-actions {
@@ -317,9 +316,8 @@
     </div>
 
     <div id="suggestions-panel" style="margin-top: 1rem;" hidden>
-      <p class="field-hint" style="margin: 0 0 0.5rem 0;">
-        Click a chip to bind it to the selected step (or
-        <em>⇢ step</em> to make a new step from it).
+      <p class="field-hint" id="binding-target" style="margin: 0 0 0.5rem 0;">
+        Click a chip to add it to the selected step.
       </p>
       {% if wizard_mode == "edit" %}
       <div class="sugg-group">
@@ -539,6 +537,7 @@
       if (JSON.parse(li.dataset.matches || '[]').length === 0) {
         renderMatchPills(li, []);
       }
+      if (li === ACTIVE_STEP) setActiveStep(li);  // refresh the indicator
       updateValidity();
     });
     center.appendChild(nameInput);
@@ -575,7 +574,12 @@
       refreshBadges();
     }));
     li.appendChild(mkBtn('×', 'Remove step', function () {
+      var wasActive = li === ACTIVE_STEP;
       li.parentElement.removeChild(li);
+      if (wasActive) {
+        var rows = document.querySelectorAll('#steps-list li[data-step]');
+        setActiveStep(rows.length ? rows[rows.length - 1] : null);
+      }
       refreshBadges();
       updateValidity();
     }));
@@ -584,21 +588,31 @@
     return li;
   }
 
-  var FOCUSED_STEP = null;
+  var ACTIVE_STEP = null;
   function revealSuggestions() {
     document.getElementById('suggestions-panel').hidden = false;
   }
+  function setActiveStep(li) {
+    ACTIVE_STEP = li;
+    document.querySelectorAll('#steps-list li[data-step]').forEach(function (row) {
+      row.classList.toggle('step-row--active', row === li);
+    });
+    var ind = document.getElementById('binding-target');
+    if (li) {
+      var nm = li.querySelector('input.step-name').value.trim() || '(unnamed step)';
+      ind.textContent = 'Chips add to the selected step: “' + nm + '”.';
+    } else {
+      ind.textContent = 'Add a step, then click chips to bind source data to it.';
+    }
+  }
   // The Suggestions panel is contextual help for binding source
   // identifiers to a step — keep it out of sight until the user is
-  // actually working in the Steps area (focuses the new-step input
-  // or any existing step row). Once revealed it stays visible so
-  // chips remain clickable.
+  // actually working in the Steps area. Focusing a step row (or its
+  // name input) makes that row the active binding target.
   document.addEventListener('focusin', function (ev) {
-    var inSteps = ev.target.closest &&
-      ev.target.closest('#steps-fieldset');
-    if (inSteps) revealSuggestions();
+    if (ev.target.closest && ev.target.closest('#steps-fieldset')) revealSuggestions();
     var li = ev.target.closest && ev.target.closest('#steps-list li[data-step]');
-    if (li) FOCUSED_STEP = li;
+    if (li) setActiveStep(li);
   });
 
   function addStep(name, wip, matches) {
@@ -613,40 +627,39 @@
     var li = renderStepRow(name, !!wip, matches || []);
     document.getElementById('steps-list').appendChild(li);
     refreshBadges();
-    FOCUSED_STEP = li;
+    setActiveStep(li);
     revealSuggestions();
     updateValidity();
   }
 
-  function addMatchToFocusedStep(match) {
-    if (FOCUSED_STEP && FOCUSED_STEP.parentElement) {
-      var existing = JSON.parse(FOCUSED_STEP.dataset.matches || '[]');
-      if (existing.indexOf(match) === -1) existing.push(match);
-      FOCUSED_STEP.dataset.matches = JSON.stringify(existing);
-      renderMatchPills(FOCUSED_STEP, existing);
-      updateValidity();
+  function addMatchToActiveStep(match) {
+    // Chips ONLY bind data to the step you're working on. They never
+    // create a step (steps come from "+ Add step"). If no step is
+    // selected, guide the user instead of guessing.
+    if (!(ACTIVE_STEP && ACTIVE_STEP.parentElement)) {
+      var ind = document.getElementById('binding-target');
+      ind.textContent = '⚠ Add a step first — chips bind to the selected step.';
+      ind.style.color = 'var(--t-700)';
+      document.getElementById('new-step-name').focus();
       return;
     }
-    addStep(match, true, [match]);
+    document.getElementById('binding-target').style.color = '';
+    var existing = JSON.parse(ACTIVE_STEP.dataset.matches || '[]');
+    if (existing.indexOf(match) === -1) existing.push(match);
+    ACTIVE_STEP.dataset.matches = JSON.stringify(existing);
+    renderMatchPills(ACTIVE_STEP, existing);
+    updateValidity();
   }
 
   function renderChip(container, item) {
-    var wrap = document.createElement('span');
-    wrap.className = 'sugg-chip';
-    var addMatch = document.createElement('button');
-    addMatch.type = 'button';
-    addMatch.textContent = '+ ' + item.name;
-    addMatch.title = 'Bind to the selected step';
-    addMatch.onclick = function () { addMatchToFocusedStep(item.name); };
-    wrap.appendChild(addMatch);
-    var asStep = document.createElement('button');
-    asStep.type = 'button';
-    asStep.className = 'sugg-chip__step';
-    asStep.textContent = '⇢ step';
-    asStep.title = 'Create a new step from this';
-    asStep.onclick = function () { addStep(item.name, !!item.wip, [item.name]); };
-    wrap.appendChild(asStep);
-    container.appendChild(wrap);
+    // One action: add this identifier to the active step.
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sugg-chip';
+    btn.textContent = '+ ' + item.name;
+    btn.title = 'Add to the selected step';
+    btn.onclick = function () { addMatchToActiveStep(item.name); };
+    container.appendChild(btn);
   }
 
   function probeVocab() {
@@ -933,6 +946,7 @@
   document.getElementById("f-name").addEventListener("input", updateValidity);
   onSourceKindChange();
   showLifecycleChips();
+  setActiveStep(null);  // binding indicator starts in "add a step" state
   if (WIZARD_MODE === "edit" && EDIT_ID) hydrateFromExisting(EDIT_ID);
   updateValidity();
 

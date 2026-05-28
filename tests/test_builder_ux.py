@@ -104,6 +104,30 @@ class TestSuggestionsHiddenUntilActive:
         assert "hidden" in m.group(0)
 
 
+class TestChipsBindToCurrentStep:
+    """Clicking a suggestion chip binds that identifier to the step
+    the user is working on — it never creates a new step. Steps are
+    created only via the explicit "+ Add step" control. The builder
+    surfaces which step chips will bind to."""
+
+    def test_no_create_step_from_chip_affordance(self, workspace):
+        contracts, data = workspace
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        with TestClient(app) as client:
+            html = _new(client)
+        # The old "⇢ step" (create-step-from-chip) affordance is gone.
+        assert "⇢ step" not in html
+        assert "sugg-chip__step" not in html
+
+    def test_binding_target_indicator_present(self, workspace):
+        contracts, data = workspace
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        with TestClient(app) as client:
+            html = _new(client)
+        # An indicator tells the user which step chips will bind to.
+        assert "binding-target" in html
+
+
 class TestConsistentFieldStyling:
     def test_primary_inputs_use_a_shared_class(self, workspace):
         contracts, data = workspace
