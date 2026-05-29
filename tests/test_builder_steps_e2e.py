@@ -200,6 +200,26 @@ class TestSaveProposesFetchData:
         ) is not None
 
 
+class TestNoStepsContract:
+    def test_save_a_no_steps_contract_uses_native_stages(
+        self, server_url: str, page: Page
+    ):
+        """Steps are optional. A contract with zero steps uses the
+        source's native stages (the exact intent of a plain YAML
+        contract like astral-uv-week). The builder must let you save it
+        without forcing a step."""
+        page.goto(server_url + "/admin/contracts/new")
+        page.fill("#f-name", "native-demo")
+        _verify_source(page)
+        # No steps added at all.
+        assert not page.query_selector_all("#steps-list .step-row")
+        # Save is enabled despite zero steps.
+        expect(page.locator("#save-btn")).to_be_enabled()
+        page.click("#save-btn")
+        panel = page.wait_for_selector(".saved-panel", state="visible", timeout=5000)
+        assert "saved" in panel.inner_text().lower()
+
+
 class TestAddStepIsVisuallyDistinct:
     def test_add_step_control_is_labelled(
         self, server_url: str, page: Page

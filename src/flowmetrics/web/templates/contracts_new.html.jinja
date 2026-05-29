@@ -354,10 +354,13 @@
       </p>
       <div x-show="sourceVerified">
       <p class="field-hint" style="margin: 0 0 0.75rem 0;">
-        A step is a stage in your workflow. By default a step captures
-        items whose source stage matches the step's name; add explicit
-        matches (chips below) to capture other labels / statuses /
-        events. Toggle WIP per step.
+        Steps are <strong>optional</strong>. With none, this workflow
+        uses the source's <strong>native stages</strong> (e.g. GitHub's
+        PR lifecycle, or Jira statuses) — leave them blank to mirror a
+        plain contract. Add steps only to define your own workflow: a
+        step captures items whose source stage matches its name; add
+        chips to map other labels / statuses / events. Toggle WIP per
+        step.
       </p>
 
       <ol class="steps-list" id="steps-list">
@@ -612,7 +615,10 @@
         return this.steps[this.steps.length - 1].name.trim() !== '';
       },
       get canDryRun() { return this.sourceVerified && this.steps.length > 0; },
-      get canSave() { return this.nameOk && this.sourceVerified && this.steps.length > 0; },
+      // Steps are optional: a contract with no steps uses the source's
+      // native stages. Save needs only a valid routing id + a reachable
+      // source.
+      get canSave() { return this.nameOk && this.sourceVerified; },
       get blocker() {
         const missing = [];
         if (!this.nameOk) missing.push('a routing id (lowercase, dashes)');
@@ -620,7 +626,6 @@
           this.source === 'jira'
             ? 'a Jira URL + project key we can reach'
             : 'a repository (owner/name) we can reach');
-        if (this.steps.length === 0) missing.push('at least one step');
         return missing.length ? 'To save, add: ' + missing.join(', ') + '.' : '';
       },
       get lifecycleChips() {
