@@ -293,7 +293,7 @@ def _cycle_time_to_vega(model: CycleTimeModel) -> dict[str, Any]:
         "width": "container",
         "height": 360,
         "padding": {"top": 10, "right": 20, "bottom": 30, "left": 50},
-        "view": {"fill": "transparent", "stroke": None},
+        "view": {"fill": "__theme:bg__", "stroke": None},
         # No top-level data and no top-level encoding. Each layer
         # owns both, and Vega-Lite shares scales across layers by
         # default (same field name → same scale). The scatter

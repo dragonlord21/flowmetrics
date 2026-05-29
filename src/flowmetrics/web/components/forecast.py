@@ -286,7 +286,7 @@ def _histogram_spec(
             },
         ],
         "config": {
-            "view": {"fill": None, "stroke": None},
+            "view": {"fill": "__theme:bg__", "stroke": None},
             "axis": {
                 "labelFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
                 "titleFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif",
