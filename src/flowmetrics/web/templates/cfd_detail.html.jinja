@@ -74,7 +74,7 @@
     <div id="flow-balance-chart" class="metric-chart"></div>
     <script>
       (function () {
-        const spec = {{ cfd_flow_balance(cfd) | safe }};
+        const spec = {{ flow_balance(cfd) | safe }};
         function go() {
           vegaEmbed("#flow-balance-chart", window.applyTheme(spec), {
             actions: false, renderer: "svg"
