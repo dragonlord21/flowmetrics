@@ -1278,14 +1278,15 @@ class TestWorkflowUrls:
         self, server_url: str, page: Page
     ):
         """Internal `contract` naming stays out of the filter
-        bar's user-facing copy. (The workflow switcher itself
-        moved to the home page; the dashboard filter bar is
-        date-controls-only.)"""
+        controls' user-facing copy. (The page-top filter bar was
+        removed in the scope-by-section dashboard; the Period /
+        Reference picker now lives in the windowed section's scope
+        header.)"""
         page.goto(server_url + "/workflows/astral-uv-week")
-        page.wait_for_selector(".filter-bar", timeout=10000)
-        bar = page.locator(".filter-bar").inner_text()
+        page.wait_for_selector(".scope-section-header--filter", timeout=10000)
+        bar = page.locator(".scope-section-header--filter").inner_text()
         assert "Contract" not in bar, (
-            f"filter bar must not say 'Contract'; got {bar!r}"
+            f"filter controls must not say 'Contract'; got {bar!r}"
         )
 
     def test_header_workflow_chip_links_to_dashboard_on_detail_pages(
@@ -1293,9 +1294,11 @@ class TestWorkflowUrls:
     ):
         """Header on a metric detail page: the workflow chip is a
         link back to the workflow dashboard, the metric name is
-        the current (non-link) breadcrumb. The 'system' chip
-        (GitHub / Jira) was dropped — viewer doesn't need to be
-        told the source per metric."""
+        the current (non-link) breadcrumb. The per-metric 'system'
+        chip (GitHub / Jira) was dropped from the breadcrumb — the
+        viewer doesn't need to be told the source per metric. (The
+        data-source freshness strip, which DOES name the source, is
+        a separate intentional affordance in the same header row.)"""
         page.goto(
             server_url + "/workflows/astral-uv-week/metrics/cycle-time"
         )
@@ -1309,9 +1312,11 @@ class TestWorkflowUrls:
             ".getAttribute(\"href\")"
         )
         assert href == "/workflows/astral-uv-week"
-        # And the system chip is NOT shown.
-        assert "GitHub" not in text and "github" not in text, (
-            f"system chip (GitHub/Jira) should be hidden in header; got {text!r}"
+        # No per-metric system chip in the breadcrumb stamps. (Scoped
+        # to .stamp so the freshness strip naming the source is fine.)
+        stamps = " ".join(page.locator(".site-header .stamp").all_inner_texts())
+        assert "GitHub" not in stamps and "Jira" not in stamps, (
+            f"breadcrumb should carry no system chip; stamps={stamps!r}"
         )
 
 
