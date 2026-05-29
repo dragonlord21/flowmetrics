@@ -66,12 +66,47 @@ Progress"}`.
 
 A step's matcher is one of:
 
-| Kind     | Matches when…                                  | Source axis |
-|----------|------------------------------------------------|-------------|
-| `label`  | a `github-label-added` stage == value          | `stage`     |
-| `status` | a Jira status (`stage`) == value               | `stage`     |
-| `event`  | a transition `signal` == the named event       | `signal`    |
-| `stage`  | raw adapter stage text == value (escape hatch) | `stage`     |
+| Kind     | Matches when…                                  | Source axis | Value space |
+|----------|------------------------------------------------|-------------|-------------|
+| `event`  | a transition `signal` == the event code        | `signal`    | **fixed code vocabulary** (below) |
+| `label`  | a `github-label-added` stage == value          | `stage`     | repo's label names (source-defined) |
+| `status` | a Jira status (`stage`) == value               | `stage`     | project's status names (source-defined) |
+| `stage`  | raw adapter stage text == value (escape hatch) | `stage`     | free text |
+
+#### Event codes — short, stable, typo-resistant
+
+`event:` is the one axis with a *fixed, enumerable* set, so it gets a
+short kebab-case code rather than a free-text display name. "PR marked
+ready for review" is accurate but a typo magnet in hand-edited YAML;
+`pr-ready` is not. Codes are scoped by the contract's `source` (already
+known), so the `github-`/`jira-` prefix from `signals.py` is dropped.
+The UI chip shows the friendly label; the stored/validated value is the
+code. Codes map 1:1 to the existing `signals.py` constants — the single
+source of truth.
+
+GitHub (`source: github`):
+
+| code               | label (UI)            | signal constant                        |
+|--------------------|-----------------------|----------------------------------------|
+| `pr-opened`        | PR opened             | `github-pr-created`                    |
+| `pr-ready`         | Ready for review      | `github-pr-ready-for-review`           |
+| `changes-requested`| Changes requested     | `github-pr-review-changes-requested`   |
+| `approved`         | Review approved       | `github-pr-review-approved`            |
+| `pr-merged`        | PR merged             | `github-pr-merged`                     |
+| `issue-opened`     | Issue opened          | `github-issue-created`                 |
+| `issue-closed`     | Issue closed          | `github-issue-closed`                  |
+
+Jira (`source: jira`):
+
+| code             | label (UI)      | signal constant         |
+|------------------|-----------------|-------------------------|
+| `created`        | Issue created   | `jira-issue-created`    |
+| `status-changed` | Status changed  | `jira-status-changed`   |
+| `resolved`       | Resolved        | `jira-resolved`         |
+
+Validation rejects an `event:` code outside this set with a message that
+lists the valid codes — so a hand-edited typo fails loudly at save/parse,
+not silently at materialise.
 
 YAML shape (backward compatible — a bare string keeps today's meaning,
 "match the stage text"):
@@ -81,13 +116,13 @@ steps:
   - name: In Review
     wip: true
     matches:
-      - event: PR marked ready for review   # signal match
-      - event: Changes requested
-      - label: needs-review                 # stage/label match
+      - event: pr-ready              # fixed code, not "PR marked ready…"
+      - event: changes-requested
+      - label: needs-review          # source-native label name
   - name: Done
     wip: false
     matches:
-      - event: PR merged
+      - event: pr-merged
 ```
 
 - **Within a step: OR** — the item enters the step on *any* matching
@@ -118,8 +153,12 @@ compatible).
 ### 3. Builder + dry-run alignment
 
 - The builder chips already separate "Labels in the repo" from
-  "Lifecycle events" — wire those to emit `label:`/`event:` typed
-  matchers instead of bare strings.
+  "Lifecycle events" — wire those to emit typed matchers instead of bare
+  strings: a lifecycle chip emits `event: <code>` (chip shows the
+  friendly label, stores the code), a label/status chip emits
+  `label:`/`status: <source-native value>`. Because chips are clicked,
+  the user never types a code; the code only matters for hand-edited
+  YAML and validation messages.
 - `bucket_items_by_step` (dry-run) and `remap_transitions` (materialise)
   must share the **same** matcher-evaluation function so the preview is
   faithful to what materialise will do. (Today they diverge — that's the
@@ -150,6 +189,10 @@ compatible).
 4. **Schema migration:** bare-string `matches` stay valid (= `stage`
    match); do we auto-upgrade the builder's existing contracts' chips to
    typed matchers, or only new ones?
+5. **Event-code names:** confirm the kebab codes in the table above
+   (`pr-ready`, `changes-requested`, …). Alternative: reuse the full
+   `signals.py` slugs verbatim (`github-pr-ready-for-review`) — stabler
+   (literally the constant) but longer and platform-prefixed.
 
 ## Success criteria
 
