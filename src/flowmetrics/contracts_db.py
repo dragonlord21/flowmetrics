@@ -297,3 +297,87 @@ def ensure_initialized(workflows_dir: Path) -> None:
             db.put(contract)
         migrated_dir.mkdir(exist_ok=True)
         shutil.move(str(path), str(migrated_dir / path.name))
+
+
+# ---------------------------------------------------------------------------
+# ContractStore — the single persistence adapter (DB + YAML fallback).
+# ---------------------------------------------------------------------------
+
+
+class ContractStore:
+    """The one contract-persistence adapter for both the web app and
+    the CLI, so the "YAML vs DB read/write" decision lives in exactly
+    one place.
+
+    Backed by the SQLite store at `<workflows_dir>/contracts.db` plus
+    the YAML files in that directory:
+
+      - **writes** (put / archive / restore / hard_delete) go to the DB;
+      - **reads** (get / get_meta) resolve DB-first, then fall back to a
+        YAML file on disk — a contract dropped in but not yet migrated —
+        *without moving it* (a read has no side effects);
+      - `ensure_initialized()` is the explicit, idempotent migration that
+        imports leftover YAMLs into the DB. It is the only operation that
+        moves files.
+    """
+
+    def __init__(self, workflows_dir: Path) -> None:
+        self.workflows_dir = Path(workflows_dir)
+        self.db = ContractsDB(self.workflows_dir / "contracts.db")
+
+    # -------------------------------------------------------- migration
+
+    def ensure_initialized(self) -> None:
+        ensure_initialized(self.workflows_dir)
+
+    # ------------------------------------------------------------ reads
+
+    def get_meta(self, contract_id: str) -> ContractMeta | None:
+        meta = self.db.get_meta(contract_id)
+        return meta if meta is not None else self._yaml_meta(contract_id)
+
+    def get(self, contract_id: str) -> Contract | None:
+        meta = self.get_meta(contract_id)
+        return meta.contract if meta is not None else None
+
+    def list(self, *, include_archived: bool = False) -> list[ContractMeta]:
+        return self.db.list(include_archived=include_archived)
+
+    # ----------------------------------------------------------- writes
+
+    def put(self, contract: Contract) -> None:
+        self.db.put(contract)
+
+    def archive(self, contract_id: str, *, reason: str | None = None) -> None:
+        self.db.archive(contract_id, reason=reason)
+
+    def restore(self, contract_id: str) -> None:
+        self.db.restore(contract_id)
+
+    def hard_delete(self, contract_id: str) -> None:
+        self.db.hard_delete(contract_id)
+
+    # --------------------------------------------------------- internal
+
+    def _yaml_meta(self, contract_id: str) -> ContractMeta | None:
+        """Resolve a contract from a YAML file on disk (read-only). The
+        file is never moved — that's `ensure_initialized`'s job."""
+        for ext in (".yaml", ".yml"):
+            path = self.workflows_dir / f"{contract_id}{ext}"
+            if not path.exists():
+                continue
+            text = path.read_text()
+            try:
+                contract = parse_contract_text(text, contract_id)
+            except ContractError:
+                return None
+            stamp = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
+            return ContractMeta(
+                contract=contract,
+                yaml=text,
+                created_at=stamp,
+                updated_at=stamp,
+                archived_at=None,
+                archived_reason=None,
+            )
+        return None

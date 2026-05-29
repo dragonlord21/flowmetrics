@@ -421,12 +421,14 @@ def create_app(
     auth (user='operator', password matches). Used for off-localhost
     binds where Tailscale or Caddy fronts the app.
     """
-    # First-boot migration: import any legacy YAMLs in the workflows
-    # dir into the SQLite store, then move them to `migrated/`.
+    # The contract store is the single YAML/DB persistence adapter
+    # (see flowmetrics.contracts_db.ContractStore). `ensure_initialized`
+    # is the first-boot migration: import any legacy YAMLs in the
+    # workflows dir into the SQLite store, then move them to `migrated/`.
     # Idempotent — subsequent calls with no YAMLs are no-ops.
-    from .contracts_db import ContractsDB, ensure_initialized
-    ensure_initialized(contracts_dir)
-    contracts_db = ContractsDB(contracts_dir / "contracts.db")
+    from .contracts_db import ContractStore
+    contracts_db = ContractStore(contracts_dir)
+    contracts_db.ensure_initialized()
 
     if cache_dir is None:
         from .cli import DEFAULT_CACHE_DIR

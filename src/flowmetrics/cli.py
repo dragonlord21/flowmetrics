@@ -1138,8 +1138,7 @@ def materialise(
     """
 
     from .backfill import write_status
-    from .contract import ContractError, load_contract
-    from .contracts_db import ContractsDB
+    from .contracts_db import ContractStore
     from .materialise import materialise as run_materialise
 
     since_iso = since.date().isoformat() if since is not None else None
@@ -1167,20 +1166,18 @@ def materialise(
 
     _status("running", "")
 
-    # Prefer the SQLite store — that's where the web builder writes and
-    # the runtime server reads. Fall back to a YAML on disk for the
-    # pure-cron / not-yet-migrated path. This only reads; it never runs
-    # the destructive YAML→DB migration (that's `ensure_initialized`'s
-    # job, invoked at serve time).
-    db_path = contracts_dir / "contracts.db"
-    contract = ContractsDB(db_path).get(name) if db_path.exists() else None
+    # The store resolves DB-first then falls back to a YAML on disk
+    # (cron / not-yet-migrated). Reads don't trigger the YAML→DB
+    # migration — that's serve-time's job.
+    contract = ContractStore(contracts_dir).get(name)
     if contract is None:
-        try:
-            contract = load_contract(name, contracts_dir)
-        except ContractError as exc:
-            _status("failed", str(exc))
-            click.echo(f"error: {exc}", err=True)
-            sys.exit(2)
+        msg = (
+            f"contract {name!r} not found under {contracts_dir} "
+            "(no DB row and no matching YAML)"
+        )
+        _status("failed", msg)
+        click.echo(f"error: {msg}", err=True)
+        sys.exit(2)
 
     # Click's DateTime returns datetime; we want date.
     overrides: dict = {}
@@ -1281,20 +1278,19 @@ def materialise_all(
     """
 
     from .contract import ContractError
-    from .contracts_db import ContractsDB, ensure_initialized
+    from .contracts_db import ContractStore
     from .materialise import materialise as run_materialise
 
-    # Read contracts from the DB. Any leftover YAMLs in the dir
-    # get migrated first so this single command handles both the
-    # first-boot case AND the steady-state cron path.
-    ensure_initialized(contracts_dir)
-    db = ContractsDB(contracts_dir / "contracts.db")
+    # Migrate any leftover YAMLs into the DB first so this single
+    # command handles both first-boot and the steady-state cron path.
+    store = ContractStore(contracts_dir)
+    store.ensure_initialized()
 
     started = _materialise_all_now()
 
-    # Skip archived rows so a retired workflow doesn't accidentally
-    # get re-imported by the daily cron.
-    live = [m for m in db.list() if m.archived_at is None]
+    # `list()` already excludes archived rows, so a retired workflow
+    # isn't re-imported by the daily cron.
+    live = store.list()
 
     results: list[dict] = []
     for meta in live:
