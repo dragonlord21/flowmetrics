@@ -32,7 +32,7 @@
         </p>
         <p class="aging-empty-sub">No data for this range yet.</p>
         <p class="aging-empty-actions">
-          <a class="btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
+          <a class="btn btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
         </p>
       </div>
     {% elif data.empty_state == "asof_before_coverage" %}
@@ -45,7 +45,7 @@
         </p>
         <p class="aging-empty-sub">No data for this range yet.</p>
         <p class="aging-empty-actions">
-          <a class="btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
+          <a class="btn btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
         </p>
       </div>
     {% elif data.empty_state == "in_flight_never_captured" %}
@@ -59,7 +59,7 @@
           no snapshot of currently-open work.
         </p>
         <p class="aging-empty-actions">
-          <a class="btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
+          <a class="btn btn--primary" href="{{ ds_link }}">Backfill on the Data Source page →</a>
         </p>
       </div>
     {% else %}
