@@ -27,6 +27,7 @@
       catch (e) { /* finalize is best-effort */ }
       window.__flowmetricsCfdView = null;
     }
+    const METRICS = {{ cfd_daily_metrics(data) | safe }};
     const spec = {{ vega_spec(data) | safe }};
     spec.height = {{ _h }};
     vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
@@ -34,10 +35,105 @@
       renderer: "svg"
     }).then(function (res) {
       window.__flowmetricsCfdView = res.view;
+      setupCfdHover(res.view, METRICS);
     }).catch(function (err) {
       const el = document.getElementById("{{ chart_container_id }}");
       el.innerText = "Chart render failed: " + err;
     });
+
+    // Vertical hover guideline linked to the x-axis: as the cursor
+    // moves, snap a dashed line to the nearest day and (if a side
+    // panel exists) fill it with that day's full flow metrics. Reads
+    // the rendered SVG + Vega's x scale — no extra round-trip.
+    function setupCfdHover(view, metrics) {
+      const container = document.getElementById("{{ chart_container_id }}");
+      const svg = container && container.querySelector("svg");
+      if (!svg) return;
+      const ns = "http://www.w3.org/2000/svg";
+      const rule = document.createElementNS(ns, "line");
+      rule.setAttribute("data-flow", "x-guideline");
+      rule.setAttribute("stroke", "#444");
+      rule.setAttribute("stroke-width", "1");
+      rule.setAttribute("stroke-dasharray", "3 3");
+      rule.setAttribute("pointer-events", "none");
+      rule.style.opacity = "0";
+      rule.style.transition = "opacity 80ms";
+      svg.appendChild(rule);
+
+      function plotBox() {
+        const bg = svg.querySelector(".role-frame .background");
+        if (!bg) return null;
+        const b = bg.getBBox();
+        const ctm = bg.getCTM();
+        const tx = ctm ? ctm.e : 0, ty = ctm ? ctm.f : 0;
+        return {
+          left: tx + b.x, top: ty + b.y,
+          right: tx + b.x + b.width, bottom: ty + b.y + b.height,
+        };
+      }
+      function nearestDay(svgX, box) {
+        const xs = view.scale("x");
+        if (!xs) return null;
+        const domain = xs.domain();
+        const bw = xs.bandwidth ? xs.bandwidth() : 0;
+        let best = null, bestDist = Infinity, bestCx = 0;
+        for (let i = 0; i < domain.length; i++) {
+          const cx = box.left + xs(domain[i]) + bw / 2;
+          const dist = Math.abs(svgX - cx);
+          if (dist < bestDist) { bestDist = dist; best = domain[i]; bestCx = cx; }
+        }
+        return best === null ? null : { iso: best, cx: bestCx };
+      }
+      function val(n) { return (n === null || n === undefined) ? "—" : n; }
+      function renderPanel(iso) {
+        // Look the panel up lazily — it may be parsed into the DOM after
+        // this embed callback first runs.
+        const panel = document.getElementById("cfd-hover-panel");
+        if (!panel) return;
+        const m = metrics[iso];
+        if (!m) return;
+        const bands = Object.keys(m.stages).map(function (s) {
+          return "<tr><td>" + s + "</td><td>" + m.stages[s] + "</td></tr>";
+        }).join("");
+        panel.innerHTML =
+          '<div class="cfd-panel-date">' + m.date_display + '</div>' +
+          '<table class="cfd-panel-table"><thead><tr>' +
+          '<th>Stage</th><th>Items</th></tr></thead><tbody>' + bands +
+          '</tbody></table>' +
+          '<table class="cfd-panel-table cfd-panel-flow"><tbody>' +
+          '<tr><td>Total WIP</td><td>' + val(m.total_wip) + '</td></tr>' +
+          '<tr><td>Arrivals (day)</td><td>' + val(m.arrivals) + '</td></tr>' +
+          '<tr><td>Departures (day)</td><td>' + val(m.departures) + '</td></tr>' +
+          '<tr><td>Throughput (avg/day)</td><td>' + val(m.throughput) + '</td></tr>' +
+          '<tr><td>Avg cycle time (days)</td><td>' + val(m.avg_cycle_time) +
+          '</td></tr></tbody></table>';
+      }
+      function onMove(e) {
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const vbw = (vb && vb.width) || svg.clientWidth;
+        const vbh = (vb && vb.height) || svg.clientHeight;
+        const svgX = (e.clientX - rect.left) * vbw / rect.width;
+        const svgY = (e.clientY - rect.top) * vbh / rect.height;
+        const box = plotBox();
+        if (!box) return;
+        if (svgX < box.left || svgX > box.right ||
+            svgY < box.top || svgY > box.bottom) {
+          rule.style.opacity = "0";
+          return;
+        }
+        const nd = nearestDay(svgX, box);
+        if (!nd) return;
+        rule.setAttribute("x1", nd.cx);
+        rule.setAttribute("x2", nd.cx);
+        rule.setAttribute("y1", box.top);
+        rule.setAttribute("y2", box.bottom);
+        rule.style.opacity = "1";
+        renderPanel(nd.iso);
+      }
+      svg.addEventListener("mousemove", onMove);
+      svg.addEventListener("mouseleave", function () { rule.style.opacity = "0"; });
+    }
   })();
 </script>
 {% endif %}

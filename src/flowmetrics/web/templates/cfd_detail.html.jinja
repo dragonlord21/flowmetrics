@@ -1,13 +1,52 @@
 {% extends "_base.html.jinja" %}
 
 {% block content %}
+  <style>
+    .cfd-layout { display: flex; gap: 1.25rem; align-items: flex-start; }
+    .cfd-chart-col { flex: 1; min-width: 0; }
+    .cfd-panel {
+      flex: 0 0 17rem; align-self: stretch;
+      border: 0.0625rem solid var(--border); border-radius: 0.5rem;
+      background: var(--surface); padding: 0.85rem 1rem;
+      font-size: 0.8125rem;
+    }
+    .cfd-panel-hint { color: var(--muted); margin: 0; }
+    .cfd-panel-date {
+      font-family: var(--head-font); font-weight: 600;
+      color: var(--p-600); margin-bottom: 0.5rem;
+    }
+    .cfd-panel-table { width: 100%; border-collapse: collapse; margin-bottom: 0.6rem; }
+    .cfd-panel-table th {
+      text-align: left; font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+      border-bottom: 0.0625rem solid var(--border); padding: 0.15rem 0;
+    }
+    .cfd-panel-table td { padding: 0.15rem 0; }
+    .cfd-panel-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .cfd-panel-flow { border-top: 0.0625rem dashed var(--border); padding-top: 0.3rem; }
+    .cfd-panel-flow td:first-child { color: var(--muted); }
+    @media (max-width: 56rem) {
+      .cfd-layout { flex-direction: column; }
+      .cfd-panel { flex: none; width: 100%; box-sizing: border-box; }
+    }
+  </style>
+
   {% with summary = {"title": "Cumulative Flow", "headline": cfd.headline} %}
     {% include "_partials/metric_summary.html.jinja" %}
   {% endwith %}
 
-  {% with mode = 'detail', data = cfd %}
-    {% include "_partials/cfd_tile.html.jinja" %}
-  {% endwith %}
+  <div class="cfd-layout">
+    <div class="cfd-chart-col">
+      {% with mode = 'detail', data = cfd %}
+        {% include "_partials/cfd_tile.html.jinja" %}
+      {% endwith %}
+    </div>
+    <aside id="cfd-hover-panel" class="cfd-panel">
+      <p class="cfd-panel-hint">Hover a day on the chart to see its flow
+        metrics — items per stage, WIP, arrivals, departures, throughput
+        and average cycle time.</p>
+    </aside>
+  </div>
 
   <section class="detail-extras">
     <h2>How to read this</h2>

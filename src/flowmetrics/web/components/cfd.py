@@ -8,11 +8,17 @@ spec. No decisions here — every number comes from the model
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import duckdb
 
-from ...charts.cfd import CfdModel, build_cfd_model, infer_stage_order
+from ...charts.cfd import (
+    CfdModel,
+    build_cfd_model,
+    daily_flow_metrics,
+    infer_stage_order,
+)
 from ...contract import WorkflowStates
 from ...warehouse.queries import (
     first_stage_entries,
@@ -47,6 +53,28 @@ def render(
         only_stages=stages if states is not None else None,
     )
     return build_cfd_model(entries, stages, view=view)
+
+
+def cfd_daily_metrics_json(model: CfdModel) -> str:
+    """Per-day flow metrics keyed by date_iso, as compact JSON — the
+    Jinja global the CFD chart fragment embeds so the hover overlay can
+    populate the per-day panel without another round-trip."""
+    obj = {
+        m.date_iso: {
+            "date_display": m.date_display,
+            "stages": m.wip_by_stage,
+            "total_wip": m.total_wip,
+            "arrivals": m.arrivals,
+            "departures": m.departures,
+            "throughput": round(m.throughput, 2),
+            "avg_cycle_time": (
+                round(m.avg_cycle_time, 1)
+                if m.avg_cycle_time is not None else None
+            ),
+        }
+        for m in daily_flow_metrics(model)
+    }
+    return json.dumps(obj, separators=(",", ":"))
 
 
 @to_vega.register

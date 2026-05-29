@@ -68,3 +68,19 @@ def test_avg_cycle_time_is_littles_law():
     d1, d2 = daily_flow_metrics(_model())
     assert d1.avg_cycle_time == 4.0           # WIP 4 / tp 1.0
     assert abs(d2.avg_cycle_time - 5 / 1.5) < 1e-9
+
+
+def test_daily_metrics_json_is_keyed_by_date_with_all_fields():
+    import json
+
+    from flowmetrics.web.components.cfd import cfd_daily_metrics_json
+
+    obj = json.loads(cfd_daily_metrics_json(_model()))
+    assert set(obj) == {"2026-05-01", "2026-05-02"}
+    rec = obj["2026-05-01"]
+    assert rec["stages"] == {"Open": 3, "Review": 1, "Done": 1}
+    assert rec["total_wip"] == 4
+    assert rec["arrivals"] == 5 and rec["departures"] == 1
+    assert rec["throughput"] == 1.0
+    assert rec["avg_cycle_time"] == 4.0
+    assert rec["date_display"] == "May 01, 2026"
