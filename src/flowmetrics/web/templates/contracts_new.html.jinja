@@ -210,6 +210,29 @@
     color: var(--muted); min-width: 9rem;
     font-family: var(--mono-font); font-size: 0.75rem;
   }
+
+  /* Live YAML preview — the same text the Save button will POST,
+     rendered as a collapsible block so the reader can verify
+     before committing. */
+  .yaml-preview {
+    margin: 1rem 0 0; padding: 0.4rem 0.6rem;
+    border: 0.0625rem solid var(--border); border-radius: 0.3rem;
+    background: var(--surface);
+  }
+  .yaml-preview > summary {
+    cursor: pointer; color: var(--muted);
+    font-size: 0.8125rem; padding: 0.1rem 0;
+    list-style: none;
+  }
+  .yaml-preview > summary::before { content: '▸ '; font-size: 0.7rem; }
+  .yaml-preview[open] > summary::before { content: '▾ '; }
+  .yaml-preview > pre {
+    margin: 0.5rem 0 0; padding: 0.6rem 0.8rem;
+    background: var(--bg); border-radius: 0.25rem;
+    font-family: var(--mono-font); font-size: 0.8125rem;
+    line-height: 1.5; white-space: pre; overflow-x: auto;
+    color: var(--fg);
+  }
 </style>
 
 <div class="builder"
@@ -469,6 +492,11 @@
         </template>
       </div>
     </fieldset>
+
+    <details class="yaml-preview">
+      <summary>Preview YAML</summary>
+      <pre x-text="buildYaml()"></pre>
+    </details>
 
     <div class="wizard-actions">
       <button type="submit" class="btn btn--primary" id="save-btn" :disabled="!canSave">
