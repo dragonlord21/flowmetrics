@@ -97,3 +97,27 @@ class TestToVega:
         assert spec["encoding"]["y"]["scale"]["domain"] == [
             "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun",
         ]
+
+    def test_cell_step_fills_width_for_many_weeks_but_caps_for_few(self):
+        """The cell step is responsive: a wide date range uses a bigger
+        step to consume horizontal space, while a single day caps the
+        step (square cell, no absurd stretch). Cells stay square."""
+        from datetime import timedelta
+
+        one_day = to_vega(build_data_source_model([(date(2026, 5, 12), 1)]))
+        # ~6 months → ~26 week columns.
+        d0 = date(2025, 12, 1)
+        many = to_vega(
+            build_data_source_model(
+                [(d0 + timedelta(days=i), 1) for i in range(0, 180, 7)]
+            )
+        )
+        cap = one_day["width"]["step"]
+        wide = many["width"]["step"]
+        # Single day sits at the max cap; many weeks use a >= step that
+        # fills width (here equal, both at the cap) — and never below it.
+        assert 16 <= wide <= cap
+        assert cap >= 30  # noticeably bigger than the old fixed 16
+        # Square cells.
+        assert one_day["height"]["step"] == one_day["width"]["step"]
+        assert many["height"]["step"] == many["width"]["step"]

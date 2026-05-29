@@ -18,6 +18,10 @@ from ...charts.data_source import (
 from ...warehouse.queries import creations_by_day
 from ._vega import to_vega
 
+# Target plot width (px) the coverage heat-map's week columns spread to
+# fill — the cell step is derived from this and the week count.
+_FILL_WIDTH_PX = 1100
+
 
 def render(
     con: duckdb.DuckDBPyConnection, contract_name: str
@@ -53,15 +57,18 @@ def _data_source_to_vega(model: DataSourceModel) -> dict[str, Any]:
     else:
         subtitle = "Most recent 180 days max"
 
+    # Responsive square cells (the contribution-grid look). The step is
+    # sized to consume the available width: ~`_FILL_WIDTH_PX` spread over
+    # the week columns, clamped so a single day doesn't stretch into a
+    # giant block (cap) and a long range doesn't shrink to specks (floor).
+    weeks = len(model.week_starts) or 1
+    step = max(16, min(40, round(_FILL_WIDTH_PX / weeks)))
+
     return {
         "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
         "background": "transparent",
-        # Fixed-size cells (the contribution-grid look): each week column
-        # and weekday row is a constant pixel step, so a sparse warehouse
-        # — even a single day — renders as a small square rather than one
-        # block stretched across a container-width / data-height plot.
-        "width": {"step": 16},
-        "height": {"step": 16},
+        "width": {"step": step},
+        "height": {"step": step},
         "title": {
             "text": "Work Items by Creation Date",
             "subtitle": subtitle,

@@ -88,9 +88,12 @@
 
   <p class="ds-headline">{{ coverage.headline }}</p>
 
+  {# Only render the coverage chart (and its reserved vertical space)
+     when the warehouse actually has data. Empty → just the headline
+     above + the Backfill panel below, no dead gap. #}
+  {% if coverage.days %}
   <section class="ds-section">
     <div id="ds-coverage" class="ds-coverage-chart"></div>
-    {% if coverage.days %}
     <script>
       (function () {
         const spec = {{ vega_spec(coverage) | safe }};
@@ -102,8 +105,8 @@
         });
       })();
     </script>
-    {% endif %}
   </section>
+  {% endif %}
 
   <section class="ds-section">
     <h2>Backfill</h2>
