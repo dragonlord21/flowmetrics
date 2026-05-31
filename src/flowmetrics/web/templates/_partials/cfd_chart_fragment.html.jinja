@@ -30,19 +30,11 @@
     const METRICS = {{ cfd_daily_metrics(data) | safe }};
     const spec = {{ vega_spec(data) | safe }};
     spec.height = {{ _h }};
-    {% if mode == 'detail' %}
-    // The floating panel lists every stage with its count, so the
-    // legend is redundant on the detail page. The colour encoding
-    // lives inside the area layer of the layered spec; find it
-    // and null its legend.
-    if (spec.layer) {
-      for (const layer of spec.layer) {
-        if (layer.encoding && layer.encoding.color) {
-          layer.encoding.color.legend = null;
-        }
-      }
-    }
-    {% endif %}
+    // Bottom-orient legend stays on both tile and detail so the
+    // reader can map a band colour back to its stage name without
+    // hovering. (The earlier top-right orientation collided with
+    // the bands and the per-band labels; bottom sits under the
+    // x-axis with no overlap.)
     function embed() {
       vegaEmbed("#{{ chart_container_id }}", window.applyTheme(spec), {
         actions: false,
@@ -173,8 +165,7 @@
         if (!xs || !ys) { hideGuides(); return; }
         const box = plotBox();
         if (!box) { hideGuides(); return; }
-        const bw = xs.bandwidth ? xs.bandwidth() / 2 : 0;
-        const xX = box.left + xs(iso) + bw;
+        const xX = box.left + xs(new Date(iso + "T00:00:00Z"));
 
         // cum[i] = sum of WIP[s_i, s_{i+1}, ..., s_{n-1}] at iso —
         // the y-value of the TOP boundary of band i (workflow order).
@@ -209,7 +200,7 @@
             lblBox.style.opacity = "0";
             continue;
           }
-          const xD = box.left + xs(D) + bw;
+          const xD = box.left + xs(new Date(D + "T00:00:00Z"));
           const yPix = box.top + ys(yCount);
           ln.setAttribute("x1", xD);
           ln.setAttribute("x2", xX);
@@ -328,16 +319,30 @@
           right: tx + b.x + b.width, bottom: ty + b.y + b.height,
         };
       }
+      function visibleDates() {
+        // The temporal x-scale's domain is [minDate, maxDate] —
+        // not the discrete day list — so iterate METRICS dates
+        // and keep the ones currently in view (so a zoomed chart
+        // snaps to the right day).
+        const xs = view.scale("x");
+        if (!xs) return [];
+        const dom = xs.domain();
+        const lo = dom[0].getTime ? dom[0].getTime() : +dom[0];
+        const hi = dom[1].getTime ? dom[1].getTime() : +dom[1];
+        return Object.keys(metrics).filter(function (d) {
+          const t = Date.parse(d + "T00:00:00Z");
+          return t >= lo && t <= hi;
+        });
+      }
       function nearestDay(svgX, box) {
         const xs = view.scale("x");
         if (!xs) return null;
-        const domain = xs.domain();
-        const bw = xs.bandwidth ? xs.bandwidth() : 0;
+        const dates = visibleDates();
         let best = null, bestDist = Infinity, bestCx = 0;
-        for (let i = 0; i < domain.length; i++) {
-          const cx = box.left + xs(domain[i]) + bw / 2;
+        for (let i = 0; i < dates.length; i++) {
+          const cx = box.left + xs(new Date(dates[i] + "T00:00:00Z"));
           const dist = Math.abs(svgX - cx);
-          if (dist < bestDist) { bestDist = dist; best = domain[i]; bestCx = cx; }
+          if (dist < bestDist) { bestDist = dist; best = dates[i]; bestCx = cx; }
         }
         return best === null ? null : { iso: best, cx: bestCx };
       }
@@ -473,8 +478,7 @@
         const xs = view.scale("x");
         const box = plotBox();
         if (!xs || !box) { renderPanel(defaultIso, false); return; }
-        const bw = xs.bandwidth ? xs.bandwidth() / 2 : 0;
-        const cx = box.left + xs(defaultIso) + bw;
+        const cx = box.left + xs(new Date(defaultIso + "T00:00:00Z"));
         placePanel(cx);
         renderPanel(defaultIso, false);
       }
@@ -497,8 +501,7 @@
         const xs = view.scale("x");
         const box = plotBox();
         if (!xs || !box) return;
-        const bw = xs.bandwidth ? xs.bandwidth() / 2 : 0;
-        const cx = box.left + xs(pinnedIso) + bw;
+        const cx = box.left + xs(new Date(pinnedIso + "T00:00:00Z"));
         moveRule(cx, box);
         placePanel(cx);
       });

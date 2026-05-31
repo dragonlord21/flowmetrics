@@ -108,25 +108,26 @@ class TestToVegaStructure:
         area = spec["layer"][0]
         assert area["encoding"]["color"]["scale"]["domain"] == list(model.stages)
 
-    def test_x_scale_fills_edge_to_edge(self):
-        # The cumulative area fills the plot edge-to-edge: a `point`
-        # scale anchors first / last data points at the plot extremes
-        # (a `band` scale would leave half-bandwidth empty strips),
-        # and `padding: 0` strips any remaining slack.
+    def test_x_axis_is_temporal_for_zoom_binding(self):
+        # A continuous (temporal) x scale fills the plot edge-to-
+        # edge by default AND is the only kind Vega-Lite will let
+        # us bind an interval-zoom selection to ("Scale bindings
+        # are only supported for unbinned, continuous domains").
         spec = to_vega(_model_with_crop())
-        x_scale = spec["encoding"]["x"]["scale"]
-        assert x_scale["type"] == "point"
-        assert x_scale["padding"] == 0
+        x = spec["encoding"]["x"]
+        assert x["type"] == "temporal"
 
     def test_axis_labels_are_thinned_to_about_ten(self):
         # 31-day window → labels thinned (no one-label-per-day wash).
+        # On the temporal x-axis Vega-Lite picks ticks itself; we
+        # cap with `tickCount` so wider windows stay legible.
         entries = [
             _entry(f"#{i}", "A", date(2026, 1, 1) + timedelta(days=i))
             for i in range(31)
         ]
         spec = to_vega(build_cfd_model(entries, ("A",)))
-        labels = spec["encoding"]["x"]["axis"]["values"]
-        assert 0 < len(labels) <= 11
+        axis = spec["encoding"]["x"]["axis"]
+        assert axis["tickCount"] <= 11
 
     def test_daily_data_reaches_the_spec_data(self):
         model = _model_with_crop()
@@ -159,7 +160,53 @@ class TestToVegaCrop:
         entries = [_entry("#1", "A", date(2026, 1, 1))]
         model = build_cfd_model(entries, ("A",))
         assert model.crop is None
-        assert "params" not in to_vega(model)
+        # With no crop, the top-level params list is empty (the
+        # zoom param lives on the area layer; see TestInteractiveZoom).
+        spec = to_vega(model)
+        assert spec.get("params", []) == []
+
+
+def _zoom_param(spec):
+    # The interval-zoom param lives inside the area layer (Vega-Lite
+    # rejects a scale-binding interval at the top of a layered spec
+    # — "Duplicate signal name"). Pull it out of the layer's params.
+    for p in spec["layer"][0].get("params", []):
+        if p.get("select", {}).get("type") == "interval":
+            return p
+    return None
+
+
+class TestInteractiveZoom:
+    """The chart ships an interval selection bound to the scales so
+    wheel-zooms and drag-pans Just Work on top of the existing
+    snap / pin / lead-time overlay."""
+
+    def test_spec_has_an_interval_selection_bound_to_scales(self):
+        zoom = _zoom_param(to_vega(_model_with_crop()))
+        assert zoom is not None, "expected an interval-selection zoom param"
+        # `bind: "scales"` enables wheel-zoom + drag-pan with no
+        # extra wiring.
+        assert zoom["bind"] == "scales"
+
+    def test_zoom_is_x_only_so_y_floor_crop_keeps_working(self):
+        # If the zoom binds the y-scale too it'd fight the cfdfloor
+        # slider (the slider drives y.scale.domainMin via expr).
+        # Lock the zoom to the time axis.
+        zoom = _zoom_param(to_vega(_model_with_crop()))
+        assert zoom["select"]["encodings"] == ["x"]
+
+    def test_zoom_coexists_with_the_y_floor_crop_slider(self):
+        # Top-level params carry the crop slider; the area layer's
+        # params carry the zoom. Two independent knobs, no overlap.
+        model = _model_with_crop()
+        assert model.crop is not None
+        spec = to_vega(model)
+        top_kinds = [
+            p.get("bind", {}).get("input") for p in spec.get("params", [])
+            if isinstance(p.get("bind"), dict)
+        ]
+        assert top_kinds == ["range"]  # the crop slider
+        assert _zoom_param(spec) is not None
 
 
 class TestBoundaryLines:

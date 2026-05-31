@@ -129,13 +129,6 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
                 "stage_order": i,
             })
 
-    # Thin axis labels to ~10 evenly-spaced ticks so wider windows
-    # stay legible. Nominal-axis `labelOverlap` doesn't thin
-    # reliably; pre-pick the dates that SHOULD show a label.
-    # Ceiling-division step so 11–19 dates actually get thinned.
-    step = max(1, (len(model.daily) + 9) // 10)
-    axis_label_values = [d.date_iso for d in model.daily[::step]]
-
     # Y-floor crop slider — present only when the model resolved
     # one (the window's left edge carries inert items to crop).
     floor_param: dict | None = None
@@ -152,25 +145,33 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
             },
         }
 
-    # x encoding is shared by every layer so the bands, the arrival
-    # line, and the departure line all sit on the same time axis.
+    # x encoding is shared by every layer so the bands, the
+    # arrival line, and the departure line all sit on the same
+    # time axis. A `temporal` scale (continuous) is required for
+    # Vega-Lite's scale-binding zoom; the default fills the plot
+    # edge-to-edge without per-tick padding.
     x_encoding = {
         "field": "date_iso",
-        "type": "nominal",
-        # A `point` scale anchors first / last data points at
-        # the plot extremes (the default `band` scale anchors
-        # them at band centres, leaving ~half-bandwidth empty
-        # strips at each edge). `padding: 0` removes any
-        # remaining slack so the cumulative area truly fills
-        # edge-to-edge.
-        "scale": {"type": "point", "padding": 0},
+        "type": "temporal",
         "axis": {
             "title": "Date (UTC)",
             "labelAngle": 0,
-            "values": axis_label_values,
-            "labelExpr": "utcFormat(datetime(datum.value), '%b %d')",
+            "tickCount": 10,
+            "format": "%b %d",
+            "formatType": "time",
         },
-        "sort": [d.date_iso for d in model.daily],
+    }
+
+    # Interval selection bound to scales — gives the chart
+    # wheel-zoom + drag-pan along the time axis with no extra
+    # wiring. Defined INSIDE the area layer (Vega-Lite throws a
+    # "Duplicate signal name" if a scale-binding param sits at
+    # the top of a layered spec; line layers inherit the shared
+    # x scale and zoom in step with the area).
+    zoom_param = {
+        "name": "cfdzoom",
+        "select": {"type": "interval", "encodings": ["x"]},
+        "bind": "scales",
     }
 
     # Area layer — the existing stacked bands.
@@ -179,6 +180,7 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
         # raising the y-floor slider crops them cleanly instead
         # of spilling the cumulative areas below the axis.
         "mark": {"type": "area", "opacity": 0.95, "clip": True},
+        "params": [zoom_param],
         "encoding": {
             "y": {
                 "field": "wip",
@@ -294,6 +296,9 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
             },
         },
     }
+    # The zoom param lives on the area layer (see comment above);
+    # only the y-floor crop slider, when present, goes at the
+    # top level.
     if floor_param is not None:
         spec["params"] = [floor_param]
     return spec
