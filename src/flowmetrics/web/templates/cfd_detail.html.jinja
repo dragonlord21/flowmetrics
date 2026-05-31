@@ -65,15 +65,6 @@
       border-top: 0.0625rem dashed var(--border); padding-top: 0.3rem;
     }
     .cfd-panel-flow td:first-child { color: var(--muted); }
-    .cfd-scrub-hint {
-      font-size: 0.75rem; color: var(--muted); margin: 0 0 1.4rem 0;
-    }
-    .cfd-scrub-hint kbd {
-      font-family: var(--mono-font); font-size: 0.7rem;
-      background: var(--surface); border: 0.0625rem solid var(--border);
-      border-radius: 0.2rem; padding: 0 0.3rem;
-    }
-
     /* Narrow viewports: the floating overlay falls back to a static
        block below the chart so it doesn't crowd a phone-width chart. */
     @media (max-width: 56rem) {
@@ -81,7 +72,6 @@
         position: static; width: 100%; box-sizing: border-box;
         margin-top: 0.75rem; left: auto !important; right: auto;
       }
-      .cfd-scrub-hint { display: none; }
     }
   </style>
 
@@ -95,10 +85,6 @@
     {% endwith %}
     <aside id="cfd-hover-panel" class="cfd-panel-float" aria-live="polite"></aside>
   </div>
-  <p class="cfd-scrub-hint">
-    Hover any day to scrub; <kbd>click</kbd> to pin the panel there.
-    Click the pinned day again to release.
-  </p>
 
   {% if cfd.daily %}
   <section class="ds-section" style="margin-top: 1.5rem;">

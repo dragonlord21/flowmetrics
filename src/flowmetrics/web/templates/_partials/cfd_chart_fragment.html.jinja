@@ -63,7 +63,9 @@
       const ns = "http://www.w3.org/2000/svg";
       const rule = document.createElementNS(ns, "line");
       rule.setAttribute("data-flow", "x-guideline");
-      rule.setAttribute("stroke", "#444");
+      // The rule crosses the dark "above" zone AND the lighter bands;
+      // mid-grey at 0.85 reads against both without dominating.
+      rule.setAttribute("stroke", "rgba(20, 20, 20, 0.85)");
       rule.setAttribute("stroke-width", "1");
       rule.setAttribute("stroke-dasharray", "3 3");
       rule.setAttribute("pointer-events", "none");
@@ -72,6 +74,181 @@
       svg.appendChild(rule);
 
       let pinnedIso = null;
+
+      // Snap-time CFD annotations à la Vacanti Figure 9.8: at each
+      // band boundary at the snap date, a dashed horizontal line
+      // extending LEFT to where the top-of-stack first reached that
+      // y-level (i.e. the lead time for items currently at that
+      // boundary), labelled "N days"; plus a "N items" count label
+      // beside the rule for each band. Built lazily once we know
+      // the stage count.
+      const guides = {
+        built: false, leadLines: [], dayLabels: [],
+        labelBoxes: [], itemLabels: [], itemBoxes: [],
+      };
+      function buildGuides(stageCount) {
+        if (guides.built) return;
+        function mkText(weight) {
+          const t = document.createElementNS(ns, "text");
+          t.setAttribute("fill", "#1a1a1a");
+          t.setAttribute("font-size", "10");
+          t.setAttribute("font-family",
+            "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif");
+          t.setAttribute("font-weight", weight);
+          t.setAttribute("pointer-events", "none");
+          t.style.opacity = "0";
+          return t;
+        }
+        function mkBox() {
+          const r = document.createElementNS(ns, "rect");
+          r.setAttribute("fill", "rgba(250, 245, 230, 0.92)");
+          r.setAttribute("rx", "2");
+          r.setAttribute("pointer-events", "none");
+          r.style.opacity = "0";
+          return r;
+        }
+        // n-1 lead-time line + label pairs (one per internal boundary).
+        for (let i = 0; i < stageCount - 1; i++) {
+          const ln = document.createElementNS(ns, "line");
+          ln.setAttribute("data-flow", "y-leadtime");
+          ln.setAttribute("stroke", "#1a1a1a");
+          ln.setAttribute("stroke-width", "1");
+          ln.setAttribute("stroke-dasharray", "4 3");
+          ln.setAttribute("pointer-events", "none");
+          ln.style.opacity = "0";
+          svg.appendChild(ln);
+          guides.leadLines.push(ln);
+          const box = mkBox();
+          const lbl = mkText("500");
+          svg.appendChild(box);
+          svg.appendChild(lbl);
+          guides.labelBoxes.push(box);
+          guides.dayLabels.push(lbl);
+        }
+        // n "N items" labels (one per band, anchored on the rule).
+        for (let i = 0; i < stageCount; i++) {
+          const box = mkBox();
+          const lbl = mkText("600");
+          svg.appendChild(box);
+          svg.appendChild(lbl);
+          guides.itemBoxes.push(box);
+          guides.itemLabels.push(lbl);
+        }
+        guides.built = true;
+      }
+      function hideGuides() {
+        const all = guides.leadLines.concat(
+          guides.dayLabels, guides.labelBoxes,
+          guides.itemLabels, guides.itemBoxes);
+        for (const el of all) el.style.opacity = "0";
+      }
+      function isoDiffDays(a, b) {
+        const da = new Date(a + "T00:00:00Z");
+        const db = new Date(b + "T00:00:00Z");
+        return Math.round((db - da) / 86400000);
+      }
+      function paintGuides(iso) {
+        const m = metrics[iso];
+        if (!m) { hideGuides(); return; }
+        const stages = Object.keys(m.stages);
+        if (stages.length < 2) { hideGuides(); return; }
+        buildGuides(stages.length);
+        const xs = view.scale("x");
+        const ys = view.scale("y");
+        if (!xs || !ys) { hideGuides(); return; }
+        const box = plotBox();
+        if (!box) { hideGuides(); return; }
+        const bw = xs.bandwidth ? xs.bandwidth() / 2 : 0;
+        const xX = box.left + xs(iso) + bw;
+
+        // cum[i] = sum of WIP[s_i, s_{i+1}, ..., s_{n-1}] at iso —
+        // the y-value of the TOP boundary of band i (workflow order).
+        const cum = new Array(stages.length);
+        let running = 0;
+        for (let i = stages.length - 1; i >= 0; i--) {
+          running += m.stages[stages[i]] || 0;
+          cum[i] = running;
+        }
+        const dates = Object.keys(metrics);
+
+        // Lead-time lines at every internal boundary
+        // (between band i and band i+1, at y = cum[i+1]).
+        for (let i = 0; i < stages.length - 1; i++) {
+          const yCount = cum[i + 1];
+          let D = null;
+          // Earliest date where total WIP at D >= yCount = when those
+          // items first entered the system.
+          for (let j = 0; j < dates.length; j++) {
+            const md = metrics[dates[j]];
+            if (!md) continue;
+            let totalD = 0;
+            for (const st of stages) totalD += md.stages[st] || 0;
+            if (totalD >= yCount) { D = dates[j]; break; }
+          }
+          const ln = guides.leadLines[i];
+          const lbl = guides.dayLabels[i];
+          const lblBox = guides.labelBoxes[i];
+          if (D === null || yCount <= 0) {
+            ln.style.opacity = "0";
+            lbl.style.opacity = "0";
+            lblBox.style.opacity = "0";
+            continue;
+          }
+          const xD = box.left + xs(D) + bw;
+          const yPix = box.top + ys(yCount);
+          ln.setAttribute("x1", xD);
+          ln.setAttribute("x2", xX);
+          ln.setAttribute("y1", yPix);
+          ln.setAttribute("y2", yPix);
+          // Hide the actual line at zero length; the label still
+          // pins to the rule so the reader sees "0 days" rather
+          // than nothing.
+          ln.style.opacity = D === iso ? "0" : "0.85";
+          // Brighter stroke so it reads on the dark "above" zone.
+          ln.setAttribute("stroke", "rgba(245, 240, 226, 0.9)");
+          const days = isoDiffDays(D, iso);
+          lbl.textContent = days + " days";
+          // For zero-length lines, anchor the label just left of
+          // the rule so it isn't on top of the rule itself.
+          const labelX = D === iso ? (xX - 50) : (xD + 5);
+          lbl.setAttribute("x", labelX);
+          lbl.setAttribute("y", yPix - 4);
+          lbl.style.opacity = "1";
+          // Size the soft pill behind the label from the rendered bbox.
+          const tb = lbl.getBBox();
+          lblBox.setAttribute("x", tb.x - 3);
+          lblBox.setAttribute("y", tb.y - 1);
+          lblBox.setAttribute("width", tb.width + 6);
+          lblBox.setAttribute("height", tb.height + 2);
+          lblBox.style.opacity = "1";
+        }
+
+        // Per-band "N items" labels — at the band's vertical
+        // midpoint, just right of the rule.
+        for (let i = 0; i < stages.length; i++) {
+          const top = cum[i];
+          const bottom = i < stages.length - 1 ? cum[i + 1] : 0;
+          const wip = m.stages[stages[i]] || 0;
+          const tx = guides.itemLabels[i];
+          const txBox = guides.itemBoxes[i];
+          if (wip <= 0) {
+            tx.style.opacity = "0";
+            txBox.style.opacity = "0";
+            continue;
+          }
+          const yMid = box.top + ys((top + bottom) / 2);
+          tx.textContent = wip + " items";
+          tx.setAttribute("x", xX + 6);
+          tx.setAttribute("y", yMid + 3);
+          tx.style.opacity = "1";
+          const tb = tx.getBBox();
+          txBox.setAttribute("x", tb.x - 3);
+          txBox.setAttribute("y", tb.y - 1);
+          txBox.setAttribute("width", tb.width + 6);
+          txBox.setAttribute("height", tb.height + 2);
+          txBox.style.opacity = "1";
+        }
+      }
 
       function plotBox() {
         const bg = svg.querySelector(".role-frame .background");
@@ -178,6 +355,7 @@
         if (svgX < box.left || svgX > box.right ||
             svgY < box.top || svgY > box.bottom) {
           rule.style.opacity = "0";
+          hideGuides();
           return;
         }
         const nd = nearestDay(svgX, box);
@@ -186,6 +364,7 @@
         moveRule(nd.cx, box);
         placePanel(nd.cx);
         renderPanel(nd.iso, false);
+        paintGuides(nd.iso);
       }
       function onClick(e) {
         const rect = svg.getBoundingClientRect();
@@ -204,12 +383,14 @@
           moveRule(nd.cx, box);
           placePanel(nd.cx);
           renderPanel(nd.iso, false);
+          paintGuides(nd.iso);
         } else {
           pinnedIso = nd.iso;
           rule.setAttribute("stroke-dasharray", "");
           moveRule(nd.cx, box);
           placePanel(nd.cx);
           renderPanel(nd.iso, true);
+          paintGuides(nd.iso);
         }
       }
       // Default the panel to the most recent day so it's never an
@@ -236,6 +417,7 @@
       svg.addEventListener("mouseleave", function () {
         if (pinnedIso !== null) return;
         rule.style.opacity = "0";
+        hideGuides();
         snapDefault();
       });
       svg.addEventListener("click", onClick);

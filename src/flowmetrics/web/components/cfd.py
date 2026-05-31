@@ -28,12 +28,24 @@ from ...warehouse.queries import (
 from ...windows import Window
 from ._vega import to_vega
 
-# A categorical palette derived from the brand hue: nine colours evenly
+# Categorical palette derived from the brand hue: nine pastels evenly
 # spaced around the wheel at a shared saturation / lightness — distinct
 # but thematically linked (brand green first). Defined as CSS theme
 # tokens (`--cfd-1`…`--cfd-9`) so they resolve from the theme at embed
 # time, like every other chart colour. Replaces Vega's off-brand "set3".
-_CFD_PALETTE = [f"__theme:cfd-{i}__" for i in range(1, 10)]
+_CFD_BAND_TOKENS = [f"__theme:cfd-{i}__" for i in range(1, 10)]
+
+
+def _palette_for_stages(stage_count: int) -> list[str]:
+    """One theme token per stage, in workflow order. The terminal
+    stage (last) always uses the muted `cfd-terminal` token so the
+    active WIP bands above it visually dominate the read — same
+    intent as Vacanti's pale-blue "Done" band in Figure 9.8."""
+    if stage_count <= 0:
+        return []
+    if stage_count == 1:
+        return ["__theme:cfd-terminal__"]
+    return _CFD_BAND_TOKENS[: stage_count - 1] + ["__theme:cfd-terminal__"]
 
 
 def render(
@@ -184,7 +196,7 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
                 "type": "nominal",
                 "scale": {
                     "domain": list(model.stages),
-                    "range": _CFD_PALETTE,
+                    "range": _palette_for_stages(len(model.stages)),
                 },
                 "legend": {"title": None, "orient": "top-right"},
             },
@@ -202,7 +214,11 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
             # just clutter.
         },
         "config": {
-            "view": {"fill": "__theme:bg__", "stroke": None},
+            # The plot rectangle paints dark — Vacanti's "items not
+            # yet started" gray. Anywhere a stacked band paints over
+            # it disappears; anywhere ABOVE the topmost band the dark
+            # fill shows through, framing the active WIP region.
+            "view": {"fill": "__theme:cfd-above__", "stroke": None},
             "axis": {
                 "labelFont": (
                     "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"
