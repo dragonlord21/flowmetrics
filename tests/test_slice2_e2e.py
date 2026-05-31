@@ -364,9 +364,12 @@ class TestDetailPageCycleTime:
     def test_detail_page_has_placeholder_sections(
         self, server_url: str, page: Page
     ):
-        """Per SPEC §7.3.3 the detail page reserves space for four
-        sections below the tile. Stubs in Slice 2; populated later.
-        Assert the section headers are present so the slot exists.
+        """The detail page reserves space for two sections below the
+        tile: a short description + interpret bullets, and a separate
+        actionable-guidance section. (Earlier slices also had
+        Caveats and Methodology stubs — those were folded into the
+        description when the extras were tightened to "how to read"
+        + "possible next steps".)
         """
         page.goto(server_url + "/workflows/astral-uv-week/metrics/cycle-time")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
@@ -375,9 +378,7 @@ class TestDetailPageCycleTime:
         # display-case changes.
         text = page.locator("body").inner_text().lower()
         assert "how to read" in text, "missing 'How to read' section"
-        assert "caveats" in text, "missing 'Caveats' section"
-        assert "methodology" in text, "missing 'Methodology' section"
-        assert "actions" in text, "missing 'Actions' section"
+        assert "possible next steps" in text, "missing 'Possible next steps' section"
 
     def test_detail_page_shows_metric_summary_above_tile(
         self, server_url: str, page: Page
