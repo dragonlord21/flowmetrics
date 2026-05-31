@@ -676,15 +676,21 @@
 
     /* ─────── Links inside metric tiles ─────── */
     .details-link {
-      /* Neutral, with underline on hover so it still reads as a
-         link. CTA color is reserved for the import button. */
-      font-size: 0.8125rem;
-      color: var(--muted);
+      /* The primary outbound action on a tile — pulls the reader
+         into the detail page. Brand green at 600 weight gives it
+         more pull than the neutral Reset chip beside it without
+         tipping into full button territory. */
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--p-700);
       text-decoration: none;
+      letter-spacing: 0.01em;
     }
     .details-link:hover {
-      color: var(--fg);
+      color: var(--p-900);
       text-decoration: underline;
+      text-decoration-color: var(--p-500);
+      text-underline-offset: 0.2em;
     }
 
     /* ─────── Detail page extras ─────── */
