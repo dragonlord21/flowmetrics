@@ -82,6 +82,16 @@
       // Which side of the rule the panel currently parks on. Labels
       // go on the OPPOSITE side so the panel doesn't occlude them.
       let panelSide = "right";
+      // Drag-pan / wheel-zoom both update Vega's `cfdzoom` signal.
+      // Vega intercepts mousedown / mouseup on the SVG before our
+      // listeners can see them (stopImmediatePropagation), so we
+      // can't measure drag distance directly. Instead, watch the
+      // zoom signal and remember when it last changed — the
+      // synthesised click that fires at the end of a drag-pan
+      // arrives within a couple of frames, so an onClick within
+      // ~200ms of a zoom-signal change is a drag-end, not a real
+      // pin gesture.
+      let lastZoomChange = 0;
 
       // Snap-time annotations: at each band boundary at the snap
       // date, a dashed horizontal line extending LEFT to where the
@@ -442,6 +452,12 @@
         paintGuides(nd.iso);
       }
       function onClick(e) {
+        // Click events that arrive within ~200ms of a zoom-signal
+        // change are the synthesised click that browsers fire at
+        // the end of a drag-pan. Ignore them so panning the chart
+        // doesn't jerk the pin to wherever the cursor happened
+        // to land.
+        if (Date.now() - lastZoomChange < 200) return;
         const rect = svg.getBoundingClientRect();
         const vb = svg.viewBox.baseVal;
         const vbw = (vb && vb.width) || svg.clientWidth;
@@ -487,6 +503,16 @@
       requestAnimationFrame(function () {
         requestAnimationFrame(snapDefault);
       });
+      // Watch the cfdzoom signal so we can debounce the post-pan
+      // synthesised click. Both `cfdzoom_date_iso` (the projected
+      // x-axis signal) and `cfdzoom` (the selection object) fire
+      // on every drag-pan / wheel-zoom — try the projected one
+      // first since it's the one Vega-Lite always creates.
+      try {
+        view.addSignalListener("cfdzoom_date_iso", function () {
+          lastZoomChange = Date.now();
+        });
+      } catch (_) { /* signal name may differ; resilient */ }
       svg.addEventListener("mousemove", onMove);
       svg.addEventListener("mouseleave", function () {
         if (pinnedIso !== null) return;

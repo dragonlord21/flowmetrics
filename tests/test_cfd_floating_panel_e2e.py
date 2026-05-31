@@ -434,3 +434,89 @@ class TestPinAndRelease:
         # Still pinned (not released).
         g = page.evaluate(_GEOM_JS)
         assert g["panel"]["pinned"] is True
+
+
+class TestPinAcrossZoomAndPan:
+    """The chart's `bind: scales` zoom captures mouse drags for
+    panning. Without compensation, the synthesised click that
+    browsers fire at the end of every drag-pan re-fires onClick
+    and jerks the pin to wherever the cursor happened to land.
+    Pin gestures still work; drag-pan gestures don't disturb the
+    pin."""
+
+    def test_pin_works_after_wheel_zoom(
+        self, server_url: str, page: Page
+    ):
+        _goto_cfd(page, server_url)
+        sb = _svg_box(page)
+        cx = sb["x"] + sb["width"] * 0.5
+        cy = sb["y"] + sb["height"] * 0.5
+        page.mouse.move(cx, cy)
+        for _ in range(3):
+            page.mouse.wheel(0, -200)
+            page.wait_for_timeout(120)
+        page.wait_for_timeout(300)
+        # Pin after zoom — wait long enough that the
+        # zoom-signal debounce window has elapsed.
+        page.wait_for_timeout(250)
+        page.mouse.click(cx + 80, cy)
+        page.wait_for_timeout(200)
+        g = page.evaluate(_GEOM_JS)
+        assert g["panel"]["pinned"] is True, (
+            "click after wheel-zoom should pin the panel"
+        )
+
+    def test_unpin_works_after_wheel_zoom(
+        self, server_url: str, page: Page
+    ):
+        _goto_cfd(page, server_url)
+        sb = _svg_box(page)
+        cx = sb["x"] + sb["width"] * 0.5
+        cy = sb["y"] + sb["height"] * 0.5
+        page.mouse.move(cx, cy)
+        for _ in range(2):
+            page.mouse.wheel(0, -200)
+            page.wait_for_timeout(120)
+        page.wait_for_timeout(300)
+        # Pin, then click same coords to release.
+        page.wait_for_timeout(250)
+        page.mouse.click(cx, cy)
+        page.wait_for_timeout(200)
+        page.mouse.click(cx, cy)
+        page.wait_for_timeout(200)
+        g = page.evaluate(_GEOM_JS)
+        assert g["panel"]["pinned"] is False, (
+            "click same day after wheel-zoom should release the pin"
+        )
+
+    def test_drag_pan_does_not_disturb_an_existing_pin(
+        self, server_url: str, page: Page
+    ):
+        _goto_cfd(page, server_url)
+        sb = _svg_box(page)
+        cx = sb["x"] + sb["width"] * 0.55
+        cy = sb["y"] + sb["height"] * 0.5
+        # Zoom in so there's room to pan.
+        page.mouse.move(cx, cy)
+        for _ in range(3):
+            page.mouse.wheel(0, -200)
+            page.wait_for_timeout(120)
+        page.wait_for_timeout(300)
+        # Pin.
+        page.wait_for_timeout(250)
+        page.mouse.click(cx, cy)
+        page.wait_for_timeout(200)
+        date_before = page.locator(".cfd-panel-date").inner_text()
+        # Drag-pan to the right.
+        page.mouse.move(sb["x"] + sb["width"] * 0.30, cy)
+        page.mouse.down()
+        page.mouse.move(sb["x"] + sb["width"] * 0.55, cy, steps=8)
+        page.mouse.up()
+        page.wait_for_timeout(300)
+        date_after = page.locator(".cfd-panel-date").inner_text()
+        g = page.evaluate(_GEOM_JS)
+        assert g["panel"]["pinned"] is True, "pan should not unpin"
+        assert date_before == date_after, (
+            f"pan should not move the pin; before={date_before!r}"
+            f" after={date_after!r}"
+        )
