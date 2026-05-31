@@ -167,9 +167,13 @@ def _cfd_to_vega(model: CfdModel) -> dict[str, Any]:
             "x": {
                 "field": "date_iso",
                 "type": "nominal",
-                # No outer padding — the cumulative area fills the
-                # plot edge-to-edge.
-                "scale": {"paddingOuter": 0},
+                # A `point` scale anchors first / last data points at
+                # the plot extremes (the default `band` scale anchors
+                # them at band centres, leaving ~half-bandwidth empty
+                # strips at each edge). `paddingOuter: 0` removes any
+                # remaining slack so the cumulative area truly fills
+                # edge-to-edge.
+                "scale": {"type": "point", "padding": 0},
                 "axis": {
                     "title": "Date (UTC)",
                     "labelAngle": 0,

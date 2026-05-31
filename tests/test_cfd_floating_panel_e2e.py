@@ -265,6 +265,82 @@ class TestFloatingPanelPosition:
         assert not violations, "overlap at: " + "; ".join(violations)
 
 
+# Read the rule + every visible per-band item-count label in one
+# round-trip, so the comparison is against a single layout snapshot.
+_LABEL_GEOM_JS = """
+() => {
+  const rule = document.querySelector('[data-flow="x-guideline"]');
+  const labels = Array.from(document.querySelectorAll('text'))
+    .filter(t => /\\bitems$/.test(t.textContent || '')
+                 && parseFloat(t.style.opacity || '0') > 0);
+  if (!rule) return null;
+  const r = rule.getBoundingClientRect();
+  return {
+    ruleX: r.left + r.width / 2,
+    labels: labels.map(t => {
+      const b = t.getBoundingClientRect();
+      return {text: t.textContent, left: b.left, right: b.right};
+    }),
+  };
+}
+"""
+
+
+class TestLabelsParkOppositeThePanel:
+    """The per-band item-count labels at the snap have to live on
+    the OPPOSITE side of the rule from the floating panel — the
+    panel sits on top of anything in its column, so labels on the
+    same side disappear under it."""
+
+    def test_hover_left_puts_labels_left_of_rule_panel_right(
+        self, server_url: str, page: Page
+    ):
+        _goto_cfd(page, server_url)
+        sb = _svg_box(page)
+        page.mouse.move(
+            sb["x"] + sb["width"] * 0.20,
+            sb["y"] + sb["height"] * 0.5,
+        )
+        page.wait_for_timeout(200)
+        # Confirm the panel parked right (precondition).
+        g = page.evaluate(_GEOM_JS)
+        assert g["panel"]["left"] > g["rule"]["x"], (
+            "expected panel right of rule on left-half hover"
+        )
+        # Every visible band-count label is entirely LEFT of the rule.
+        lg = page.evaluate(_LABEL_GEOM_JS)
+        assert lg is not None and lg["labels"], "no labels rendered"
+        overlaps = [b for b in lg["labels"] if b["right"] > lg["ruleX"]]
+        assert not overlaps, (
+            f"with panel on the right, labels must sit left of"
+            f" rule.x={lg['ruleX']:.1f}; violations: {overlaps}"
+        )
+
+    def test_hover_right_puts_labels_right_of_rule_panel_left(
+        self, server_url: str, page: Page
+    ):
+        _goto_cfd(page, server_url)
+        sb = _svg_box(page)
+        page.mouse.move(
+            sb["x"] + sb["width"] * 0.85,
+            sb["y"] + sb["height"] * 0.5,
+        )
+        page.wait_for_timeout(200)
+        # Confirm the panel parked left (precondition).
+        g = page.evaluate(_GEOM_JS)
+        assert g["panel"]["right"] < g["rule"]["x"], (
+            "expected panel left of rule on right-half hover"
+        )
+        # Every visible band-count label is entirely RIGHT of the rule.
+        lg = page.evaluate(_LABEL_GEOM_JS)
+        assert lg is not None and lg["labels"], "no labels rendered"
+        overlaps = [b for b in lg["labels"] if b["left"] < lg["ruleX"]]
+        assert not overlaps, (
+            f"with panel on the left, labels must sit right of"
+            f" rule.x={lg['ruleX']:.1f}; violations: {overlaps}"
+        )
+
+
 class TestPinAndRelease:
     """Click pins the panel — solid rule + .is-pinned class +
     a 'PINNED' banner. Clicking the same day releases."""

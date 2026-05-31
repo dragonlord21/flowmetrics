@@ -74,6 +74,9 @@
       svg.appendChild(rule);
 
       let pinnedIso = null;
+      // Which side of the rule the panel currently parks on. Labels
+      // go on the OPPOSITE side so the panel doesn't occlude them.
+      let panelSide = "right";
 
       // Snap-time CFD annotations à la Vacanti Figure 9.8: at each
       // band boundary at the snap date, a dashed horizontal line
@@ -208,11 +211,21 @@
           ln.setAttribute("stroke", "rgba(245, 240, 226, 0.9)");
           const days = isoDiffDays(D, iso);
           lbl.textContent = days + " days";
-          // For zero-length lines, anchor the label just left of
-          // the rule so it isn't on top of the rule itself.
-          const labelX = D === iso ? (xX - 50) : (xD + 5);
+          // Anchor the day label on the side OPPOSITE the panel so
+          // the panel can't occlude it. Panel right → labels left of
+          // rule; panel left → labels right of rule. For zero-length
+          // lines, pin to the rule with a small offset either way.
+          let labelX, anchor;
+          if (panelSide === "right") {
+            labelX = (D === iso) ? (xX - 6) : (xD + 5);
+            anchor = (D === iso) ? "end" : "start";
+          } else {
+            labelX = xX + 6;
+            anchor = "start";
+          }
           lbl.setAttribute("x", labelX);
           lbl.setAttribute("y", yPix - 4);
+          lbl.setAttribute("text-anchor", anchor);
           lbl.style.opacity = "1";
           // Size the soft pill behind the label from the rendered bbox.
           const tb = lbl.getBBox();
@@ -238,8 +251,14 @@
           }
           const yMid = box.top + ys((top + bottom) / 2);
           tx.textContent = wip + " items";
-          tx.setAttribute("x", xX + 6);
+          // Opposite side of the rule from the panel — see the
+          // panelSide comment above. text-anchor flips to keep the
+          // label snug against the rule from whichever side.
+          const labelX = (panelSide === "right") ? (xX - 6) : (xX + 6);
+          const anchor = (panelSide === "right") ? "end" : "start";
+          tx.setAttribute("x", labelX);
           tx.setAttribute("y", yMid + 3);
+          tx.setAttribute("text-anchor", anchor);
           tx.style.opacity = "1";
           const tb = tx.getBBox();
           txBox.setAttribute("x", tb.x - 3);
@@ -329,6 +348,9 @@
         let left = wrapCx + gap;
         if (left + panelW > wrapRect.width - pad) {
           left = wrapCx - gap - panelW;
+          panelSide = "left";
+        } else {
+          panelSide = "right";
         }
         // Last-resort clamp — never run off the left edge either.
         if (left < pad) left = pad;

@@ -105,10 +105,15 @@ class TestToVegaStructure:
         spec = to_vega(model)
         assert spec["encoding"]["color"]["scale"]["domain"] == list(model.stages)
 
-    def test_x_scale_has_no_outer_padding(self):
-        # Cumulative area fills the plot edge-to-edge.
+    def test_x_scale_fills_edge_to_edge(self):
+        # The cumulative area fills the plot edge-to-edge: a `point`
+        # scale anchors first / last data points at the plot extremes
+        # (a `band` scale would leave half-bandwidth empty strips),
+        # and `padding: 0` strips any remaining slack.
         spec = to_vega(_model_with_crop())
-        assert spec["encoding"]["x"]["scale"]["paddingOuter"] == 0
+        x_scale = spec["encoding"]["x"]["scale"]
+        assert x_scale["type"] == "point"
+        assert x_scale["padding"] == 0
 
     def test_axis_labels_are_thinned_to_about_ten(self):
         # 31-day window → labels thinned (no one-label-per-day wash).
