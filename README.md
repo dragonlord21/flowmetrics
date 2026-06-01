@@ -62,8 +62,9 @@ flow serve              # → http://127.0.0.1:8000 → "+ New workflow"
 # dashboard survives logout / reboot.
 ```
 
-**Ad-hoc reports** — one-shot CLI for terminal pipelines, static HTML
-exports, or agent consumption (`--format json`).
+**Ad-hoc reports** — one-shot CLI for terminal pipelines and agent
+consumption (`--format json`). Text or JSON only; charts live in the
+web UI.
 
 ```
 $ flow efficiency --repo astral-sh/uv

@@ -610,7 +610,10 @@ def forecast_how_many(
     type=click.Path(path_type=Path),
     default=Path("./contracts"),
     show_default=True,
-    help="Directory of workflow YAMLs (one per workflow).",
+    help=(
+        "Directory holding contracts.db (the wizard's store, "
+        "DB-first lookup) and any un-migrated workflow YAMLs."
+    ),
 )
 @click.option(
     "--cache-dir",
@@ -668,14 +671,20 @@ def materialize(
 ) -> None:
     """Fetch + canonicalise + write Parquet for one contract.
 
+    NAME is looked up DB-first in `<workflows-dir>/contracts.db`
+    (where the wizard writes), then falls back to a `NAME.yaml` file
+    in the same directory. `flow contracts list` shows what's
+    resolvable. Use `flow materialize-all` for the whole set.
+
     Invoked by external cron / systemd-timer / k8s CronJob. Exits 0
     on success, non-zero on any failure. Operators see the error in
     cron mail or systemd journal.
 
-    `--since` and `--until` override the contract YAML's start/stop
-    for this invocation only — they don't mutate the YAML. Useful
-    for targeted backfills when the warehouse needs to be brought
-    forward without changing the contract's canonical window.
+    `--since` and `--until` override the contract's stored
+    start/stop for this invocation only — they don't mutate the
+    DB row or YAML. Useful for targeted backfills when the
+    warehouse needs to be brought forward without changing the
+    contract's canonical window.
 
     `--status-file` (opt-in) writes a JSON running → done/failed
     record so the web Data Source page can poll a browser-triggered
@@ -776,7 +785,7 @@ def _materialize_all_now() -> datetime:
 
 @cli.command(
     name="materialize-all",
-    short_help="Run materialize for every workflow YAML in --workflows-dir",
+    short_help="Run materialize for every configured workflow",
 )
 @click.option(
     "--data-dir",
@@ -814,7 +823,11 @@ def materialize_all(
     offline: bool,
     manifest_path: Path | None,
 ) -> None:
-    """Iterate every workflow YAML and materialize each one.
+    """Iterate every configured workflow and materialize each one.
+
+    Workflows come from contracts.db (the wizard's store) plus any
+    un-migrated YAML files in --workflows-dir. `flow contracts list`
+    shows what would run.
 
     Scheduler-friendly: a single failing contract doesn't block the
     rest. Exit code is 0 when at least one workflow succeeded (so
@@ -885,6 +898,118 @@ def materialize_all(
     # cron-job's first day, not an error).
     if results and ok == 0:
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# `flow contracts ...` — read-only peek at the configured workflows.
+# Mirrors the home page of the dashboard for operators who never open
+# the browser; closes a long-standing discoverability gap where the
+# materialize commands silently read contracts.db but no CLI surfaced it.
+# ---------------------------------------------------------------------------
+
+
+@cli.group(short_help="Inspect configured workflows")
+def contracts() -> None:
+    """Read-only inspection of configured workflows (contracts.db +
+    un-migrated YAML files in --workflows-dir)."""
+
+
+@contracts.command("list", short_help="List configured workflows")
+@click.option(
+    "--workflows-dir", "contracts_dir",
+    type=click.Path(path_type=Path),
+    default=Path("./contracts"),
+    show_default=True,
+    help=(
+        "Directory holding contracts.db (DB-first) and any "
+        "un-migrated workflow YAMLs."
+    ),
+)
+@click.option(
+    "--all/--no-all", "include_archived",
+    default=False,
+    help="Include archived workflows.",
+)
+def contracts_list(contracts_dir: Path, include_archived: bool) -> None:
+    """Enumerate every workflow `flow materialize` / `flow serve`
+    would resolve.
+
+    Source markers: `db` for rows in contracts.db (wizard-managed);
+    `yaml` for un-migrated YAML files in the workflows-dir. When
+    both exist for the same name, the DB row wins — same precedence
+    as `ContractStore.get()`.
+    """
+    from .contracts_db import ContractStore
+
+    store = ContractStore(contracts_dir)
+    # DB rows (active + archived as requested) come from the
+    # underlying SQLite via ContractStore.list().
+    db_rows = store.list(include_archived=include_archived)
+    db_names = {m.name for m in db_rows}
+
+    # Un-migrated YAMLs: scan the workflows-dir directly. Skip any
+    # whose name is already shadowed by a DB row so output reflects
+    # what `flow materialize` would actually resolve.
+    yaml_rows: list[tuple[str, str]] = []
+    if contracts_dir.is_dir():
+        for path in sorted(contracts_dir.iterdir()):
+            if path.suffix not in (".yaml", ".yml"):
+                continue
+            stem = path.stem
+            if stem in db_names:
+                continue
+            meta = store.get_meta(stem)
+            if meta is None:
+                # Malformed YAML — skip silently; the materialize
+                # command will surface a clear error if invoked.
+                continue
+            yaml_rows.append((stem, _contract_target(meta.contract)))
+
+    if not db_rows and not yaml_rows:
+        click.echo(
+            f"No workflows configured in {contracts_dir.resolve()}.\n"
+            "\n"
+            "To add one, run `flow serve` and click '+ New workflow' in\n"
+            "the browser — the wizard probes your repo and writes a\n"
+            "contracts.db row for you.\n"
+            "\n"
+            "Or drop a workflow YAML into the directory; see\n"
+            "docs/HOWTO.md#write-a-workflow-yaml-by-hand."
+        )
+        return
+
+    # One row per workflow, three columns: name, source, target.
+    # `archived` rows carry a suffix so a glance is unambiguous.
+    rows: list[tuple[str, str, str, bool]] = []
+    for meta in db_rows:
+        rows.append((
+            meta.name,
+            "db",
+            _contract_target(meta.contract),
+            meta.archived_at is not None,
+        ))
+    for name, target in yaml_rows:
+        rows.append((name, "yaml", target, False))
+
+    # Column widths sized from data, capped so a very long repo
+    # name doesn't blow up the format.
+    name_w = max(len("NAME"), *(len(r[0]) for r in rows))
+    src_w = max(len("SOURCE"), *(len(r[1]) for r in rows))
+    click.echo(f"{'NAME':<{name_w}}  {'SOURCE':<{src_w}}  TARGET")
+    for name, src, target, archived in sorted(rows):
+        suffix = "  [archived]" if archived else ""
+        click.echo(f"{name:<{name_w}}  {src:<{src_w}}  {target}{suffix}")
+
+
+def _contract_target(contract) -> str:
+    """One-line summary of what the contract is fetching — GitHub
+    `repo` or Jira `jira_project @ jira_url`. Carried in the listing
+    so an operator can match name → source without opening the YAML."""
+    if contract.source == "github":
+        return contract.repo or "(no repo set)"
+    if contract.source == "jira":
+        return f"{contract.jira_project} @ {contract.jira_url}"
+    return contract.source
 
 
 # ---------------------------------------------------------------------------

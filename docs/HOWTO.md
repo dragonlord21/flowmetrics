@@ -130,6 +130,22 @@ starters: [`samples/`](../samples/).
 
 ## Fetch data once
 
+First, see what's configured:
+
+```bash
+flow contracts list --workflows-dir CONTRACTS_DIR
+# NAME           SOURCE  TARGET
+# astral-uv      db      astral-sh/uv
+# kno-shaping    db      dvhthomas/kno
+```
+
+`SOURCE` shows where each contract came from: `db` for wizard-managed
+rows in `contracts.db`, `yaml` for un-migrated YAML files in the
+workflows-dir. When both exist for the same name, the DB row wins —
+same precedence the materialize commands use.
+
+Materialize a single workflow:
+
 ```bash
 flow materialize <workflow-name> \
     --workflows-dir CONTRACTS_DIR \
@@ -144,14 +160,18 @@ flow materialize <workflow-name> \
   `DATA_DIR/runs/<workflow>/run_id=<…>/manifest.json`.
 - Exits 0 on success, non-zero on failure. Cron-friendly.
 
-Fetch every workflow YAML in a directory in one go (this is what the
-schedulers below run):
+Materialize every configured workflow at once — what the schedulers
+below run:
 
 ```bash
 flow materialize-all \
     --workflows-dir CONTRACTS_DIR \
     --data-dir       DATA_DIR
 ```
+
+A single failing contract doesn't block the others; the per-day
+manifest at `DATA_DIR/_status/daily-<UTC-date>.json` records what
+ran, what passed, and what failed.
 
 Writes a per-day manifest at
 `DATA_DIR/_status/daily-<UTC-date>.json` with per-workflow results.
@@ -387,29 +407,23 @@ a cron schedule and uploads `data/` as a build artifact.
 
 ## Ad-hoc CLI reports
 
-The same metrics as one-shot commands — for terminals, pipelines,
-static HTML exports, and agent consumption. No warehouse required;
-these hit the source API directly.
+Numeric metrics for terminals, pipelines, and agents. No warehouse
+required; these hit the source API directly. **For charts, use the
+web UI (`flow serve`)** — the CLI deliberately produces only text /
+JSON, never graphics.
 
 ```bash
-# Flow efficiency for this week.
+# Flow efficiency for this week (single number).
 flow efficiency --repo astral-sh/uv
 
-# Forecast when 50 items will be done.
+# Forecast when 50 items will be done (percentile dates).
 flow forecast when-done --repo astral-sh/uv --items 50
 
-# How many items will be done by 2026-06-30.
+# How many items will be done by 2026-06-30 (percentile counts).
 flow forecast how-many --repo astral-sh/uv --target-date 2026-06-30
-
-# Cumulative Flow Diagram.
-flow cfd --repo astral-sh/uv --start 2026-04-12 --stop 2026-05-11 \
-    --workflow "Open,Merged"
-
-# Aging WIP — label-driven mode.
-flow aging --repo dvhthomas/kno --wip-labels "shaping,in-progress,in-review"
 ```
 
-Every command takes `--format text|json|html` (default `text`). See
+Every command takes `--format text|json` (default `text`). See
 [REFERENCE § CLI](REFERENCE.md#cli).
 
 ## Output for agents (JSON)

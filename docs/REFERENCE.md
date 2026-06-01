@@ -111,18 +111,30 @@ is verified **before** any byte is written.
 (data-only) archives restore with the default invocation; trying
 `--config-only` against one is a hard error.
 
+### `flow contracts list`
+
+Read-only enumeration of configured workflows.
+
+| Flag | Default | Notes |
+|----|----|----|
+| `--workflows-dir PATH` | `contracts` | DB + YAML lookup root. |
+| `--all / --no-all` | off | Include archived rows. |
+
+Output columns: `NAME`, `SOURCE` (`db` = wizard-managed in
+`contracts.db`, `yaml` = un-migrated YAML file), `TARGET` (GitHub
+`owner/repo` or `JIRA_PROJECT @ jira_url`). Archived rows carry a
+`[archived]` suffix.
+
 ### Ad-hoc reports
 
 All take `--repo OWNER/NAME` **or** `--jira-url URL --jira-project
 KEY` (mutually exclusive). All write to stdout unless `--output PATH`
-is given. All accept `--format text|json|html` (default `text`).
+is given. All accept `--format text|json` (default `text`). Charts
+live in the web UI — the CLI is intentionally graphics-free.
 
 | Command | Purpose | Required |
 |----|----|----|
-| `flow aging` | Aging WIP — items × current state × age | `--workflow` *or* `--wip-labels` |
-| `flow cfd` | Cumulative Flow Diagram | `--start --stop --workflow` |
 | `flow efficiency` | Portfolio flow efficiency for a window | — (defaults to this week) |
-| `flow scatterplot` | Cycle-time scatter w/ P50/P85/P95 | — (defaults to last 30 days) |
 | `flow forecast when-done` | When will N items be done? | `--items` |
 | `flow forecast how-many` | How many items by a target date? | `--target-date` |
 
@@ -134,11 +146,9 @@ Common ad-hoc flags:
 | `--cache-dir PATH` | Default `.cache/github`. |
 | `--offline / --online` | Cache-only vs. hit-API-on-miss. |
 | `--include-issues / --no-include-issues` | GitHub-only: also include Issues. |
-| `--format text\|json\|html` | text=humans, json=agents, html=archival. |
+| `--format text\|json` | text=humans (default), json=agents. |
 | `--output PATH` | Stdout by default. |
 | `-v, --verbose` | Full text report (tables + interpretation). Default text is a one-line headline. |
-| `--workflow "A,B,C"` | Comma-separated states, earliest → latest. |
-| `--wip-labels "x,y,z"` | GitHub-only: PR-label-driven WIP, ordered (rightmost = most progress). |
 
 Forecast-only:
 
