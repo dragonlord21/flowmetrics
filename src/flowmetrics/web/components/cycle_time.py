@@ -48,6 +48,7 @@ def render(
     view: Window | None = None,
     ptile_min: int = 0,
     ptile_max: int = 100,
+    ptile_ranges: list[tuple[int, int]] | None = None,
 ) -> CycleTimeModel:
     """Query completed items and resolve the cycle-time model.
 
@@ -64,7 +65,9 @@ def render(
     model = build_cycle_time_model(
         completed_items(con, contract_name), view=view
     )
-    if ptile_min <= 0 and ptile_max >= 100:
+    # No-op filter shortcut: bounds default to all-items AND no
+    # explicit ranges supplied.
+    if (ptile_ranges is None and ptile_min <= 0 and ptile_max >= 100):
         return model
     from dataclasses import replace
 
@@ -72,6 +75,7 @@ def render(
     kept = filter_by_rank(
         list(model.points),
         key=lambda p: p.cycle_time_days,
+        ranges=ptile_ranges,
         ptile_min=ptile_min,
         ptile_max=ptile_max,
     )

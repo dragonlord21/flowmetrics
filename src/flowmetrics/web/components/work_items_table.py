@@ -113,6 +113,12 @@ class WorkItemsTableData:
     # AND so sort / pagination links carry them forward.
     ptile_min: int
     ptile_max: int
+    # Active percentile-rank ranges for the multi-select chip
+    # bar. Each entry is a (lo, hi) pair; the chip whose
+    # data-ptile-min / data-ptile-max match an entry renders
+    # active. Single-bucket selection collapses to a one-element
+    # tuple.
+    ptile_ranges: tuple[tuple[int, int], ...]
     # Pre-computed metric value at each snap stop on the slider —
     # the JS readout shows e.g. "P50 (4d) – P85 (12d)" by reading
     # this dict at the handles' current positions.
@@ -225,6 +231,7 @@ def render(
     view: Window | None = None,
     ptile_min: int = 0,
     ptile_max: int = 100,
+    ptile_ranges: list[tuple[int, int]] | None = None,
 ) -> WorkItemsTableData:
     """Read a page of rows for the contract.
 
@@ -365,6 +372,21 @@ def render(
     ptile_max = max(0, min(100, int(ptile_max)))
     if ptile_min > ptile_max:
         ptile_min, ptile_max = ptile_max, ptile_min
+    # Multi-range filter (chip multi-select): clamp each pair,
+    # drop empty list. When a single coalesced range is the SAME
+    # as ptile_min..ptile_max, store it canonically so the
+    # template knows whether the user selected a single band.
+    effective_ranges: list[tuple[int, int]]
+    if ptile_ranges:
+        effective_ranges = []
+        for lo, hi in ptile_ranges:
+            lo = max(0, min(100, int(lo)))
+            hi = max(0, min(100, int(hi)))
+            if lo > hi:
+                lo, hi = hi, lo
+            effective_ranges.append((lo, hi))
+    else:
+        effective_ranges = [(ptile_min, ptile_max)]
 
     # Two CTEs: `base` filters + tags each row with the ranking
     # metric; `ranked` adds PERCENT_RANK over that metric and
@@ -387,13 +409,21 @@ def render(
         ") "
     )
     ranked_params = [*rank_metric_params, *where_params]
+    # Range filter: ANY of the selected `(lo, hi)` pairs — multi-
+    # chip selection unions disjoint bands (e.g. [0,50] ∪ [85,95]).
+    rank_clause = " OR ".join(
+        "percentile_rank BETWEEN ? AND ?" for _ in effective_ranges
+    )
+    rank_clause_params: list = []
+    for lo, hi in effective_ranges:
+        rank_clause_params.extend([lo, hi])
 
     # Total matching rows — feeds the pager.
     total_count = con.execute(
         ranked_cte
         + "SELECT count(*) FROM ranked "
-        + "WHERE percentile_rank BETWEEN ? AND ?",
-        [*ranked_params, ptile_min, ptile_max],
+        + f"WHERE ({rank_clause})",
+        [*ranked_params, *rank_clause_params],
     ).fetchone()[0]
 
     # Stable secondary order by item_id so equal-key rows don't
@@ -404,14 +434,14 @@ def render(
         + "       created_at, completed_at, cycle_time_days, "
         + "       percentile_rank "
         + "FROM ranked "
-        + "WHERE percentile_rank BETWEEN ? AND ? "
+        + f"WHERE ({rank_clause}) "
         + f"ORDER BY {sql_column} {order}, item_id ASC "
         + "LIMIT ? OFFSET ?"
     )
     offset = (page - 1) * page_size
     rows = con.execute(
         data_sql,
-        [*ranked_params, ptile_min, ptile_max, page_size, offset],
+        [*ranked_params, *rank_clause_params, page_size, offset],
     ).fetchall()
 
     # Pre-parse the asof date once so we can compute age per row
@@ -526,6 +556,7 @@ def render(
         total_pages=total_pages,
         ptile_min=ptile_min,
         ptile_max=ptile_max,
+        ptile_ranges=tuple(effective_ranges),
         ptile_values=ptile_values,
         ptile_unit="d",
     )

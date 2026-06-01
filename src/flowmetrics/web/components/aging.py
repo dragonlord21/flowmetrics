@@ -43,6 +43,7 @@ def render(
     reference: Window | None = None,
     ptile_min: int = 0,
     ptile_max: int = 100,
+    ptile_ranges: list[tuple[int, int]] | None = None,
 ) -> AgingModel:
     """Query the in-flight snapshot + completed items and resolve
     the aging-WIP model.
@@ -67,7 +68,7 @@ def render(
         reference=reference,
         wip_states=frozenset(states.wip) if states is not None else None,
     )
-    if ptile_min <= 0 and ptile_max >= 100:
+    if (ptile_ranges is None and ptile_min <= 0 and ptile_max >= 100):
         return model
     from dataclasses import replace
 
@@ -75,6 +76,7 @@ def render(
     kept = filter_by_rank(
         list(model.items),
         key=lambda it: it.age_days,
+        ranges=ptile_ranges,
         ptile_min=ptile_min,
         ptile_max=ptile_max,
     )

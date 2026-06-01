@@ -12,7 +12,9 @@ the dominant value for small PRs).
 
 from __future__ import annotations
 
-from flowmetrics.charts.ptile_filter import PTILE_STOPS, filter_by_rank
+from flowmetrics.charts.ptile_filter import (
+    PTILE_STOPS, filter_by_rank, parse_ranges,
+)
 
 
 class TestPtileStops:
@@ -93,3 +95,62 @@ class TestFilterByRank:
             [42], key=lambda x: x, ptile_min=50, ptile_max=100,
         )
         assert kept == []
+
+
+class TestFilterByRankRanges:
+    """Multi-range support — chip multi-select sends a list of
+    `(lo, hi)` bands; items kept if their rank falls in ANY of
+    them (logical union, the standard multi-select semantic)."""
+
+    def test_disjoint_ranges_union_their_results(self):
+        # 11 distinct values → ranks 0, 10, 20, ..., 100.
+        items = list(range(11))
+        kept = filter_by_rank(
+            items, key=lambda x: x,
+            ranges=[(0, 10), (80, 100)],
+        )
+        # Ranks 0, 10 (items 0, 1) + ranks 80, 90, 100 (items 8, 9, 10).
+        assert sorted(kept) == [0, 1, 8, 9, 10]
+
+    def test_ranges_override_legacy_min_max(self):
+        # When both `ranges` and the legacy ptile_min/max are
+        # passed, `ranges` wins.
+        items = list(range(11))
+        kept = filter_by_rank(
+            items, key=lambda x: x,
+            ranges=[(0, 10)],
+            ptile_min=50, ptile_max=100,
+        )
+        assert sorted(kept) == [0, 1]
+
+    def test_empty_ranges_list_keeps_nothing(self):
+        items = list(range(5))
+        kept = filter_by_rank(items, key=lambda x: x, ranges=[])
+        assert kept == []
+
+
+class TestParseRanges:
+    def test_none_returns_none(self):
+        assert parse_ranges(None) is None
+
+    def test_empty_string_returns_none(self):
+        assert parse_ranges("") is None
+
+    def test_single_pair(self):
+        assert parse_ranges("0-50") == [(0, 50)]
+
+    def test_multiple_pairs_comma_separated(self):
+        assert parse_ranges("0-50,85-95") == [(0, 50), (85, 95)]
+
+    def test_clamps_out_of_range_bounds(self):
+        # 120 clamps to 100; positive overshoot is the realistic
+        # case (negatives can't be parsed unambiguously with `-`
+        # as the separator).
+        assert parse_ranges("80-120") == [(80, 100)]
+
+    def test_swaps_when_lo_greater_than_hi(self):
+        assert parse_ranges("95-85") == [(85, 95)]
+
+    def test_skips_malformed_chunks(self):
+        # Two valid pairs separated by junk; junk is dropped.
+        assert parse_ranges("0-50,nope,85-95") == [(0, 50), (85, 95)]

@@ -1,35 +1,35 @@
-{# Page-level Percentile Filter — single-select chip bar.
+{# Page-level Percentile Filter — multi-select chip bar.
 
-   One click filters BOTH the chart's scatter AND the work-items
-   table to items inside the chosen percentile bucket. `All` is
-   the default and lifts the filter.
+   Each non-"All" chip toggles independently; the union of all
+   active chips is the effective filter. "All" is a special
+   exclusive chip that lifts the filter (deselects everything
+   else and sets ptile_ranges to the full band).
 
-   Each chip carries `data-ptile-min` / `data-ptile-max` and
-   posts to the work-items endpoint via HTMX on click. The
+   Each chip carries `data-ptile-min` / `data-ptile-max`. On
+   click the JS recomputes the active set, builds the
+   comma-separated `ptile_ranges` value (e.g. `0-50,85-95`),
+   and issues an HTMX request to the work-items endpoint. The
    response carries `HX-Trigger-After-Settle:
    flowmetrics:ptile-changed` so the chart fragment above
-   refetches itself with the same bounds.
+   refetches with the same ranges.
 
    Required context:
-     data           — WorkItemsTableData (carries ptile_min /
-                      ptile_max / ptile_values / ptile_unit).
+     data           — WorkItemsTableData (carries ptile_ranges).
      contract.name  — for the HTMX URL.
 #}
-{%- set unit = data.ptile_unit -%}
-{%- set values = data.ptile_values -%}
-{# Bucket label helper — renders e.g. "P50–P85" or with the
-   actual metric value alongside when available. #}
-{%- macro chip(label, lo, hi, current_lo, current_hi) -%}
-  {%- set is_active = (lo == current_lo and hi == current_hi) -%}
+{%- set active_ranges = data.ptile_ranges -%}
+{%- set is_full = (active_ranges | length == 1 and active_ranges[0][0] == 0 and active_ranges[0][1] == 100) -%}
+{%- macro chip(label, lo, hi, ranges, full) -%}
+  {%- if lo == 0 and hi == 100 -%}
+    {%- set is_active = full -%}
+  {%- else -%}
+    {%- set is_active = (not full and (lo, hi) in ranges) -%}
+  {%- endif -%}
   <button type="button"
           class="ptile-chip{% if is_active %} ptile-chip--active{% endif %}"
           data-ptile-min="{{ lo }}"
           data-ptile-max="{{ hi }}"
-          hx-get="/api/internal/work-items?workflow={{ contract.name }}&from=slider&ptile_min={{ lo }}&ptile_max={{ hi }}"
-          hx-target="#work-items-body"
-          hx-swap="innerHTML"
-          hx-vals='js:{sort: document.getElementById("work-items-state")?.dataset.sort || "", direction: document.getElementById("work-items-state")?.dataset.direction || ""}'
-          hx-include="#work-items-search, #work-items-completed-on, #work-items-in-flight-at">
+          {% if lo == 0 and hi == 100 %}data-ptile-all="1"{% endif %}>
     {{ label }}
   </button>
 {%- endmacro -%}
@@ -37,35 +37,81 @@
   <span class="ptile-toolbar-label">Percentile</span>
   <div class="ptile-chips" id="ptile-chips"
        role="group" aria-label="Percentile filter">
-    {{ chip("All", 0, 100, data.ptile_min, data.ptile_max) }}
-    {{ chip("≤ P50", 0, 50, data.ptile_min, data.ptile_max) }}
-    {{ chip("P50–P85", 50, 85, data.ptile_min, data.ptile_max) }}
-    {{ chip("P85–P95", 85, 95, data.ptile_min, data.ptile_max) }}
-    {{ chip("> P95", 95, 100, data.ptile_min, data.ptile_max) }}
+    {{ chip("All", 0, 100, active_ranges, is_full) }}
+    {{ chip("≤ P50", 0, 50, active_ranges, is_full) }}
+    {{ chip("P50–P85", 50, 85, active_ranges, is_full) }}
+    {{ chip("P85–P95", 85, 95, active_ranges, is_full) }}
+    {{ chip("> P95", 95, 100, active_ranges, is_full) }}
   </div>
-  {# No numeric readout here — the metric strip above already
-     names P50 / P85 / P95 for the metric's predictive
-     percentile lines (e.g. cycle-time thresholds on aging). A
-     second set of numbers from a DIFFERENT distribution (the
-     in-flight age distribution that the slider actually ranks
-     against) reads as inconsistent. Chips speak in relative
-     buckets; the strip carries the absolute values. #}
 </div>
 
 <script>
   (function () {
-    // Only the table body and the chart re-fetch on chip click;
-    // the chip bar itself isn't part of the swap, so the active
-    // class has to flip client-side at click time.
     const chips = document.getElementById('ptile-chips');
     if (!chips) return;
+    const contract = {{ contract.name | tojson }};
+
+    function activeRanges() {
+      const out = [];
+      for (const c of chips.querySelectorAll('.ptile-chip--active')) {
+        if (c.dataset.ptileAll) continue;  // "All" implies no filter
+        out.push([+c.dataset.ptileMin, +c.dataset.ptileMax]);
+      }
+      return out;
+    }
+
+    function fire() {
+      const ranges = activeRanges();
+      // Empty selection = treat like "All" so the table doesn't
+      // go blank — the user clicked the last active chip off.
+      const allChip = chips.querySelector('[data-ptile-all="1"]');
+      if (!ranges.length) {
+        chips.querySelectorAll('.ptile-chip--active').forEach(
+          el => el.classList.remove('ptile-chip--active'));
+        if (allChip) allChip.classList.add('ptile-chip--active');
+      }
+      const effective = ranges.length
+        ? ranges
+        : [[0, 100]];
+      const param = effective.map(r => r[0] + '-' + r[1]).join(',');
+      const state = document.getElementById('work-items-state');
+      const sort = state ? state.dataset.sort : '';
+      const dir = state ? state.dataset.direction : '';
+      const search = document.getElementById('work-items-search');
+      const completedOn = document.getElementById('work-items-completed-on');
+      const inFlightAt = document.getElementById('work-items-in-flight-at');
+      const qs = new URLSearchParams({
+        workflow: contract,
+        from: 'slider',
+        ptile_ranges: param,
+        sort: sort || '',
+        direction: dir || '',
+        q: search ? search.value : '',
+        completed_on: completedOn ? completedOn.value : '',
+        in_flight_at: inFlightAt ? inFlightAt.value : '',
+      });
+      if (window.htmx) {
+        window.htmx.ajax('GET', '/api/internal/work-items?' + qs.toString(), {
+          target: '#work-items-body', swap: 'innerHTML',
+        });
+      }
+    }
+
     chips.addEventListener('click', function (e) {
       const btn = e.target.closest('.ptile-chip');
       if (!btn) return;
-      for (const sibling of chips.querySelectorAll('.ptile-chip')) {
-        sibling.classList.remove('ptile-chip--active');
+      if (btn.dataset.ptileAll) {
+        // "All" deselects everything else and is the only active.
+        chips.querySelectorAll('.ptile-chip--active').forEach(
+          el => el.classList.remove('ptile-chip--active'));
+        btn.classList.add('ptile-chip--active');
+      } else {
+        // Toggle this chip. If it becomes active, "All" turns off.
+        btn.classList.toggle('ptile-chip--active');
+        const allChip = chips.querySelector('[data-ptile-all="1"]');
+        if (allChip) allChip.classList.remove('ptile-chip--active');
       }
-      btn.classList.add('ptile-chip--active');
+      fire();
     });
   })();
 </script>

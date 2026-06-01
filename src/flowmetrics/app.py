@@ -346,7 +346,11 @@ class WorkflowView:
             view=self.view_window,
         )
 
-    def render_aging(self, con, *, ptile_min: int = 0, ptile_max: int = 100):
+    def render_aging(
+        self, con, *,
+        ptile_min: int = 0, ptile_max: int = 100,
+        ptile_ranges: list[tuple[int, int]] | None = None,
+    ):
         # Aging WIP is a "right now" snapshot — pinned to the
         # in-flight snapshot date (the latest materialise), NOT
         # the Period anchor. The warehouse holds one in-flight
@@ -359,9 +363,14 @@ class WorkflowView:
             states=self.contract.states,
             reference=self.selection.reference,
             ptile_min=ptile_min, ptile_max=ptile_max,
+            ptile_ranges=ptile_ranges,
         )
 
-    def render_cycle_time(self, con, *, ptile_min: int = 0, ptile_max: int = 100):
+    def render_cycle_time(
+        self, con, *,
+        ptile_min: int = 0, ptile_max: int = 100,
+        ptile_ranges: list[tuple[int, int]] | None = None,
+    ):
         return render_cycle_time(
             con, self.id,
             # Cycle-time's percentile lines summarise the dots on
@@ -369,6 +378,7 @@ class WorkflowView:
             # reference. The reference is for aging + forecasts.
             view=self.selection.view,
             ptile_min=ptile_min, ptile_max=ptile_max,
+            ptile_ranges=ptile_ranges,
         )
 
     def render_throughput(self, con):
@@ -456,7 +466,7 @@ def create_app(
 
     _CARRIED_PARAMS = frozenset({
         "period", "anchor", "view_days", "ref_days",
-        "ptile_min", "ptile_max",
+        "ptile_min", "ptile_max", "ptile_ranges",
     })
 
     @pass_context
@@ -477,12 +487,11 @@ def create_app(
     templates.env.filters["keep_filters"] = _keep_filters
 
     def _clamp_ptile(pmin, pmax) -> tuple[int, int]:
-        """Normalise the Percentile Filter slider's query-string
+        """Normalise the Percentile Filter's query-string single-band
         bounds: clamp to 0..100, swap if reversed, fall back to
         (0, 100) on malformed input. Used by every route that
-        consumes the slider state (cycle-time + aging detail
-        pages, their HTMX fragments, and the work-items table
-        endpoint)."""
+        consumes the chip state (cycle-time + aging detail pages,
+        their HTMX fragments, and the work-items table endpoint)."""
         try:
             lo = max(0, min(100, int(pmin)))
             hi = max(0, min(100, int(pmax)))
@@ -491,6 +500,13 @@ def create_app(
         if lo > hi:
             lo, hi = hi, lo
         return lo, hi
+
+    def _parse_ptile_ranges(s: str | None) -> list[tuple[int, int]] | None:
+        """URL → list of (lo, hi) tuples for the multi-select chip
+        bar; thin wrapper around the charts/ptile_filter helper
+        so the route can pass it straight through to render()."""
+        from .charts.ptile_filter import parse_ranges
+        return parse_ranges(s)
 
     # `vega_spec` Jinja global — turns a chart model into its
     # Vega-Lite spec JSON. The chart fragment templates call
@@ -1540,16 +1556,20 @@ def create_app(
     def cycle_time_detail(
         request: Request, workflow_id: str,
         ptile_min: int = 0, ptile_max: int = 100,
+        ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
+        pranges = _parse_ptile_ranges(ptile_ranges)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
                 con, ptile_min=pmin, ptile_max=pmax,
+                ptile_ranges=pranges,
             )
             work_items = render_work_items_table(
                 con, workflow_id, view=view.view_window,
                 ptile_min=pmin, ptile_max=pmax,
+                ptile_ranges=pranges,
             )
         return templates.TemplateResponse(
             request,
@@ -1580,12 +1600,15 @@ def create_app(
     def cycle_time_fragment(
         request: Request, workflow: str,
         ptile_min: int = 0, ptile_max: int = 100,
+        ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
+        pranges = _parse_ptile_ranges(ptile_ranges)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
                 con, ptile_min=pmin, ptile_max=pmax,
+                ptile_ranges=pranges,
             )
         return templates.TemplateResponse(
             request,
@@ -1655,11 +1678,16 @@ def create_app(
         request: Request,
         workflow_id: str,
         ptile_min: int = 0, ptile_max: int = 100,
+        ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
+        pranges = _parse_ptile_ranges(ptile_ranges)
         with view.warehouse() as con:
-            aging = view.render_aging(con, ptile_min=pmin, ptile_max=pmax)
+            aging = view.render_aging(
+                con, ptile_min=pmin, ptile_max=pmax,
+                ptile_ranges=pranges,
+            )
             # Table scope mirrors the chart: in-flight items only,
             # at the same asof. Completed items aren't part of
             # aging-WIP and don't belong here. Sort by start date
@@ -1676,6 +1704,7 @@ def create_app(
                     if view.contract.states else None
                 ),
                 ptile_min=pmin, ptile_max=pmax,
+                ptile_ranges=pranges,
             )
         return templates.TemplateResponse(
             request,
@@ -1814,11 +1843,16 @@ def create_app(
     def aging_fragment(
         request: Request, workflow: str,
         ptile_min: int = 0, ptile_max: int = 100,
+        ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
+        pranges = _parse_ptile_ranges(ptile_ranges)
         with view.warehouse() as con:
-            aging = view.render_aging(con, ptile_min=pmin, ptile_max=pmax)
+            aging = view.render_aging(
+                con, ptile_min=pmin, ptile_max=pmax,
+                ptile_ranges=pranges,
+            )
         return templates.TemplateResponse(
             request,
             "_partials/aging_chart_fragment.html.jinja",
@@ -1901,6 +1935,7 @@ def create_app(
         page: int = 1,
         ptile_min: int = 0,
         ptile_max: int = 100,
+        ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         """HTMX swap target for the work-items table: sort + filter
         + paginate round-trip, returning only the partial.
@@ -1957,6 +1992,7 @@ def create_app(
                 view=view.view_window,
                 ptile_min=pmin,
                 ptile_max=pmax,
+                ptile_ranges=_parse_ptile_ranges(ptile_ranges),
             )
         response = templates.TemplateResponse(
             request,

@@ -569,6 +569,15 @@
       font-size: 0.9375rem;
       color: var(--fg);
     }
+    /* Small descriptive text below a chart (e.g. the flow-balance
+       chart on the CFD detail page). Smaller and muted so the
+       chart visual stays the focus. */
+    .metric-caption {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+      margin: 0.5rem 0 0 0;
+    }
 
     /* ─────── Chart tile ─────── */
     .metric {
@@ -804,7 +813,7 @@
     .ptile-chip {
       appearance: none;
       border: 0; background: var(--white);
-      color: var(--fg);
+      color: var(--muted);
       font-family: inherit; font-size: 0.78rem;
       padding: 0.32rem 0.7rem;
       cursor: pointer;
@@ -812,12 +821,17 @@
       transition: background 0.12s, color 0.12s;
     }
     .ptile-chip:last-child { border-right: 0; }
-    .ptile-chip:hover { background: var(--surface); }
+    .ptile-chip:hover { background: var(--surface); color: var(--fg); }
+    /* Active state: muted brand tint, not bright green. The
+       chip-bar is a low-key filter — should read as "selected",
+       not as the page's primary action. */
     .ptile-chip--active {
-      background: var(--p-500); color: var(--white);
+      background: var(--p-100);
+      color: var(--p-700);
       font-weight: 600;
+      box-shadow: inset 0 -0.125rem 0 var(--p-500);
     }
-    .ptile-chip--active:hover { background: var(--p-700); }
+    .ptile-chip--active:hover { background: var(--p-200); }
     .ptile-toolbar-bounds {
       font-size: 0.72rem; color: var(--muted);
       font-family: var(--mono-font);

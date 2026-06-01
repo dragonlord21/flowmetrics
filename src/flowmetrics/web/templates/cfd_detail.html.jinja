@@ -87,13 +87,20 @@
   </div>
 
   {% if cfd.daily %}
-  <section class="ds-section" style="margin-top: 1.5rem;">
-    <h2>Flow balance — daily arrivals vs departures</h2>
-    <p class="filter-hint" style="margin: 0 0 0.5rem 0;">
+  {# Flow balance — same tile shell as the main chart above so
+     the page reads as two charts of equal weight. Helper text
+     sits BELOW the chart in small print, not above. #}
+  <section id="flow-balance-tile" class="metric">
+    <header class="metric-header">
+      <span class="metric-strip-label" style="margin-right: auto;">
+        Flow balance
+      </span>
+    </header>
+    <div id="flow-balance-chart" class="metric-chart"></div>
+    <p class="metric-caption">
       When the two lines track each other the system is balanced;
       arrivals persistently above departures means WIP is growing.
     </p>
-    <div id="flow-balance-chart" class="metric-chart"></div>
     <script>
       (function () {
         const spec = {{ flow_balance(cfd) | safe }};
