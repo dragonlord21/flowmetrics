@@ -15,6 +15,7 @@ Errors in JSON mode are a `flowmetrics.error.v1` envelope on stdout.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
@@ -1591,18 +1592,108 @@ def _port_busy_hints(port: int, os_name: str | None = None) -> str:
         "than 127.0.0.1. Also readable from $FLOW_PASSWORD."
     ),
 )
+@click.option(
+    "--bg/--no-bg",
+    default=False,
+    help=(
+        "Install + start the dashboard as a persistent native "
+        "service (macOS launchd). Idempotent: re-running reloads "
+        "with the latest flags. Use `--bg --stop` to tear it down."
+    ),
+)
+@click.option(
+    "--stop/--no-stop",
+    default=False,
+    help=(
+        "With --bg: bootout the agent and remove its plist. "
+        "Without --bg: ignored."
+    ),
+)
 def serve(
     port: int,
     host: str,
     data_dir: Path,
     contracts_dir: Path,
     password: str | None,
+    bg: bool,
+    stop: bool,
 ) -> None:
     """Serve the dashboard + per-metric detail pages.
 
     Reads from the local Parquet store under --data-dir (populated by
     `flow materialise`). Never touches GitHub or Jira during a request.
+
+    Pass `--bg` to install + start as a persistent native service
+    (macOS launchd). `--bg --stop` tears it down. Linux + Windows
+    operators: use the templated units under scripts/scheduling/
+    (see docs/HOWTO.md#run-as-a-persistent-web-server).
     """
+    # --stop only makes sense alongside --bg (its inverse). Catch
+    # `flow serve --stop` (no --bg) as an operator typo so we don't
+    # silently start the dashboard in the foreground.
+    if stop and not bg:
+        raise click.ClickException(
+            "--stop requires --bg (it's the inverse of --bg). "
+            "Did you mean `flow serve --bg --stop`?"
+        )
+
+    if bg:
+        from . import bg as bg_mod
+
+        if stop:
+            try:
+                bg_mod.stop_and_uninstall(
+                    launchagents_dir=bg_mod.default_launchagents_dir(),
+                    uid=bg_mod.current_uid(),
+                )
+            except bg_mod.BgError as exc:
+                raise click.ClickException(str(exc)) from exc
+            click.echo("flow serve --bg stopped + uninstalled.")
+            return
+
+        # Off-localhost binds are network-exposed; require a password.
+        # Same rule as foreground — checked here too because the
+        # plist will encode the chosen flags as-is.
+        if host != "127.0.0.1" and not password:
+            raise click.ClickException(
+                f"--host {host} is network-exposed and requires "
+                "--password (or $FLOW_PASSWORD)."
+            )
+        # launchd doesn't inherit a CWD; resolve everything to
+        # absolutes before writing the plist.
+        flow_bin_str = shutil.which("flow")
+        if flow_bin_str is None:
+            raise click.ClickException(
+                "could not locate the `flow` executable on PATH. "
+                "Re-run after `uv tool install` or with the absolute "
+                "path on PATH."
+            )
+        flow_bin = Path(flow_bin_str).resolve()
+        data_dir_abs = data_dir.resolve()
+        contracts_dir_abs = contracts_dir.resolve()
+        log_dir = data_dir_abs / "_status"
+        try:
+            plist_path = bg_mod.install_and_start(
+                launchagents_dir=bg_mod.default_launchagents_dir(),
+                flow_bin=flow_bin,
+                workflows_dir=contracts_dir_abs,
+                data_dir=data_dir_abs,
+                port=port,
+                host=host,
+                password=password,
+                log_dir=log_dir,
+                uid=bg_mod.current_uid(),
+            )
+        except bg_mod.BgError as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(
+            f"flow serve --bg installed at {plist_path}\n"
+            f"  → http://{host}:{port}/\n"
+            f"  logs:  {log_dir}/serve.{{out,err}}.log\n"
+            f"  stop:  flow serve --bg --stop"
+        )
+        return
+
     import uvicorn
 
     from .app import create_app

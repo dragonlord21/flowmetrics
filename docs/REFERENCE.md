@@ -31,6 +31,15 @@ hits the source API during a request.
 | `--data-dir PATH` | `data` | Parquet warehouse root. |
 | `--workflows-dir PATH` | `contracts` | YAMLs + `contracts.db` live here. |
 | `--password TEXT` | — | HTTP Basic password. Also reads `$FLOW_PASSWORD`. |
+| `--bg / --no-bg` | off | macOS only. Install + start as a persistent launchd service. Idempotent — re-run to reload. |
+| `--stop / --no-stop` | off | With `--bg`: bootout + remove plist. Without `--bg`: error (the operator probably typed it wrong). |
+
+Background install writes
+`~/Library/LaunchAgents/com.flowmetrics.serve.plist` with
+`RunAtLoad=true` + `KeepAlive=true`. Logs land at
+`<data-dir>/_status/serve.{out,err}.log`. Linux + Windows raise a
+clear error pointing at the templated units under
+`scripts/scheduling/`.
 
 ### `flow materialise NAME`
 

@@ -184,30 +184,43 @@ flow serve \
 For a dashboard that survives logout, reboots, and crashes — no
 Terminal tab to leave open.
 
-| Host | Template |
+| Host | Path |
 |----|----|
-| macOS | [`com.flowmetrics.serve.plist`](../scripts/scheduling/macos-launchd/com.flowmetrics.serve.plist) |
+| macOS | `flow serve --bg` (built-in) |
 | Linux (systemd) | [`flowmetrics-serve.service`](../scripts/scheduling/linux-systemd/flowmetrics-serve.service) |
 | Windows | NSSM wrapper, see below |
 
-### macOS (launchd)
+### macOS — `flow serve --bg`
 
 ```bash
-cd scripts/scheduling/macos-launchd
-
-# Replace REPLACE_HOME (install root) and REPLACE_FLOW (which flow)
-# with absolute paths.
-$EDITOR com.flowmetrics.serve.plist
-
-cp com.flowmetrics.serve.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.flowmetrics.serve.plist
-open http://127.0.0.1:8000
+# Install + start. Idempotent: re-run to reload with new flags.
+flow serve --bg \
+    --workflows-dir ~/flow/contracts \
+    --data-dir       ~/flow/data
+# → http://127.0.0.1:8000/
+#   logs:  ~/flow/data/_status/serve.{out,err}.log
+#   stop:  flow serve --bg --stop
 ```
 
-The agent has `RunAtLoad=true` + `KeepAlive=true`: it starts at user
-login and respawns after crashes or clean exits. Logs land at
-`<FLOWMETRICS_HOME>/data/_status/serve.{out,err}.log`. Stop with
-`launchctl bootout gui/$UID/com.flowmetrics.serve`.
+What it does:
+
+- Writes a LaunchAgent plist to `~/Library/LaunchAgents/com.flowmetrics.serve.plist`
+  with the flags you pass (resolved to absolute paths).
+- `launchctl bootout` (best-effort, in case it was already loaded)
+  then `launchctl bootstrap` it. Starts immediately.
+- `RunAtLoad=true` + `KeepAlive=true`: launchd restarts the agent on
+  login, crash, or clean exit. Survives logout and reboot.
+
+Tear it down:
+
+```bash
+flow serve --bg --stop
+```
+
+Want the plist by hand? The templated path under
+[`scripts/scheduling/macos-launchd/`](../scripts/scheduling/macos-launchd/)
+ships the same shape — useful when you need to tweak schedule keys
+the `--bg` flag doesn't expose.
 
 ### Linux (systemd — user unit)
 
