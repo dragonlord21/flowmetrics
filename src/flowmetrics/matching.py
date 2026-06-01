@@ -1,9 +1,9 @@
 """The single step-matcher evaluator.
 
 Both the dry-run preview (`source_probe.bucket_items_by_step`) and the
-materialise remap (`materialise.remap_transitions`) decide "does this
+materialize remap (`materialize.remap_transitions`) decide "does this
 transition belong to this step?" through `matcher_matches` here, so the
-preview can never diverge from what materialise actually writes.
+preview can never diverge from what materialize actually writes.
 
 A transition has two axes:
   - `signal` — the named lifecycle event (`github-pr-merged`, …);

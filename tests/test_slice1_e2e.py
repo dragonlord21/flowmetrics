@@ -1,9 +1,9 @@
-"""Slice 1 acceptance: `flow materialise NAME` produces Parquet
+"""Slice 1 acceptance: `flow materialize NAME` produces Parquet
 that DuckDB can query.
 
 The slice 1 click-path the user described:
 
-  > Run `flow materialise calcmark` from cron at 06:00. Five minutes
+  > Run `flow materialize calcmark` from cron at 06:00. Five minutes
   > later, Parquet files exist under data/work_items/contract_id=…/
   > and DuckDB can SELECT count(*) and get real numbers.
 
@@ -13,7 +13,7 @@ astral-sh/uv for 2026-05-04..2026-05-10) so the test stays offline
 and reproducible. The contract name in the test is astral-uv-week
 because that's what the fixture covers; the user-facing example will
 be CalcMark (or whatever the operator points it at), but the
-acceptance contract — "given a valid contract, materialise writes
+acceptance contract — "given a valid contract, materialize writes
 queryable Parquet" — doesn't care which repo.
 
 Per SPEC.md §6 (test credibility rule) this is an e2e test: it
@@ -53,9 +53,9 @@ def _write_test_contract(contracts_dir: Path) -> str:
 
 
 class TestSlice1Acceptance:
-    """`flow materialise` writes Parquet that DuckDB can query."""
+    """`flow materialize` writes Parquet that DuckDB can query."""
 
-    def test_materialise_produces_queryable_work_items_parquet(self, tmp_path):
+    def test_materialize_produces_queryable_work_items_parquet(self, tmp_path):
         contracts_dir = tmp_path / "contracts"
         contracts_dir.mkdir()
         data_dir = tmp_path / "data"
@@ -64,7 +64,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 name,
                 "--data-dir",
                 str(data_dir),
@@ -77,7 +77,7 @@ class TestSlice1Acceptance:
             catch_exceptions=False,
         )
         assert result.exit_code == 0, (
-            f"`flow materialise` failed (exit={result.exit_code}):\n"
+            f"`flow materialize` failed (exit={result.exit_code}):\n"
             f"{result.output}"
         )
 
@@ -97,7 +97,7 @@ class TestSlice1Acceptance:
             f"expected ≥10 PRs from astral-sh/uv fixture window, got {rows[0]}"
         )
 
-    def test_materialise_writes_expected_columns(self, tmp_path):
+    def test_materialize_writes_expected_columns(self, tmp_path):
         """The user does `SELECT * FROM read_parquet(...)` and expects
         identity, lifecycle, and provenance columns. Phase-duration and
         stage-duration columns can arrive in later slices; identity +
@@ -111,7 +111,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 name,
                 "--data-dir",
                 str(data_dir),
@@ -147,13 +147,13 @@ class TestSlice1Acceptance:
             "cycle_time_days",
             # Provenance
             "contract_id",
-            "materialised_at",
+            "materialized_at",
             "run_id",
         }
         missing = required - cols
         assert not missing, f"missing required columns: {missing}; have {sorted(cols)}"
 
-    def test_materialise_writes_transitions_parquet(self, tmp_path):
+    def test_materialize_writes_transitions_parquet(self, tmp_path):
         contracts_dir = tmp_path / "contracts"
         contracts_dir.mkdir()
         data_dir = tmp_path / "data"
@@ -162,7 +162,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 name,
                 "--data-dir",
                 str(data_dir),
@@ -189,7 +189,7 @@ class TestSlice1Acceptance:
         missing = required - cols
         assert not missing, f"missing transitions columns: {missing}; have {sorted(cols)}"
 
-    def test_materialise_writes_run_manifest(self, tmp_path):
+    def test_materialize_writes_run_manifest(self, tmp_path):
         contracts_dir = tmp_path / "contracts"
         contracts_dir.mkdir()
         data_dir = tmp_path / "data"
@@ -198,7 +198,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 name,
                 "--data-dir",
                 str(data_dir),
@@ -223,9 +223,9 @@ class TestSlice1Acceptance:
         for key in ["run_id", "contract_id", "started_at", "completed_at", "items_fetched"]:
             assert key in manifest, f"missing manifest key {key!r}; have {sorted(manifest)}"
 
-    def test_materialise_reads_db_stored_contract(self, tmp_path):
+    def test_materialize_reads_db_stored_contract(self, tmp_path):
         """A contract created in the web builder lives in the SQLite
-        store, not as a YAML file on disk. `flow materialise NAME` must
+        store, not as a YAML file on disk. `flow materialize NAME` must
         read it from the store — the Data Source page's browser-driven
         backfill spawns exactly this command, and it was failing with
         'contract not found ... looked for NAME.yaml' for DB-only
@@ -257,7 +257,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 name,
                 "--data-dir",
                 str(data_dir),
@@ -270,7 +270,7 @@ class TestSlice1Acceptance:
             catch_exceptions=False,
         )
         assert result.exit_code == 0, (
-            "materialise should read the DB-stored contract "
+            "materialize should read the DB-stored contract "
             f"(exit={result.exit_code}):\n{result.output}"
         )
         work_items_dir = data_dir / "work_items" / f"contract_id={name}"
@@ -279,7 +279,7 @@ class TestSlice1Acceptance:
         )
 
     def test_unknown_contract_name_exits_nonzero_with_clear_message(self, tmp_path):
-        """When cron is misconfigured (wrong name), `flow materialise`
+        """When cron is misconfigured (wrong name), `flow materialize`
         must fail loudly — not silently produce empty Parquet."""
         contracts_dir = tmp_path / "contracts"
         contracts_dir.mkdir()
@@ -288,7 +288,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 "does-not-exist",
                 "--data-dir",
                 str(data_dir),
@@ -315,7 +315,7 @@ class TestSlice1Acceptance:
         result = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 "broken",
                 "--data-dir",
                 str(data_dir),

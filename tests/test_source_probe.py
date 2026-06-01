@@ -25,7 +25,7 @@ class _Resp:
 
 class TestBucketItemsByStep:
     """Pure function — no I/O. The heart of the dry-run preview. Uses
-    the same typed matchers + evaluator as materialise."""
+    the same typed matchers + evaluator as materialize."""
 
     def _item(self, stage, signal=None):
         return {

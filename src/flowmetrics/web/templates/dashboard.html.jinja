@@ -12,7 +12,7 @@
   {%- set qs = ('&' + q) if q else '' -%}
 
   {# Snapshot section — Aging WIP. Pinned to the latest
-     materialise date; the Period picker doesn't apply here.
+     materialize date; the Period picker doesn't apply here.
      `hx-preserve` keeps this section's DOM (including the Vega
      chart) across the windowed-section's hx-boost'd Period swap,
      so changing Period never re-renders Aging. #}

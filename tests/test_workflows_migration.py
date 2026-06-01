@@ -2,7 +2,7 @@
 files into the SQLite store, then move them to
 `<workflows-dir>/migrated/` so the rollback path exists.
 
-Triggered automatically on `flow serve` / `flow materialise(-all)`
+Triggered automatically on `flow serve` / `flow materialize(-all)`
 first-run, and available via `flow contracts migrate` for cron-style
 installs. Idempotent — subsequent runs with no YAMLs are no-ops.
 """

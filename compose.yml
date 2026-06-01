@@ -1,4 +1,4 @@
-# Two services share one image — `materialise` for the cron-style
+# Two services share one image — `materialize` for the cron-style
 # ingest (run on demand or via host-side scheduler), `serve` for the
 # long-running dashboard. Both bind-mount your local contracts/ and
 # data/ so deletes + edits round-trip.
@@ -27,8 +27,8 @@ services:
       --data-dir /app/data
     restart: unless-stopped
 
-  materialise:
-    # One-shot. Invoke via `docker compose run --rm materialise`.
+  materialize:
+    # One-shot. Invoke via `docker compose run --rm materialize`.
     image: flowmetrics:latest
     build:
       context: .
@@ -38,6 +38,6 @@ services:
       - ./contracts:/app/contracts:ro
       - ./data:/app/data
     command: >
-      flow materialise-all
+      flow materialize-all
       --workflows-dir /app/contracts
       --data-dir /app/data

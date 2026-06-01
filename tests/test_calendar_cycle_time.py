@@ -18,7 +18,7 @@ precision; the user reverted to the strict whole-day formula
 because cycle time is reported per-day everywhere it's used
 (forecasting, percentile checks, throughput cadence).
 
-The single source of truth lives in `materialise.cycle_time_days`;
+The single source of truth lives in `materialize.cycle_time_days`;
 the column is read straight from Parquet by every UI consumer.
 `test_cycle_time_function_is_defined_exactly_once` enforces that.
 """
@@ -28,7 +28,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from flowmetrics.materialise import cycle_time_days
+from flowmetrics.materialize import cycle_time_days
 
 
 class TestCycleTimeDays:
@@ -116,14 +116,14 @@ class TestCycleTimeDays:
 
     def test_cycle_time_function_is_defined_exactly_once(self):
         """Single source of truth: `cycle_time_days` is defined in
-        `materialise.py` only. Every UI consumer reads the
+        `materialize.py` only. Every UI consumer reads the
         pre-computed `cycle_time_days` column from Parquet — no
         component re-derives the value. Drift between definitions
         has caused past metric-mismatch bugs (e.g. lifecycle showing
         ~10h while the table reports 1.41d).
 
         This guards against the regression by scanning the codebase
-        for a `def cycle_time_days(` outside materialise.py. The
+        for a `def cycle_time_days(` outside materialize.py. The
         formula's specific Vacanti adjustment is too easy to
         "helpfully" re-implement; the test forbids that.
         """
@@ -135,10 +135,10 @@ class TestCycleTimeDays:
             for lineno, line in enumerate(path.read_text().splitlines(), 1):
                 if "def cycle_time_days(" in line:
                     rel = str(path.relative_to(src_root))
-                    if rel != "materialise.py":
+                    if rel != "materialize.py":
                         offenders.append((rel, lineno, line.strip()))
         assert not offenders, (
-            "`def cycle_time_days(` defined OUTSIDE materialise.py — "
+            "`def cycle_time_days(` defined OUTSIDE materialize.py — "
             "the function must exist in exactly one place. UI "
             "consumers read the stored column instead. Offenders:\n"
             + "\n".join(f"  {p}:{ln}: {ll}" for p, ln, ll in offenders)

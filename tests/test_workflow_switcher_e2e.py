@@ -61,7 +61,7 @@ class _ServerThread(threading.Thread):
 
 @pytest.fixture(scope="module")
 def server_url(tmp_path_factory):
-    """Materialise TWO contracts so the dropdown has something to
+    """Materialize TWO contracts so the dropdown has something to
     switch BETWEEN. Both use the GitHub fixture cache (offline)
     so the test stays hermetic and fast."""
     from flowmetrics.app import create_app
@@ -90,7 +90,7 @@ def server_url(tmp_path_factory):
         res = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 name,
                 "--data-dir",
                 str(data_dir),
@@ -143,7 +143,7 @@ class TestWorkflowSwitcher:
         page.wait_for_selector("ul.home-workflow-list")
 
         # Empty-state copy must NOT be present when contracts
-        # exist. The test fixture materialises two contracts;
+        # exist. The test fixture materializes two contracts;
         # if the home page falls back to the empty state, this
         # assertion catches it loudly.
         body_text = page.locator("body").inner_text()

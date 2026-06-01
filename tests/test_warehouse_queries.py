@@ -21,7 +21,7 @@ from flowmetrics.warehouse.queries import (
     count_open_items,
     first_stage_entries,
     in_flight_snapshot,
-    latest_materialised_at,
+    latest_materialized_at,
     observed_stages,
     pairwise_stage_precedence,
 )
@@ -236,14 +236,14 @@ class TestPairwiseStagePrecedence:
         }
 
 
-def _warehouse_with_materialised() -> duckdb.DuckDBPyConnection:
+def _warehouse_with_materialized() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(":memory:")
     con.execute(
         """CREATE TABLE work_items (
             contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
             title VARCHAR, url VARCHAR,
             created_at TIMESTAMP, completed_at TIMESTAMP,
-            cycle_time_days DOUBLE, materialised_at TIMESTAMP)"""
+            cycle_time_days DOUBLE, materialized_at TIMESTAMP)"""
     )
     con.executemany(
         "INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?,?)",
@@ -265,12 +265,12 @@ def _warehouse_with_materialised() -> duckdb.DuckDBPyConnection:
 class TestCompletionDateRange:
     def test_returns_min_and_max_completion_dates_for_contract(self):
         from datetime import date as _d
-        lo, hi = completion_date_range(_warehouse_with_materialised(), "c")
+        lo, hi = completion_date_range(_warehouse_with_materialized(), "c")
         assert lo == _d(2026, 1, 4)
         assert hi == _d(2026, 1, 9)
 
     def test_unknown_contract_yields_none_none(self):
-        assert completion_date_range(_warehouse_with_materialised(), "nope") == (None, None)
+        assert completion_date_range(_warehouse_with_materialized(), "nope") == (None, None)
 
     def test_no_completions_yields_none_none(self):
         # only in-flight items for the contract.
@@ -280,7 +280,7 @@ class TestCompletionDateRange:
                 contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
                 title VARCHAR, url VARCHAR,
                 created_at TIMESTAMP, completed_at TIMESTAMP,
-                cycle_time_days DOUBLE, materialised_at TIMESTAMP)"""
+                cycle_time_days DOUBLE, materialized_at TIMESTAMP)"""
         )
         con.execute(
             "INSERT INTO work_items VALUES "
@@ -290,10 +290,10 @@ class TestCompletionDateRange:
         assert completion_date_range(con, "c") == (None, None)
 
 
-class TestLatestMaterialisedAt:
-    def test_returns_the_max_materialised_at_date(self):
+class TestLatestMaterializedAt:
+    def test_returns_the_max_materialized_at_date(self):
         from datetime import date as _d
-        assert latest_materialised_at(_warehouse_with_materialised(), "c") == _d(2026, 5, 3)
+        assert latest_materialized_at(_warehouse_with_materialized(), "c") == _d(2026, 5, 3)
 
     def test_unknown_contract_is_none(self):
-        assert latest_materialised_at(_warehouse_with_materialised(), "nope") is None
+        assert latest_materialized_at(_warehouse_with_materialized(), "nope") is None

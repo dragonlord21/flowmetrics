@@ -1,10 +1,10 @@
-"""End-to-end (offline): a typed-matcher contract materialises so the
+"""End-to-end (offline): a typed-matcher contract materializes so the
 warehouse transitions carry the user's STEP names, not the adapter's raw
 stages (#2 slice E).
 
-Runs the real `flow materialise` CLI against the pinned astral-sh/uv
+Runs the real `flow materialize` CLI against the pinned astral-sh/uv
 fixture cache (2026-05-04..2026-05-10) — no network. Proves the
-remap-at-materialise path end to end, and that the WIP step name lines
+remap-at-materialize path end to end, and that the WIP step name lines
 up with the warehouse stages (so the dashboard's WIP filter will work).
 """
 
@@ -45,7 +45,7 @@ _YAML = """contract:
 """
 
 
-def _materialise(tmp_path: Path):
+def _materialize(tmp_path: Path):
     contracts = tmp_path / "contracts"
     contracts.mkdir()
     data = tmp_path / "data"
@@ -53,7 +53,7 @@ def _materialise(tmp_path: Path):
     res = CliRunner().invoke(
         cli,
         [
-            "materialise", "uv-typed",
+            "materialize", "uv-typed",
             "--data-dir", str(data),
             "--workflows-dir", str(contracts),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -66,7 +66,7 @@ def _materialise(tmp_path: Path):
 
 
 def test_transitions_carry_step_names_not_adapter_stages(tmp_path):
-    data, _ = _materialise(tmp_path)
+    data, _ = _materialize(tmp_path)
     glob = str(
         data / "transitions" / "contract_id=uv-typed" / "**" / "*.parquet"
     )
@@ -90,7 +90,7 @@ def test_transitions_carry_step_names_not_adapter_stages(tmp_path):
 
 
 def test_wip_step_name_aligns_with_warehouse_stages(tmp_path):
-    _, contracts = _materialise(tmp_path)
+    _, contracts = _materialize(tmp_path)
     c = parse_contract_text((contracts / "uv-typed.yaml").read_text(), "uv-typed")
     # The WIP filter keys off states.wip (step names); after remap the
     # warehouse stages ARE these names, so the filter resolves.

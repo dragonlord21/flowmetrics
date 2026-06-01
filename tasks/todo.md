@@ -17,7 +17,7 @@ each PR lands. Both plans now shipped end-to-end.
 
 ### Slice A2: Native scheduler recipes ✅ (commit bf6c858)
 
-- [x] `flow materialise-all` wrapper command + 6 unit tests.
+- [x] `flow materialize-all` wrapper command + 6 unit tests.
 - [x] linux-systemd `.service` + `.timer` + README.
 - [x] linux-cron `crontab.sample` + README.
 - [x] macos-launchd `.plist` + README.
@@ -38,8 +38,8 @@ each PR lands. Both plans now shipped end-to-end.
 ### Slice A4: Container path ✅ (commit 68e4726)
 
 - [x] `Dockerfile` (multi-stage, non-root, slim).
-- [x] `compose.yml` (serve + materialise services).
-- [x] `.github/workflows/materialise.yml` (scheduled GH Actions
+- [x] `compose.yml` (serve + materialize services).
+- [x] `.github/workflows/materialize.yml` (scheduled GH Actions
       ingest with artifact upload).
 - [x] CI `docker` job builds + smokes `flow --help` inside the
       container.
@@ -55,7 +55,7 @@ each PR lands. Both plans now shipped end-to-end.
 
 - [x] `GET /api/internal/contracts` — list.
 - [x] `GET /api/internal/contracts/{id}` — full payload (parsed +
-      raw YAML + materialise status block).
+      raw YAML + materialize status block).
 - [x] Auth respects localhost-vs-network posture.
 - [x] +9 unit tests; `_available_contracts` now picks up `.yml`
       alongside `.yaml`.
@@ -81,7 +81,7 @@ each PR lands. Both plans now shipped end-to-end.
 - [x] "+ New workflow" CTA on `/`.
 - [x] +6 unit tests; visually verified in the browser.
 
-### Slice B4: Stage builder via probe materialise ✅ (commit 254fe39)
+### Slice B4: Stage builder via probe materialize ✅ (commit 254fe39)
 
 - [x] `POST /api/internal/contracts/_probe-stages` with 15-min
       per-target cache + `?force=true` bust.
@@ -122,7 +122,7 @@ C4 `b8ae57a`, C5 `9b7a2e6`, C6+C7 `c0830d2`. 1199 tests green.
 - [x] `flow serve` first-boot migration: scan workflows dir → import
       YAMLs → move to `migrated/` → echo summary. Same path
       available via `flow contracts migrate`.
-- [x] `flow materialise(-all)` read from the DB. New
+- [x] `flow materialize(-all)` read from the DB. New
       `--from-yaml PATH` flag for one-off ad-hoc contracts.
 - [x] CRUD endpoints in `app.py` switched to the DB.
 - [x] Existing test suite green (after the few helpers that inject
@@ -139,7 +139,7 @@ C4 `b8ae57a`, C5 `9b7a2e6`, C6+C7 `c0830d2`. 1199 tests green.
 - [x] List endpoint excludes archived by default;
       `?include_archived=true` includes with an `archived: true` flag.
 - [x] `DELETE` becomes hard delete; refuses unless already archived.
-- [x] `flow materialise(-all)` skips archived rows.
+- [x] `flow materialize(-all)` skips archived rows.
 - [x] `tests/test_contracts_archive.py` covers the full lifecycle.
 - **Checkpoint:** API curl flow works before any UI.
 
@@ -217,7 +217,7 @@ C4 `b8ae57a`, C5 `9b7a2e6`, C6+C7 `c0830d2`. 1199 tests green.
       `Content-Disposition`. Works on archived rows via
       `?include_archived=true`.
 - [x] "Download YAML" link + "Copy YAML" button on the edit page.
-- [x] Downloaded YAML → `flow materialise --from-yaml PATH`
+- [x] Downloaded YAML → `flow materialize --from-yaml PATH`
       succeeds (round-trip test).
 
 ### Slice C7: Archived contracts page
@@ -229,5 +229,5 @@ C4 `b8ae57a`, C5 `9b7a2e6`, C6+C7 `c0830d2`. 1199 tests green.
       renders when n > 0.
 - [x] Playwright E2E: full lifecycle — create → archive →
       restore → archive → hard-delete → assert gone in home,
-      archive page, AND `materialise-all` manifest.
+      archive page, AND `materialize-all` manifest.
 - **Checkpoint:** Plan C complete.

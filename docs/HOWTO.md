@@ -75,7 +75,7 @@ auto-suggest labels / statuses, lets you pick stages, and writes to
 `<workflows-dir>/contracts.db`. Walkthrough with screenshots:
 [TUTORIAL § 5](TUTORIAL.md#5-add-a-workflow-in-the-browser).
 
-Once saved, hit **Data source** → **Backfill** to materialise.
+Once saved, hit **Data source** → **Backfill** to materialize.
 
 ## Write a workflow YAML by hand
 
@@ -131,7 +131,7 @@ starters: [`samples/`](../samples/).
 ## Fetch data once
 
 ```bash
-flow materialise <workflow-name> \
+flow materialize <workflow-name> \
     --workflows-dir CONTRACTS_DIR \
     --data-dir       DATA_DIR
 ```
@@ -148,7 +148,7 @@ Fetch every workflow YAML in a directory in one go (this is what the
 schedulers below run):
 
 ```bash
-flow materialise-all \
+flow materialize-all \
     --workflows-dir CONTRACTS_DIR \
     --data-dir       DATA_DIR
 ```
@@ -169,7 +169,7 @@ install / verify / uninstall commands.
 | Linux + systemd | [`scripts/scheduling/linux-systemd/`](../scripts/scheduling/linux-systemd/) |
 | Linux + cron | [`scripts/scheduling/linux-cron/`](../scripts/scheduling/linux-cron/) |
 | Windows | [`scripts/scheduling/windows-task-scheduler/`](../scripts/scheduling/windows-task-scheduler/) |
-| GitHub Actions (CI-hosted) | `.github/workflows/materialise.yml` |
+| GitHub Actions (CI-hosted) | `.github/workflows/materialize.yml` |
 
 All templates take the same three placeholders:
 
@@ -350,7 +350,7 @@ to give).
 `scripts/scheduling/backup/backup-and-prune.sh` (POSIX) and
 `backup-and-prune.ps1` (Windows) wrap `flow backup` and retain the
 14 newest archives. Wire them into the same scheduler you use for
-materialise (above).
+materialize (above).
 
 ### Off-host backups
 
@@ -374,7 +374,7 @@ tool at `$FLOWMETRICS_HOME/data/_backups/`.
 docker compose up serve
 # → http://localhost:8000
 
-docker compose --profile ingest run --rm materialise
+docker compose --profile ingest run --rm materialize
 ```
 
 `compose.yml` bind-mounts `./contracts` and `./data` so edits and
@@ -382,7 +382,7 @@ deletes round-trip to the host. Both services use the same image
 built from `Dockerfile`.
 
 For CI-hosted ingest (no host to operate), see
-`.github/workflows/materialise.yml` — runs `flow materialise-all` on
+`.github/workflows/materialize.yml` — runs `flow materialize-all` on
 a cron schedule and uploads `data/` as a build artifact.
 
 ## Ad-hoc CLI reports
@@ -454,7 +454,7 @@ the upgraded binary.
 
 After upgrade, if Parquet read errors crop up (a major DuckDB bump
 can change on-disk shape), restore from the most recent good backup
-into a fresh `--data-dir` or re-run `flow materialise-all` — the
+into a fresh `--data-dir` or re-run `flow materialize-all` — the
 warehouse is downstream of the source API, never the source of truth.
 
 ## Develop against a source checkout
@@ -514,14 +514,14 @@ jq '.results[] | select(.workflow == "your-workflow")' \
    data/_status/daily-$(date -u +%F).json
 
 # Re-run just that workflow.
-flow materialise your-workflow --workflows-dir contracts --data-dir data
+flow materialize your-workflow --workflows-dir contracts --data-dir data
 ```
 
 ### Parquet read errors after upgrade
 
 DuckDB writes Parquet at its current version. A major bump can change
 the on-disk shape. Restore from the most recent good backup into a
-fresh `--data-dir`, or re-run `flow materialise-all` against your
+fresh `--data-dir`, or re-run `flow materialize-all` against your
 contracts.
 
 ### `flow` not on PATH after install

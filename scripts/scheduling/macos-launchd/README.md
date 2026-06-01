@@ -4,7 +4,7 @@ Two units, both LaunchAgents (user-level — no root):
 
 | Plist | Job | Trigger |
 |----|----|----|
-| `com.flowmetrics.materialise.plist` | Daily ingest | `StartCalendarInterval` |
+| `com.flowmetrics.materialize.plist` | Daily ingest | `StartCalendarInterval` |
 | `com.flowmetrics.serve.plist` | Persistent dashboard | `RunAtLoad` + `KeepAlive` |
 
 Use one or both. Together they give you a Mac that fetches data on a
@@ -44,23 +44,23 @@ launchctl bootout gui/$UID/com.flowmetrics.serve
 rm ~/Library/LaunchAgents/com.flowmetrics.serve.plist
 ```
 
-## Daily ingest (materialise)
+## Daily ingest (materialize)
 
 ## Install
 
 ```bash
 # 1. Edit the plist: replace REPLACE_HOME and REPLACE_VENV with your
 #    paths. Use absolute paths, not ~.
-$EDITOR com.flowmetrics.materialise.plist
+$EDITOR com.flowmetrics.materialize.plist
 
 # 2. Drop into the user LaunchAgents dir.
-cp com.flowmetrics.materialise.plist ~/Library/LaunchAgents/
+cp com.flowmetrics.materialize.plist ~/Library/LaunchAgents/
 
 # 3. Register it with launchd.
-launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.flowmetrics.materialise.plist
+launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.flowmetrics.materialize.plist
 
 # 4. (Optional) Fire it once to verify.
-launchctl kickstart -k gui/$UID/com.flowmetrics.materialise
+launchctl kickstart -k gui/$UID/com.flowmetrics.materialize
 ```
 
 ## Verify
@@ -95,8 +95,8 @@ cat $FLOWMETRICS_HOME/data/_status/daily-$(date -u +%F).json | jq .
 ## Uninstall
 
 ```bash
-launchctl bootout gui/$UID/com.flowmetrics.materialise
-rm ~/Library/LaunchAgents/com.flowmetrics.materialise.plist
+launchctl bootout gui/$UID/com.flowmetrics.materialize
+rm ~/Library/LaunchAgents/com.flowmetrics.materialize.plist
 ```
 
 ## Gotchas

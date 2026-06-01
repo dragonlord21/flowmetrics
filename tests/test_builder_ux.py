@@ -145,7 +145,7 @@ class TestConsistentFieldStyling:
 
 class TestWarehouseEmptyStateCopy:
     def test_new_mode_hides_warehouse_suggestions(self, workspace):
-        """A brand-new contract has never materialised, so the
+        """A brand-new contract has never materialized, so the
         'in your warehouse' suggestions group is meaningless — it's
         only rendered in edit mode."""
         contracts, data = workspace

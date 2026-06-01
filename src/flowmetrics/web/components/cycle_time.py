@@ -55,7 +55,7 @@ def render(
 
     `view` clamps the scatter — and the P50/P85/P95 percentile
     sample — to its inclusive window; None uses the full
-    materialised history.
+    materialized history.
 
     `ptile_min` / `ptile_max` (0..100) narrow the SCATTER to dots
     whose cycle-time rank falls inside that band — the

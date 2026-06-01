@@ -2,7 +2,7 @@
 
 The lifecycle component answers "what happened to *this* item, in
 time order?". It reads the `transitions` Parquet (stage entry events
-written by `flow materialise`) plus the item's `work_items` row
+written by `flow materialize`) plus the item's `work_items` row
 (for title + URL), and returns a typed payload the Jinja partial
 renders as a Vega-Lite timeline.
 
@@ -58,7 +58,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     res = CliRunner().invoke(
         cli,
         [
-            "materialise",
+            "materialize",
             "astral-uv-week",
             "--data-dir",
             str(data_dir),

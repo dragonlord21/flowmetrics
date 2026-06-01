@@ -2,7 +2,7 @@
 backfill (detached subprocess + JSON status file + HTMX poll).
 
 The app is created with `offline=True` so the backfill subprocess
-materialises from the fixture cache and never touches the network.
+materializes from the fixture cache and never touches the network.
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ def server_url(tmp_path_factory):
     res = CliRunner().invoke(
         cli,
         [
-            "materialise", name,
+            "materialize", name,
             "--data-dir", str(data_dir),
             "--workflows-dir", str(contracts_dir),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -79,7 +79,7 @@ def server_url(tmp_path_factory):
     )
     assert res.exit_code == 0, res.output
 
-    # `offline=True` → the backfill subprocess materialises from
+    # `offline=True` → the backfill subprocess materializes from
     # the fixture cache; no test ever touches the network.
     app = create_app(
         data_dir=data_dir,

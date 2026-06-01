@@ -4,7 +4,7 @@ dashboard + matching detail page, in a real browser.
 The slice 2 click-path (from docs/SPEC-warehouse-app.md §15 and the
 spec-driven session leading up to it):
 
-  > Run `flow materialise astral-uv-week` (Slice 1, already works).
+  > Run `flow materialize astral-uv-week` (Slice 1, already works).
   > Run `flow serve --port 8000 --host 127.0.0.1 --data-dir … --workflows-dir …`.
   > Open http://127.0.0.1:8000/. See:
   >   - Sticky filter bar (decorative in Slice 2).
@@ -53,10 +53,10 @@ pytestmark = pytest.mark.e2e
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
 
-def _materialise_aging_demo(
+def _materialize_aging_demo(
     contracts_dir: Path, data_dir: Path, cache_dir: Path
 ) -> None:
-    """Materialise a synthetic `aging-demo` contract whose warehouse
+    """Materialize a synthetic `aging-demo` contract whose warehouse
     holds genuine in-flight items.
 
     Aging WIP is pinned to the in-flight snapshot date. The
@@ -69,7 +69,7 @@ def _materialise_aging_demo(
     """
     from flowmetrics.compute import WorkItem
     from flowmetrics.contract import Contract
-    from flowmetrics.materialise import materialise
+    from flowmetrics.materialize import materialize
 
     name = "aging-demo"
     (contracts_dir / f"{name}.yaml").write_text(
@@ -112,10 +112,10 @@ def _materialise_aging_demo(
     source.fetch_completed_in_window.return_value = completed
     source.fetch_in_flight.return_value = in_flight
     with patch(
-        "flowmetrics.materialise.make_github_source",
+        "flowmetrics.materialize.make_github_source",
         return_value=source,
     ):
-        materialise(
+        materialize(
             contract=Contract(
                 name=name, source="github", repo="x/y",
                 start=date(2026, 1, 1), stop=date(2026, 12, 31),
@@ -127,7 +127,7 @@ def _materialise_aging_demo(
 
 
 # ---------------------------------------------------------------------------
-# Server fixture: in-thread uvicorn against pre-materialised Parquet
+# Server fixture: in-thread uvicorn against pre-materialized Parquet
 # ---------------------------------------------------------------------------
 
 
@@ -162,7 +162,7 @@ class _ServerThread(threading.Thread):
 
 @pytest.fixture(scope="module")
 def server_url(tmp_path_factory):
-    """Set up a fresh data dir with materialised fixture data, then
+    """Set up a fresh data dir with materialized fixture data, then
     serve via uvicorn in a daemon thread. Yields the base URL.
     """
     from flowmetrics.app import create_app
@@ -174,7 +174,7 @@ def server_url(tmp_path_factory):
     data_dir = tmp_path / "data"
     name = "astral-uv-week"
 
-    # Materialise once via the public CLI so this also exercises the
+    # Materialize once via the public CLI so this also exercises the
     # Slice 1 path end-to-end.
     contract_yaml = {
         "contract": {
@@ -189,7 +189,7 @@ def server_url(tmp_path_factory):
     res = CliRunner().invoke(
         _cli,
         [
-            "materialise",
+            "materialize",
             name,
             "--data-dir",
             str(data_dir),
@@ -201,11 +201,11 @@ def server_url(tmp_path_factory):
         ],
         catch_exceptions=False,
     )
-    assert res.exit_code == 0, f"fixture materialise failed: {res.output}"
+    assert res.exit_code == 0, f"fixture materialize failed: {res.output}"
 
     # A second contract with genuine in-flight items, so the aging
-    # chart has something to draw (see `_materialise_aging_demo`).
-    _materialise_aging_demo(contracts_dir, data_dir, tmp_path / "cache")
+    # chart has something to draw (see `_materialize_aging_demo`).
+    _materialize_aging_demo(contracts_dir, data_dir, tmp_path / "cache")
 
     app = create_app(data_dir=data_dir, contracts_dir=contracts_dir)
     port = _free_port()
@@ -991,7 +991,7 @@ class TestAgingOnDashboard:
     with P50/P85/P95 reference lines from completed cycle times.
 
     Aging is pinned to the in-flight snapshot date (the latest
-    materialise) — it does not follow the Period picker. The
+    materialize) — it does not follow the Period picker. The
     `astral-uv-week` fixture is all completed work, so its aging
     chart is legitimately empty; tests that need a populated chart
     point at the `aging-demo` contract (real in-flight items).
@@ -1106,7 +1106,7 @@ class TestAgingOnDashboard:
     ):
         """User-pinned distinction: empty answers should be action-
         first. Aging pins its as-of to the snapshot date (the
-        latest materialise = today in this test); the fixture's
+        latest materialize = today in this test); the fixture's
         completion data ends in early May, so aging is past that
         coverage — the empty state names the gap AND links to the
         Data Source page for browser-based backfill (no CLI)."""
@@ -1120,7 +1120,7 @@ class TestAgingOnDashboard:
             f"empty message must name the latest data date; got {text!r}"
         )
         # No CLI command anywhere in the UI.
-        assert "flow materialise" not in text, (
+        assert "flow materialize" not in text, (
             f"empty state must not print a CLI command; got {text!r}"
         )
         # The action is a link to the Data Source page.

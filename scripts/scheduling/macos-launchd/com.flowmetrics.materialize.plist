@@ -7,27 +7,27 @@
     REPLACE_VENV  → path to the venv ($HOME/projects/flowmetrics/.venv)
 
   Install:
-    cp com.flowmetrics.materialise.plist ~/Library/LaunchAgents/
-    launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.flowmetrics.materialise.plist
+    cp com.flowmetrics.materialize.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$UID ~/Library/LaunchAgents/com.flowmetrics.materialize.plist
 
   Test-fire it once:
-    launchctl kickstart -k gui/$UID/com.flowmetrics.materialise
+    launchctl kickstart -k gui/$UID/com.flowmetrics.materialize
 
   Uninstall:
-    launchctl bootout gui/$UID/com.flowmetrics.materialise
-    rm ~/Library/LaunchAgents/com.flowmetrics.materialise.plist
+    launchctl bootout gui/$UID/com.flowmetrics.materialize
+    rm ~/Library/LaunchAgents/com.flowmetrics.materialize.plist
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.flowmetrics.materialise</string>
+  <string>com.flowmetrics.materialize</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>REPLACE_VENV/bin/flow</string>
-    <string>materialise-all</string>
+    <string>materialize-all</string>
     <string>--workflows-dir</string>
     <string>REPLACE_HOME/contracts</string>
     <string>--data-dir</string>

@@ -105,7 +105,7 @@
     );
     if (typed !== id) return;
     var purge = window.confirm(
-      "Also delete the materialised warehouse data for this workflow?"
+      "Also delete the materialized warehouse data for this workflow?"
     );
     var url = "/api/internal/contracts/" + encodeURIComponent(id);
     if (purge) url += "?purge_data=true";

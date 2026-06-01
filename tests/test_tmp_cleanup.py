@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime, timedelta
 
-from flowmetrics.materialise import cleanup_tmp_files
+from flowmetrics.materialize import cleanup_tmp_files
 
 
 def _age(path, delta: timedelta) -> None:
@@ -33,7 +33,7 @@ class TestCleanupTmpFiles:
 
     def test_keeps_a_fresh_tmp(self, tmp_path):
         """A `.tmp` from a write in flight (recent mtime) must be
-        spared — deleting it would corrupt a running materialise."""
+        spared — deleting it would corrupt a running materialize."""
         t = tmp_path / "items-live.parquet.tmp"
         t.write_text("write in progress")
         n = cleanup_tmp_files(tmp_path, now=datetime.now(UTC))

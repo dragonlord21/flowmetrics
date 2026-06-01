@@ -1,14 +1,14 @@
-"""Materialise must capture in-flight items, not just completed ones.
+"""Materialize must capture in-flight items, not just completed ones.
 
 Aging WIP needs items with `completed_at IS NULL` to plot. The
 fetch primitive `fetch_in_flight(asof)` exists on the source
 abstraction (and is implemented by the GitHub adapter), but
-`materialise.materialise()` only called `fetch_completed_in_window`
+`materialize.materialize()` only called `fetch_completed_in_window`
 in slice 1 — so the warehouse only ever knew about completed
 work, and the aging chart was always empty even after a fresh
 import.
 
-These tests pin the new behavior: materialise calls BOTH fetch
+These tests pin the new behavior: materialize calls BOTH fetch
 primitives, writes the union to Parquet, and the resulting view
 contains rows with `completed_at IS NULL`.
 """
@@ -21,11 +21,11 @@ from unittest.mock import MagicMock, patch
 
 from flowmetrics.compute import WorkItem
 from flowmetrics.contract import Contract
-from flowmetrics.materialise import materialise
+from flowmetrics.materialize import materialize
 
 
 def _make_item(item_id, *, created_at, completed_at):
-    """Minimal WorkItem for the materialise pipeline."""
+    """Minimal WorkItem for the materialize pipeline."""
     return WorkItem(
         item_id=item_id,
         title=f"item {item_id}",
@@ -37,9 +37,9 @@ def _make_item(item_id, *, created_at, completed_at):
     )
 
 
-class TestMaterialiseFetchesInFlight:
+class TestMaterializeFetchesInFlight:
     def test_both_fetch_methods_are_called(self, tmp_path: Path):
-        """Pin the call shape: materialise hits BOTH fetch_completed
+        """Pin the call shape: materialize hits BOTH fetch_completed
         and fetch_in_flight on every run."""
         contract = Contract(
             name="demo",
@@ -54,10 +54,10 @@ class TestMaterialiseFetchesInFlight:
         mock_source.fetch_in_flight.return_value = []
 
         with patch(
-            "flowmetrics.materialise.make_github_source",
+            "flowmetrics.materialize.make_github_source",
             return_value=mock_source,
         ):
-            materialise(
+            materialize(
                 contract=contract,
                 data_dir=tmp_path / "data",
                 cache_dir=tmp_path / "cache",
@@ -70,7 +70,7 @@ class TestMaterialiseFetchesInFlight:
         mock_source.fetch_in_flight.assert_called_once()
 
     def test_in_flight_items_appear_in_warehouse(self, tmp_path: Path):
-        """End-to-end: after materialise, the work_items Parquet
+        """End-to-end: after materialize, the work_items Parquet
         contains rows where `completed_at IS NULL` (in-flight)."""
         contract = Contract(
             name="demo",
@@ -96,10 +96,10 @@ class TestMaterialiseFetchesInFlight:
         mock_source.fetch_in_flight.return_value = [in_flight_item]
 
         with patch(
-            "flowmetrics.materialise.make_github_source",
+            "flowmetrics.materialize.make_github_source",
             return_value=mock_source,
         ):
-            materialise(
+            materialize(
                 contract=contract,
                 data_dir=tmp_path / "data",
                 cache_dir=tmp_path / "cache",
@@ -148,10 +148,10 @@ class TestMaterialiseFetchesInFlight:
         mock_source.fetch_completed_in_window.return_value = []
         mock_source.fetch_in_flight.return_value = [in_flight_item]
         with patch(
-            "flowmetrics.materialise.make_github_source",
+            "flowmetrics.materialize.make_github_source",
             return_value=mock_source,
         ):
-            materialise(
+            materialize(
                 contract=contract,
                 data_dir=tmp_path / "data",
                 cache_dir=tmp_path / "cache",

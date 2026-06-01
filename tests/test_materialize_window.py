@@ -2,7 +2,7 @@
 
 The web builder no longer asks for a window — data is fetched via the
 Data Source page's backfill (which passes its own --since/--until). So a
-contract created in the UI has no window at all. `materialise` must still
+contract created in the UI has no window at all. `materialize` must still
 run: when start/stop are absent it falls back to a rolling window (the
 most recent N days up to today) instead of refusing with an assertion.
 """
@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from flowmetrics.contract import Contract
-from flowmetrics.materialise import DEFAULT_FETCH_WINDOW_DAYS, _resolve_window
+from flowmetrics.materialize import DEFAULT_FETCH_WINDOW_DAYS, _resolve_window
 
 
 def _c(**kw) -> Contract:

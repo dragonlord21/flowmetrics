@@ -50,7 +50,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     res = CliRunner().invoke(
         cli,
         [
-            "materialise",
+            "materialize",
             "astral-uv-week",
             "--data-dir",
             str(data_dir),

@@ -3,7 +3,7 @@
 The dashboard groups tiles by what scope drives them:
 
   - Snapshot section (Aging WIP) — pinned to the latest
-    materialise; no Period picker applies.
+    materialize; no Period picker applies.
   - Windowed section (Throughput, Cycle Time, Cumulative Flow,
     Forecast) — the Period + Reference picker that drives them
     lives in this section's header.
@@ -48,7 +48,7 @@ def app(tmp_path_factory):
     )
     res = CliRunner().invoke(
         cli, [
-            "materialise", "astral-uv-week",
+            "materialize", "astral-uv-week",
             "--data-dir", str(data),
             "--workflows-dir", str(contracts),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -120,11 +120,11 @@ class TestOrdering:
 
 class TestDataSourceStrip:
     """One compact line under the header naming the data source +
-    the latest materialise date, linking to /data-source. Replaces
+    the latest materialize date, linking to /data-source. Replaces
     both the old 'Data source & backfill →' link and the stale-data
     banner inside the filter form."""
 
-    def test_strip_names_source_and_latest_materialise_date(self, html):
+    def test_strip_names_source_and_latest_materialize_date(self, html):
         assert "data-source-strip" in html
         # Source-display name (GitHub / Jira) and 'data through'.
         assert ("GitHub data through" in html) or ("Jira data through" in html)

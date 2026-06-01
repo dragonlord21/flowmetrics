@@ -264,14 +264,14 @@ def completion_date_range(
     return None, None
 
 
-def latest_materialised_at(
+def latest_materialized_at(
     con: duckdb.DuckDBPyConnection, contract_name: str
 ) -> date | None:
-    """The latest materialise date for `contract_name` — i.e. the
+    """The latest materialize date for `contract_name` — i.e. the
     asof of the warehouse's most recent in-flight snapshot. None
     when the warehouse holds no rows yet."""
     row = con.execute(
-        "SELECT max(materialised_at) FROM work_items "
+        "SELECT max(materialized_at) FROM work_items "
         "WHERE contract_id = ?",
         [contract_name],
     ).fetchone()

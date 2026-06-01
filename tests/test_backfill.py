@@ -1,5 +1,5 @@
 """Tests for backfill status — the per-workflow JSON file a
-browser-triggered `flow materialise` writes so the Data Source
+browser-triggered `flow materialize` writes so the Data Source
 page can poll progress.
 """
 
@@ -68,16 +68,16 @@ def _contracts_dir() -> tuple[Path, Path]:
     return tmp, contracts
 
 
-class TestMaterialiseStatusFile:
+class TestMaterializeStatusFile:
     def test_records_done_on_success(self):
-        """`flow materialise --status-file` writes a `done` record
+        """`flow materialize --status-file` writes a `done` record
         with the lifecycle timestamps + a summary message."""
         tmp, contracts = _contracts_dir()
         status = tmp / "status.json"
         res = CliRunner().invoke(
             cli,
             [
-                "materialise", "astral-uv-week",
+                "materialize", "astral-uv-week",
                 "--data-dir", str(tmp / "data"),
                 "--workflows-dir", str(contracts),
                 "--cache-dir", str(FIXTURE_CACHE),
@@ -102,7 +102,7 @@ class TestMaterialiseStatusFile:
         res = CliRunner().invoke(
             cli,
             [
-                "materialise", "does-not-exist",
+                "materialize", "does-not-exist",
                 "--data-dir", str(tmp / "data"),
                 "--workflows-dir", str(contracts),
                 "--cache-dir", str(FIXTURE_CACHE),
@@ -117,13 +117,13 @@ class TestMaterialiseStatusFile:
         assert s["message"], "failed record must name the error"
 
     def test_without_status_file_writes_nothing(self):
-        """`--status-file` is opt-in — a plain cron materialise
+        """`--status-file` is opt-in — a plain cron materialize
         writes no status file."""
         tmp, contracts = _contracts_dir()
         res = CliRunner().invoke(
             cli,
             [
-                "materialise", "astral-uv-week",
+                "materialize", "astral-uv-week",
                 "--data-dir", str(tmp / "data"),
                 "--workflows-dir", str(contracts),
                 "--cache-dir", str(FIXTURE_CACHE),
@@ -184,9 +184,9 @@ class TestStaleLock:
         assert display_status(s, now)["status"] == "running"
 
 
-class TestMaterialiseSnapshotsAreAdditive:
+class TestMaterializeSnapshotsAreAdditive:
     def test_two_same_day_runs_write_two_files(self):
-        """Two materialise runs on the same calendar day each
+        """Two materialize runs on the same calendar day each
         write their own Parquet (the filename carries the run_id)
         — a backfill never overwrites a same-day snapshot."""
         tmp, contracts = _contracts_dir()
@@ -195,7 +195,7 @@ class TestMaterialiseSnapshotsAreAdditive:
             res = CliRunner().invoke(
                 cli,
                 [
-                    "materialise", "astral-uv-week",
+                    "materialize", "astral-uv-week",
                     "--data-dir", str(data),
                     "--workflows-dir", str(contracts),
                     "--cache-dir", str(FIXTURE_CACHE),
@@ -214,10 +214,10 @@ class TestMaterialiseSnapshotsAreAdditive:
         )
 
 
-class TestMaterialiseSweepsStaleTmp:
-    def test_materialise_removes_a_stale_tmp_on_start(self):
+class TestMaterializeSweepsStaleTmp:
+    def test_materialize_removes_a_stale_tmp_on_start(self):
         """A `.tmp` left by a prior interrupted write is swept when
-        the next materialise runs — the data dir stays rsync-tidy."""
+        the next materialize runs — the data dir stays rsync-tidy."""
         tmp, contracts = _contracts_dir()
         data = tmp / "data"
         stale = data / "work_items" / "items-crashed.parquet.tmp"
@@ -229,7 +229,7 @@ class TestMaterialiseSweepsStaleTmp:
         res = CliRunner().invoke(
             cli,
             [
-                "materialise", "astral-uv-week",
+                "materialize", "astral-uv-week",
                 "--data-dir", str(data),
                 "--workflows-dir", str(contracts),
                 "--cache-dir", str(FIXTURE_CACHE),
@@ -239,7 +239,7 @@ class TestMaterialiseSweepsStaleTmp:
         )
         assert res.exit_code == 0, res.output
         assert not stale.exists(), (
-            "a stale .tmp must be swept when materialise runs"
+            "a stale .tmp must be swept when materialize runs"
         )
         # The real snapshots are written and intact.
         assert list((data / "work_items").rglob("*.parquet"))
@@ -250,11 +250,11 @@ class TestCompaction:
     per table — every work item kept at its latest version, only
     the redundant older snapshots dropped."""
 
-    def _materialise(self, data, contracts):
+    def _materialize(self, data, contracts):
         return CliRunner().invoke(
             cli,
             [
-                "materialise", "astral-uv-week",
+                "materialize", "astral-uv-week",
                 "--data-dir", str(data),
                 "--workflows-dir", str(contracts),
                 "--cache-dir", str(FIXTURE_CACHE),
@@ -267,17 +267,17 @@ class TestCompaction:
         """The deduped warehouse the read view sees is byte-for-byte
         identical before and after compaction — nothing lost."""
         from flowmetrics.app import open_warehouse
-        from flowmetrics.materialise import compact_contract
+        from flowmetrics.materialize import compact_contract
 
         tmp, contracts = _contracts_dir()
         data = tmp / "data"
         for _ in range(2):
-            assert self._materialise(data, contracts).exit_code == 0
+            assert self._materialize(data, contracts).exit_code == 0
         assert len(list((data / "work_items").rglob("*.parquet"))) == 2
 
         con = open_warehouse(data)
         before = con.execute(
-            "SELECT item_id, materialised_at, completed_at "
+            "SELECT item_id, materialized_at, completed_at "
             "FROM work_items ORDER BY item_id"
         ).fetchall()
         before_tx = con.execute(
@@ -292,7 +292,7 @@ class TestCompaction:
         )
         con = open_warehouse(data)
         after = con.execute(
-            "SELECT item_id, materialised_at, completed_at "
+            "SELECT item_id, materialized_at, completed_at "
             "FROM work_items ORDER BY item_id"
         ).fetchall()
         after_tx = con.execute(
@@ -302,14 +302,14 @@ class TestCompaction:
         assert after == before, "compaction must preserve every work item"
         assert after_tx == before_tx, "compaction must preserve transitions"
 
-    def test_materialise_keeps_the_file_count_bounded(self):
-        """Materialise compacts before each run, so snapshot files
+    def test_materialize_keeps_the_file_count_bounded(self):
+        """Materialize compacts before each run, so snapshot files
         don't grow without bound — three runs leave two files, not
         three."""
         tmp, contracts = _contracts_dir()
         data = tmp / "data"
         for _ in range(3):
-            assert self._materialise(data, contracts).exit_code == 0
+            assert self._materialize(data, contracts).exit_code == 0
         files = list((data / "work_items").rglob("*.parquet"))
         assert len(files) == 2, (
             f"compaction should bound files to ~2; got {files}"

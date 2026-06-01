@@ -128,7 +128,7 @@ def probe_source_vocab(source: str, target: dict) -> dict:
       - Jira `labels`: `/rest/api/2/project/{key}/statuses`.
       - `lifecycle_events`: curated per source (constants above).
       - `warehouse_stages`: the route fills this from the warehouse
-        when editing a materialised contract; empty here.
+        when editing a materialized contract; empty here.
 
     Source-API failures return empty `labels` so the lifecycle +
     warehouse subsections still render.
@@ -304,8 +304,8 @@ def bucket_items_by_step(
 
     Each item carries `current_stage` (and, for event matchers, a
     representative `signal`). Steps carry typed matchers; bucketing
-    uses the SAME `matching` evaluator as the materialise remap, so the
-    preview can't drift from what materialise will write. Items matching
+    uses the SAME `matching` evaluator as the materialize remap, so the
+    preview can't drift from what materialize will write. Items matching
     no step land in a trailing `_unmatched` bucket. Pure — no I/O.
     """
     from .contract import Step

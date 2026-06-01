@@ -21,7 +21,7 @@ overhead?*
 **Single-operator, multi-instance, dual-surface.** Build the warehouse
 (Parquet + DuckDB), a single-page web dashboard (FastAPI + HTMX +
 Vega-Lite), and an MCP server. ETL is a separate
-`flow materialise <contract>` CLI command driven by external cron /
+`flow materialize <contract>` CLI command driven by external cron /
 systemd-timer / k8s-cronjob — never an in-process scheduler. The
 runtime process serves the dashboard and the MCP server; it never
 fetches from GitHub/Jira directly.
@@ -54,7 +54,7 @@ any MCP client) the same questions from a terminal or chat.
 - [ ] **One single-scroll dashboard beats per-chart pages.** Test:
   build Slice 4 with anchored sections; if you wish for multi-page
   navigation, refactor.
-- [ ] **`flow materialise` + external cron is simpler than in-process
+- [ ] **`flow materialize` + external cron is simpler than in-process
   scheduling.** Test: Slice 1 ships the CLI command; iterate on cron
   config in real use.
 - [ ] **Shared-password auth is enough for Tailscale-fronted
@@ -69,7 +69,7 @@ any MCP client) the same questions from a terminal or chat.
 Each slice ends with a browser-visible chart or an MCP-invokable
 tool. No slice is "data layer in isolation."
 
-1. **CLI: `flow materialise`.** Fetch GitHub PRs → write Parquet for
+1. **CLI: `flow materialize`.** Fetch GitHub PRs → write Parquet for
    one hardcoded contract. Tested via external cron locally.
 2. **Web: single dashboard, one chart, port + host flags.**
    `flow serve --port 8000 --host 127.0.0.1`. One Vega-Lite
@@ -98,7 +98,7 @@ Tools:
   aggregate(contract, since, until, group_by, filters)
   forecast_when_done(contract, items, training_window, filters)
   forecast_how_many(contract, days, training_window, filters)
-  refresh(contract)          # invokes `flow materialise` for the contract
+  refresh(contract)          # invokes `flow materialize` for the contract
   explain_item(contract, source, item_id)
 
 Resources:
@@ -167,7 +167,7 @@ config; agent sees them as separate servers
   "personal" — undersells the work-context).
 - **Slice 2 enforces shared-password** when bound off-localhost. No
   way to expose the dashboard to Tailscale without a password.
-- **External cron** (`flow materialise <contract>`) — not
+- **External cron** (`flow materialize <contract>`) — not
   APScheduler.
 - **Single-page dashboard** with anchored sections — not per-chart
   pages.

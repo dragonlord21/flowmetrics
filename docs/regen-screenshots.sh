@@ -3,9 +3,9 @@
 # `flow serve` instance.
 #
 # Prerequisites:
-#   1. Workflows materialised:
-#        flow materialise astral-uv-week --workflows-dir contracts --data-dir data
-#        flow materialise apache-cassandra-week --workflows-dir contracts --data-dir data
+#   1. Workflows materialized:
+#        flow materialize astral-uv-week --workflows-dir contracts --data-dir data
+#        flow materialize apache-cassandra-week --workflows-dir contracts --data-dir data
 #      The starter YAMLs live in samples/ — copy what you need into
 #      contracts/ first.
 #

@@ -4,7 +4,7 @@ Two units:
 
 | File | Job | Type |
 |----|----|----|
-| `flowmetrics-materialise.{service,timer}` | Daily ingest | Oneshot, fired by a timer |
+| `flowmetrics-materialize.{service,timer}` | Daily ingest | Oneshot, fired by a timer |
 | `flowmetrics-serve.service` | Persistent dashboard | Long-running, restarted on failure |
 
 Use one or both. Together they give you a host that fetches data on
@@ -51,7 +51,7 @@ rm ~/.config/systemd/user/flowmetrics-serve.service
 systemctl --user daemon-reload
 ```
 
-## Daily ingest (materialise timer)
+## Daily ingest (materialize timer)
 
 Pick the user that owns your install (e.g. `flowmetrics`).
 
@@ -64,16 +64,16 @@ Pick the user that owns your install (e.g. `flowmetrics`).
 #    you can hard-code it.
 
 # 2. Copy the unit + timer in (system-wide install).
-sudo cp flowmetrics-materialise.service /etc/systemd/system/
-sudo cp flowmetrics-materialise.timer   /etc/systemd/system/
+sudo cp flowmetrics-materialize.service /etc/systemd/system/
+sudo cp flowmetrics-materialize.timer   /etc/systemd/system/
 sudo systemctl daemon-reload
 
 # 3. Enable + start the TIMER (not the service — the timer triggers it).
 #    Replace `flowmetrics` with the user the job runs as.
-sudo systemctl enable --now flowmetrics-materialise@flowmetrics.timer
+sudo systemctl enable --now flowmetrics-materialize@flowmetrics.timer
 
 # 4. (Optional) Fire it once manually to validate.
-sudo systemctl start flowmetrics-materialise@flowmetrics.service
+sudo systemctl start flowmetrics-materialize@flowmetrics.service
 ```
 
 ## Verify
@@ -83,7 +83,7 @@ sudo systemctl start flowmetrics-materialise@flowmetrics.service
 systemctl list-timers | grep flowmetrics
 
 # What did the last run do?
-journalctl -u flowmetrics-materialise@flowmetrics.service --since=today
+journalctl -u flowmetrics-materialize@flowmetrics.service --since=today
 
 # Or read the structured manifest:
 cat $FLOWMETRICS_HOME/data/_status/daily-$(date -u +%F).json | jq .
@@ -103,7 +103,7 @@ OnCalendar=*-*-* 00,06,12,18:00
 ## Uninstall
 
 ```bash
-sudo systemctl disable --now flowmetrics-materialise@flowmetrics.timer
-sudo rm /etc/systemd/system/flowmetrics-materialise.{service,timer}
+sudo systemctl disable --now flowmetrics-materialize@flowmetrics.timer
+sudo rm /etc/systemd/system/flowmetrics-materialize.{service,timer}
 sudo systemctl daemon-reload
 ```

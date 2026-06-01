@@ -59,7 +59,7 @@ FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
 @pytest.fixture
 def warehouse() -> duckdb.DuckDBPyConnection:
-    """Materialise the pinned fixture data into a tmp warehouse so
+    """Materialize the pinned fixture data into a tmp warehouse so
     every component renderer has data to read. Independent of the
     other component-test fixtures so this file stands alone."""
     tmp = Path(tempfile.mkdtemp())
@@ -82,7 +82,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     res = CliRunner().invoke(
         cli,
         [
-            "materialise",
+            "materialize",
             "astral-uv-week",
             "--data-dir",
             str(data_dir),

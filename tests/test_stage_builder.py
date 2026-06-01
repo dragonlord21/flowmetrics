@@ -2,7 +2,7 @@
 
 The user clicks "Discover stages", which POSTs to
 `/api/internal/contracts/_probe-stages`. The server runs a bounded
-materialise into a scratch dir, extracts distinct stage names from
+materialize into a scratch dir, extracts distinct stage names from
 the transitions table, deletes the scratch dir, and returns
 {stages: [...]}. The result is cached for 15 minutes per source
 target so the user can iterate without re-paying the API call.
@@ -82,7 +82,7 @@ class TestProbeStages:
 
 class TestProbeStagesCache:
     """Same source target probed twice within 15 minutes shouldn't
-    re-run the bounded materialise. The cache key is the source
+    re-run the bounded materialize. The cache key is the source
     target tuple (kind + repo OR kind + jira_url + jira_project)."""
 
     def test_repeat_call_hits_cache_not_probe(self, workspace):

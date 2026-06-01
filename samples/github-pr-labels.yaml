@@ -4,7 +4,7 @@
 # (`status:in-review`, `team:backend/qa-pending`, etc.) rather than the
 # native Draft → Approved → Merged cycle. The `wip_labels:` list names
 # the labels that count as WIP, in workflow order (left to right on the
-# board). State is materialised from LabeledEvent / UnlabeledEvent
+# board). State is materialized from LabeledEvent / UnlabeledEvent
 # timestamps in the PR's timeline.
 #
 # See docs/SPEC-github-labels.md for the full resolution rules.

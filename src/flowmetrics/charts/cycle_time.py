@@ -157,12 +157,12 @@ def build_cycle_time_model(
 
 
 def _empty_model(all_items: list[CompletedItem]) -> CycleTimeModel:
-    """Empty-state model. Distinguishes 'nothing materialised at
+    """Empty-state model. Distinguishes 'nothing materialized at
     all' from 'nothing in this window' — the operator needs the
     right fix (backfill vs. widen the view)."""
     if not all_items:
         headline = (
-            "No data materialised yet — open the Data Source "
+            "No data materialized yet — open the Data Source "
             "page to fetch completions from the source system."
         )
     else:

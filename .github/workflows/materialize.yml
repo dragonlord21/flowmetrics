@@ -1,8 +1,8 @@
-# Scheduled materialise via GitHub Actions — alternative to native
+# Scheduled materialize via GitHub Actions — alternative to native
 # cron / systemd when you'd rather your warehouse live in CI.
 #
 # Pattern: the workflow YAMLs are committed in `contracts/` (the
-# repo is the source of truth). The job runs `flow materialise-all`
+# repo is the source of truth). The job runs `flow materialize-all`
 # against them and uploads the resulting `data/` as a build artifact
 # (retained 14 days). Use `actions/download-artifact` (or copy to
 # a release / external bucket) if you want the warehouse off CI.
@@ -14,7 +14,7 @@
 #   2. Edit the cron schedule to taste.
 #   3. Push.
 
-name: materialise
+name: materialize
 
 on:
   schedule:
@@ -30,8 +30,8 @@ permissions:
   # `contents: write` and use actions/checkout with a token.
 
 jobs:
-  materialise:
-    name: materialise-all
+  materialize:
+    name: materialize-all
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -58,14 +58,14 @@ jobs:
           key: flowmetrics-source-cache-${{ github.run_id }}
           restore-keys: flowmetrics-source-cache-
 
-      - name: Materialise every workflow
+      - name: Materialize every workflow
         env:
           # Override with your own secret if private repos are in
           # scope. The default GITHUB_TOKEN reads public repos
           # in this org without setup.
           GITHUB_TOKEN: ${{ secrets.FLOW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
-          uv run flow materialise-all \
+          uv run flow materialize-all \
             --workflows-dir contracts \
             --data-dir data
 
@@ -80,6 +80,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: materialise-manifest-${{ github.run_id }}
+          name: materialize-manifest-${{ github.run_id }}
           path: data/_status/daily-*.json
           retention-days: 30

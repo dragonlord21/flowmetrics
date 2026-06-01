@@ -14,7 +14,7 @@ Working assumptions (call out anything that's wrong):
 - **Auth for the web contract builder** rides on the existing
   `--password` (HTTP Basic via `--host 0.0.0.0`); localhost-bound use
   stays unauthenticated.
-- **Stage discovery** in the builder uses a *probe materialise* — small
+- **Stage discovery** in the builder uses a *probe materialize* — small
   bounded fetch that returns known stages from the source — with
   manual override always available.
 
@@ -28,14 +28,14 @@ A non-developer on macOS, Linux, or Windows can:
 
 1. Install flowmetrics.
 2. Drop a workflow YAML into `contracts/`.
-3. Schedule a daily materialise via their OS's native scheduler **or** a
+3. Schedule a daily materialize via their OS's native scheduler **or** a
    container.
 4. Back up the warehouse to disk or object storage.
 5. Restore from that backup onto a fresh machine and serve unchanged.
 
 ### Why now
 
-The materialise CLI is already cron-friendly (exit codes, atomic
+The materialize CLI is already cron-friendly (exit codes, atomic
 writes, manifests). The gaps are surface-level: one Windows subprocess
 bug, missing schedule templates for each OS, no backup story, and ops
 docs scattered across HOWTO + SPEC. Closing them is mostly docs +
@@ -71,7 +71,7 @@ A1. `A5` consolidates docs once the recipes exist.
   (`lsof -ti:PORT`, `kill …`) with a cross-platform block: POSIX hint
   on POSIX, Windows hint (`netstat -ano | findstr :PORT`,
   `taskkill /F /PID PID`) on Windows. Same `os.name` check.
-- Document that `flow serve` and `flow materialise` both work on
+- Document that `flow serve` and `flow materialize` both work on
   Windows by exercising the existing test suite under `windows-latest`
   in CI (add a Windows job to `.github/workflows/test.yml`; mark any
   CI-only-broken tests `@pytest.mark.skipif(os.name == 'nt')` with a
@@ -83,7 +83,7 @@ A1. `A5` consolidates docs once the recipes exist.
 
 **Acceptance**
 
-- `flow serve` + `flow materialise` complete without error on
+- `flow serve` + `flow materialize` complete without error on
   `windows-latest` in CI.
 - Browser-triggered backfill returns the expected JSON status
   transitions on Windows (mocked subprocess test).
@@ -102,21 +102,21 @@ A1. `A5` consolidates docs once the recipes exist.
 **One PR. Ships a working scheduled-ingest on every supported OS.**
 
 - Add `scripts/scheduling/` with three minimal, parameterised templates:
-  - `linux-systemd/flowmetrics-materialise.service` +
-    `flowmetrics-materialise.timer` (daily, 02:30 local).
+  - `linux-systemd/flowmetrics-materialize.service` +
+    `flowmetrics-materialize.timer` (daily, 02:30 local).
   - `linux-cron/crontab.sample` (daily, same time; safe `PATH` + `cd`
     preamble).
-  - `macos-launchd/com.flowmetrics.materialise.plist`
+  - `macos-launchd/com.flowmetrics.materialize.plist`
     (`StartCalendarInterval` daily 02:30; `StandardErrorPath`
     points at a log file).
-  - `windows-task-scheduler/flowmetrics-materialise.xml` (importable
+  - `windows-task-scheduler/flowmetrics-materialize.xml` (importable
     via `schtasks /Create /XML`) + a one-page README on what to edit.
 - Each template uses environment-variable substitution
   (`FLOWMETRICS_HOME`, `FLOWMETRICS_VENV`, `FLOWMETRICS_WORKFLOW`) so
   copying + setting two vars is the whole install.
-- Add a "one liner" wrapper script per OS that materialises every YAML
+- Add a "one liner" wrapper script per OS that materializes every YAML
   in `contracts/` so the scheduler only fires one command
-  (`scripts/scheduling/materialise-all.sh` + `.ps1`). Wrapper iterates,
+  (`scripts/scheduling/materialize-all.sh` + `.ps1`). Wrapper iterates,
   logs successes/failures to a single JSON manifest per day, exits
   non-zero only if every contract failed (so monitoring alerts
   meaningfully).
@@ -166,7 +166,7 @@ A1. `A5` consolidates docs once the recipes exist.
   shared-credentials file. Use `botocore`'s standard env vars; never
   bake creds into config.
 - Add scheduler templates in `scripts/scheduling/backup/` for each OS,
-  running `flow backup` after the daily materialise.
+  running `flow backup` after the daily materialize.
 - Unit tests: round-trip a tiny synthetic warehouse — backup → restore
   → DuckDB read returns identical rows. Test that restore refuses to
   overwrite non-empty dir without `--force`. Test that a corrupted
@@ -198,14 +198,14 @@ A1. `A5` consolidates docs once the recipes exist.
 
 - `Dockerfile` (multi-stage: `uv sync --frozen` in builder, slim runtime
   with only the venv + the package). Single image runs either
-  `flow materialise` or `flow serve` based on `CMD`. Image labels:
+  `flow materialize` or `flow serve` based on `CMD`. Image labels:
   `org.opencontainers.image.source`, `…version`.
-- `compose.yml`: two services — `materialise` (one-shot, run via
+- `compose.yml`: two services — `materialize` (one-shot, run via
   `docker compose run`) and `serve` (long-running, port 8000, bind-mounts
   `./contracts` and `./data`). Documented as the "I just want it
   running" path.
-- `.github/workflows/materialise.yml`: scheduled GH Actions workflow
-  that runs `flow materialise` against contracts committed in the repo
+- `.github/workflows/materialize.yml`: scheduled GH Actions workflow
+  that runs `flow materialize` against contracts committed in the repo
   (uses repo as the source of truth for YAML; warehouse persists to
   a GH cache / artifact). Demonstrates the cloud-native pattern.
 - Test job in CI that builds the image and runs
@@ -213,7 +213,7 @@ A1. `A5` consolidates docs once the recipes exist.
   in the slim base.
 
 **Files touched**: new `Dockerfile`, new `compose.yml`,
-new `.github/workflows/materialise.yml`, CI updates.
+new `.github/workflows/materialize.yml`, CI updates.
 
 **Acceptance**
 
@@ -228,7 +228,7 @@ new `.github/workflows/materialise.yml`, CI updates.
 - `docker build .` + `docker run` health-checks in CI.
 - Manual: `docker compose up serve`, open `http://localhost:8000`,
   verify a tile renders.
-- Manual: `gh workflow run materialise.yml`, inspect logs + the
+- Manual: `gh workflow run materialize.yml`, inspect logs + the
   saved artifact.
 
 #### A5 — Ops guide on GitHub Pages
@@ -260,7 +260,7 @@ new `.github/workflows/materialise.yml`, CI updates.
 **Acceptance**
 
 - A new reader following only `docs/OPERATIONS.md` can stand up a
-  scheduled materialise on each OS.
+  scheduled materialize on each OS.
 - Internal markdown links resolve on github.com AND on the published
   Pages site (`jekyll-relative-links` handles the rewrite — verify
   visually after publish).
@@ -331,7 +331,7 @@ worth a UI. `B5` rounds it out with edit.
   source}` for every YAML under `--workflows-dir`. JSON.
 - New endpoint `GET /api/internal/contracts/{id}` → full contract
   payload: parsed dataclass fields + the raw YAML text + a
-  `materialise_status` block ({last_run_at, status, items}).
+  `materialize_status` block ({last_run_at, status, items}).
 - Both are unauthenticated when serving on `127.0.0.1`; gated by the
   existing HTTP Basic when serving off-localhost.
 - Unit tests: list returns every YAML; detail returns parsed +
@@ -435,7 +435,7 @@ helper), template updates on the home page, tests.
 - E2E (Playwright): fill in form for `astral-sh/uv`, save, assert
   redirect to `/workflows/{name}` and the page returns 200.
 
-#### B4 — Stage builder via probe materialise
+#### B4 — Stage builder via probe materialize
 
 **One PR. Replaces "freeform stage names" with discovery + DnD.**
 
@@ -443,7 +443,7 @@ helper), template updates on the home page, tests.
   section.
 - "Discover stages" button calls a new endpoint `POST
   /api/internal/contracts/_probe-stages`. Server runs a bounded
-  materialise (`--since` = last 30 days, no `--status-file`) into a
+  materialize (`--since` = last 30 days, no `--status-file`) into a
   scratch dir, reads the resulting transitions to extract distinct
   stage names, deletes the scratch dir. Returns
   `{stages: [name], hint?: str}` (the hint surfaces things like
@@ -531,7 +531,7 @@ updates, tests.
 - A YAML textarea editor. The structured form covers every field
   in the schema today; a raw editor is friction we don't need.
 - Contract templating / cloning. Add when there's a third use case.
-- Webhook-triggered re-materialise. The cron path is enough until
+- Webhook-triggered re-materialize. The cron path is enough until
   someone asks.
 
 ---
@@ -574,8 +574,8 @@ A user with the dashboard open can:
   (CRUD, archive, audit timestamps) without scattering files; the
   shape stays YAML-shaped so import/export is a no-op and the
   Pydantic schema is still the validator. `flow serve` and
-  `flow materialise(-all)` both read from the DB. The DB sits
-  *alongside* the materialise warehouse (the existing `--data-dir`),
+  `flow materialize(-all)` both read from the DB. The DB sits
+  *alongside* the materialize warehouse (the existing `--data-dir`),
   not inside it.
 - **First-start migration.** On first server boot (or via
   `flow contracts migrate`), any `*.yaml` / `*.yml` files in the
@@ -681,13 +681,13 @@ archived-contracts page.
   5. Echo a one-line summary to stderr.
 - Same migration runs from `flow contracts migrate` as a manual
   trigger for cron-style installs.
-- `flow materialise(-all)` reads from the DB. Removed: directory
+- `flow materialize(-all)` reads from the DB. Removed: directory
   iteration. Added: an optional `--from-yaml PATH` flag for one-off
   contracts not yet in the DB (used by the test suite + ad-hoc).
 
 **Files touched**: new `src/flowmetrics/contracts_db.py`,
 `src/flowmetrics/contract.py` (rewrite), `src/flowmetrics/cli.py`
-(materialise paths), `src/flowmetrics/app.py` (CRUD endpoints now
+(materialize paths), `src/flowmetrics/app.py` (CRUD endpoints now
 hit the DB).
 
 **Acceptance**
@@ -699,7 +699,7 @@ hit the DB).
   inject YAMLs into a temp workflows-dir) now exercise the import
   path implicitly. Tests that need a contract pre-seeded use the
   PUT API as today.
-- `flow materialise apache-cassandra-week` succeeds against a DB
+- `flow materialize apache-cassandra-week` succeeds against a DB
   freshly seeded from the existing demo YAML.
 
 **Verification**
@@ -711,7 +711,7 @@ hit the DB).
 
 #### C2 — Archive / restore lifecycle (server endpoints)
 
-**One PR. No UI surface; API + materialise behaviour only.**
+**One PR. No UI surface; API + materialize behaviour only.**
 
 - `POST /api/internal/contracts/{id}/archive` — sets
   `archived_at = NOW()`. Idempotent. Refuses if Parquet exists for
@@ -726,7 +726,7 @@ hit the DB).
 - `DELETE /api/internal/contracts/{id}` becomes **hard delete** —
   requires `archived_at IS NOT NULL`. Returns 409 with the hint
   "archive this contract first" when called on a live row.
-- `flow materialise(-all)` adds `WHERE archived_at IS NULL` to its
+- `flow materialize(-all)` adds `WHERE archived_at IS NULL` to its
   fetch. Archived contracts are invisible to the cron path.
 - Audit: archive sets `archived_at` from server clock. Optional
   reason in the request body lands in a new `archived_reason TEXT`
@@ -742,7 +742,7 @@ queries), `src/flowmetrics/app.py` (endpoints), tests
   `?include_archived=true` includes it with `archived: true` →
   restore → list includes it → archive again → hard-delete →
   list excludes it permanently.
-- `flow materialise-all` skips archived contracts (verified by
+- `flow materialize-all` skips archived contracts (verified by
   archiving one of the demo contracts, running the daily
   wrapper, asserting the manifest has only the others).
 
@@ -841,7 +841,7 @@ update), `docs/GLOSSARY.md` (Ready ↔ Backlog note),
     `["Issue created", "Assigned", "Resolved", "Reopened",
      "Closed"]`.
   - **`warehouse_stages`** — existing `_probe-stages` behaviour
-    (distinct stage names already in the materialised transitions).
+    (distinct stage names already in the materialized transitions).
 - UI affordance in the builder:
   - "Suggestions" panel under the Steps editor.
   - Three small subsections: **Used in your warehouse**, **Labels
@@ -893,7 +893,7 @@ update), `docs/GLOSSARY.md` (Ready ↔ Backlog note),
   window from `since`. Streams items in time order; stops at the
   first cap to bite.
 - The fetch is **non-persisting**: items go through the existing
-  Source adapter but bypass the materialise → Parquet path. They
+  Source adapter but bypass the materialize → Parquet path. They
   live in a process-local cache only.
 - Response shape:
   ```json
@@ -982,7 +982,7 @@ in-process cache), `src/flowmetrics/app.py` (endpoint),
 **Acceptance**
 
 - Downloaded YAML is byte-identical to the row's `yaml` column.
-- Downloaded YAML, fed to `flow materialise --from-yaml
+- Downloaded YAML, fed to `flow materialize --from-yaml
   /path/to/file.yaml`, succeeds.
 - Copy button populates the clipboard with the same text.
 
@@ -1014,7 +1014,7 @@ route in `app.py`, link on `home.html.jinja`, tests.
 
 - Playwright E2E: full lifecycle — create → archive → restore →
   archive → hard-delete → assert gone everywhere (home, archive
-  page, materialise-all manifest).
+  page, materialize-all manifest).
 
 ### Phase checkpoints (Plan C)
 
@@ -1046,7 +1046,7 @@ route in `app.py`, link on `home.html.jinja`, tests.
   ALTER TABLE (gated on PRAGMA `user_version`) is sufficient.
 - **No "import multiple YAMLs at once" UI.** Import-from-YAML
   stays as the first-boot migration + the per-contract
-  `flow materialise --from-yaml` path.
+  `flow materialize --from-yaml` path.
 
 ---
 

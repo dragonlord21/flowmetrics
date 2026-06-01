@@ -93,7 +93,7 @@ The dashboard shows the right shape but empty cards until the
 warehouse is populated. Click **Data source** (top-right).
 
 You'll see a coverage map for your window. Click **Backfill** to
-materialise the workflow. The page polls `flow materialise`'s
+materialize the workflow. The page polls `flow materialize`'s
 status file under the hood; the bar fills as work_items + transitions
 land in `data/`. A few seconds for a small window.
 
@@ -102,7 +102,7 @@ land in `data/`. A few seconds for a small window.
 Click the workflow name to return to the dashboard. You'll see:
 
 - **Aging WIP** — every in-flight item by current state × age, pinned
-  to the most recent materialise.
+  to the most recent materialize.
 - **Cycle Time / Throughput / CFD / Forecast** — driven by the Period
   picker (top of the page).
 

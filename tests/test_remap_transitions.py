@@ -1,5 +1,5 @@
 """remap_transitions — relabel adapter stages to the user's steps at
-materialise time (#2 Slice B).
+materialize time (#2 Slice B).
 
 Each transition's `stage` is rewritten to the first step it matches (OR
 within a step, first step wins across steps). Unmatched transitions go

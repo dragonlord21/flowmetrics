@@ -38,10 +38,10 @@ pytestmark = pytest.mark.e2e
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
 
-def _materialise_wide(
+def _materialize_wide(
     contracts_dir: Path, data_dir: Path, cache_dir: Path
 ) -> None:
-    """Materialise a `wide-demo` contract whose completions span
+    """Materialize a `wide-demo` contract whose completions span
     ~130 days, plus a few in-flight items.
 
     The `astral-uv-week` fixture only holds one week of data, so a
@@ -52,7 +52,7 @@ def _materialise_wide(
     """
     from flowmetrics.compute import WorkItem
     from flowmetrics.contract import Contract
-    from flowmetrics.materialise import materialise
+    from flowmetrics.materialize import materialize
 
     name = "wide-demo"
     (contracts_dir / f"{name}.yaml").write_text(
@@ -96,10 +96,10 @@ def _materialise_wide(
     source.fetch_completed_in_window.return_value = completed
     source.fetch_in_flight.return_value = in_flight
     with patch(
-        "flowmetrics.materialise.make_github_source",
+        "flowmetrics.materialize.make_github_source",
         return_value=source,
     ):
-        materialise(
+        materialize(
             contract=Contract(
                 name=name, source="github", repo="x/y",
                 start=date(2025, 1, 1), stop=date(2027, 12, 31),
@@ -153,7 +153,7 @@ def server_url(tmp_path_factory):
     res = CliRunner().invoke(
         cli,
         [
-            "materialise", name,
+            "materialize", name,
             "--data-dir", str(data_dir),
             "--workflows-dir", str(contracts_dir),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -164,8 +164,8 @@ def server_url(tmp_path_factory):
     assert res.exit_code == 0, res.output
 
     # A second contract whose data spans ~130 days — the filter-
-    # propagation tests need that spread (see `_materialise_wide`).
-    _materialise_wide(contracts_dir, data_dir, tmp_path / "cache")
+    # propagation tests need that spread (see `_materialize_wide`).
+    _materialize_wide(contracts_dir, data_dir, tmp_path / "cache")
 
     app = create_app(data_dir=data_dir, contracts_dir=contracts_dir)
     port = _free_port()
@@ -273,7 +273,7 @@ class TestPeriodFilterBar:
         self, server_url: str, page: Page
     ):
         """Aging is a "right now" snapshot pinned to the latest
-        materialise — a custom Period anchor in the URL must NOT
+        materialize — a custom Period anchor in the URL must NOT
         move its as-of date, and the page carries no Period bar."""
         page.goto(
             server_url + "/workflows/astral-uv-week/metrics/aging"

@@ -21,7 +21,7 @@ steps/`matches` are **preview-only**; this spec closes that gap.
     `current_stage` (`source_probe.py:295` — `if stage in matches`);
   - **untyped** — a match string is compared to the stage text with no
     notion of "label" vs "status" vs "lifecycle event".
-- The **real** materialise pipeline does **not** use `matches`. The
+- The **real** materialize pipeline does **not** use `matches`. The
   source adapters emit their own `StageTransition(item_id, entered_at,
   stage, signal)` rows:
   - GitHub PR review lifecycle stages: `Draft / Awaiting Review /
@@ -106,7 +106,7 @@ Jira (`source: jira`):
 
 Validation rejects an `event:` code outside this set with a message that
 lists the valid codes — so a hand-edited typo fails loudly at save/parse,
-not silently at materialise.
+not silently at materialize.
 
 YAML shape (each matcher is a typed mapping; no bare strings):
 
@@ -131,7 +131,7 @@ steps:
   (not the transition stream). Deferred to its own spec; OR-of-typed-
   matchers covers the common cases.
 
-### 2. A remap layer at materialise time
+### 2. A remap layer at materialize time
 
 Add a pure function that relabels adapter transitions to the user's
 step names before they're written to the warehouse:
@@ -158,16 +158,16 @@ compatible).
   `label:`/`status: <source-native value>`. Because chips are clicked,
   the user never types a code; the code only matters for hand-edited
   YAML and validation messages.
-- `bucket_items_by_step` (dry-run) and `remap_transitions` (materialise)
+- `bucket_items_by_step` (dry-run) and `remap_transitions` (materialize)
   must share the **same** matcher-evaluation function so the preview is
-  faithful to what materialise will do. (Today they diverge — that's the
+  faithful to what materialize will do. (Today they diverge — that's the
   root of the confusion.)
 
 ## Boundaries
 
 - **Always:** keep a no-steps contract working exactly as today
   (adapter-native stages); share one matcher evaluator between
-  preview and materialise.
+  preview and materialize.
 - **Ask first:** any change to the settled decisions above (remap
   timing, `_unmatched` handling, OR-only, no-migration clean break).
 - **Never:** silently drop transitions (unmatched ones go to
@@ -180,7 +180,7 @@ All open questions are resolved — ready to implement.
 1. **Event-code vocabulary:** short kebab codes (`pr-ready`,
    `changes-requested`, `pr-merged`, …) scoped by source, mapped 1:1 to
    `signals.py`. The UI chip shows the friendly label.
-2. **Remap timing:** **at materialise.** Each transition's `stage` is
+2. **Remap timing:** **at materialize.** Each transition's `stage` is
    rewritten to the matching step name during backfill, so the warehouse
    stores step names and every downstream metric + `states.wip` works
    unchanged. Editing steps requires a re-backfill to take effect.
@@ -203,13 +203,13 @@ All open questions are resolved — ready to implement.
 ## Success criteria
 
 - A UI-built GitHub PR workflow ("Open / In Review / Merged" with event
-  matchers) materialises so the CFD/aging/throughput bucket by those
+  matchers) materializes so the CFD/aging/throughput bucket by those
   three steps, and `states.wip` highlights "In Review".
-- The dry-run preview and the materialised result agree item-for-item
+- The dry-run preview and the materialized result agree item-for-item
   on bucketing (shared evaluator).
 - A no-steps contract is byte-for-byte unchanged.
 - New unit tests: typed-matcher evaluation (label/status/event/stage),
-  `remap_transitions` (incl. unmatched handling), preview/materialise
+  `remap_transitions` (incl. unmatched handling), preview/materialize
   parity; one e2e: build a typed workflow → backfill → dashboard buckets
   by the user's steps.
 
@@ -217,6 +217,6 @@ All open questions are resolved — ready to implement.
 
 - Unit: matcher evaluator + `remap_transitions` (pure, table-driven).
 - Component: dry-run preview uses the shared evaluator.
-- e2e (offline fixture): build "Open/In Review/Merged" → materialise →
+- e2e (offline fixture): build "Open/In Review/Merged" → materialize →
   assert warehouse stages are the step names and WIP filter is "In
   Review".

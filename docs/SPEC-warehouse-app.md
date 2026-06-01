@@ -25,7 +25,7 @@
 ### Goals
 
 1. **Move flow-metrics computation off interactive runtime.** The
-   `flow materialise` CLI is invoked by external cron; it fetches
+   `flow materialize` CLI is invoked by external cron; it fetches
    from GitHub/Jira and writes Parquet. The runtime serves charts
    and MCP queries from that Parquet — never by calling external
    APIs during a request.
@@ -92,7 +92,7 @@
                                  │ writes Parquet (atomic rename)
                                  │
 ┌─────────────────────────────────────────────────────────────────┐
-│             flow materialise <contract>  (separate command)      │
+│             flow materialize <contract>  (separate command)      │
 │             driven by external cron / systemd-timer / k8s-cron   │
 │  ─────────────────────────────────────────────────────────────  │
 │  One-shot ETL:                                                   │
@@ -129,7 +129,7 @@ Three concrete benefits over an in-process scheduler:
 
 - **The runtime is stateless.** Restarting `flow serve` doesn't reset
   any cron clock; the scheduler is OS-managed.
-- **Scaling is cloud-portable.** `flow materialise` runs as a
+- **Scaling is cloud-portable.** `flow materialize` runs as a
   k8s CronJob, a Lambda on a schedule, a Vercel cron — none of which
   the runtime knows about.
 - **Failure isolation.** A misbehaving ETL run can't crash the
@@ -198,7 +198,7 @@ One row per piece of work. Denormalised. Wide. Hive-partitioned by
 | | `comment_count` | int | |
 | | `last_activity_at` | timestamp | |
 | Provenance | `contract_id` | string | hash of contract YAML |
-| | `materialised_at` | timestamp | when ETL produced this row |
+| | `materialized_at` | timestamp | when ETL produced this row |
 | | `run_id` | string | ETL run that produced this row |
 
 ### 4.2 `stage_transitions` (long table)
@@ -307,7 +307,7 @@ contract:
 
   refresh:
     # Schedule is metadata only — external cron actually invokes the
-    # `flow materialise` command. This block documents the intended
+    # `flow materialize` command. This block documents the intended
     # cadence for the operator's reference.
     intended_schedule: "0 6 * * *"
     in_flight_max_age_days: 180
@@ -357,7 +357,7 @@ Run at contract-load time:
 - `inherits` resolves.
 
 Invalid contracts are rejected with line-level error messages.
-`flow materialise` refuses to run; the web UI continues serving the
+`flow materialize` refuses to run; the web UI continues serving the
 last good contract.
 
 ---
@@ -367,7 +367,7 @@ last good contract.
 ### 6.1 Invocation
 
 ```
-flow materialise <contract-name> \
+flow materialize <contract-name> \
     --data-dir $DATA_DIR \
     --workflows-dir $CONTRACTS_DIR
 ```
@@ -387,19 +387,19 @@ Three supported patterns; pick whichever fits your deployment.
 
 ```cron
 # m h dom mon dow command
-0 6 * * *  cd /home/me/flowmetrics && /usr/local/bin/flow materialise platform-team
-30 6 * * * cd /home/me/flowmetrics && /usr/local/bin/flow materialise personal-projects
+0 6 * * *  cd /home/me/flowmetrics && /usr/local/bin/flow materialize platform-team
+30 6 * * * cd /home/me/flowmetrics && /usr/local/bin/flow materialize personal-projects
 ```
 
 **systemd-timer** (Linux server):
 
 ```ini
-# flow-materialise@.service
+# flow-materialize@.service
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/flow materialise %i
+ExecStart=/usr/local/bin/flow materialize %i
 
-# flow-materialise@.timer
+# flow-materialize@.timer
 [Timer]
 OnCalendar=*-*-* 06:00:00
 Persistent=true
@@ -410,7 +410,7 @@ Persistent=true
 ```yaml
 apiVersion: batch/v1
 kind: CronJob
-metadata: { name: flow-materialise-platform-team }
+metadata: { name: flow-materialize-platform-team }
 spec:
   schedule: "0 6 * * *"
   jobTemplate:
@@ -420,7 +420,7 @@ spec:
           containers:
             - name: flow
               image: flowmetrics:latest
-              command: ["flow", "materialise", "platform-team"]
+              command: ["flow", "materialize", "platform-team"]
               env: [...secrets from secret manager...]
               volumeMounts: [...persistent volume for $DATA_DIR...]
 ```
@@ -429,7 +429,7 @@ The runtime is unaware of which is in use.
 
 ### 6.3 Refresh tiering
 
-`flow materialise` applies the same tiering each run:
+`flow materialize` applies the same tiering each run:
 
 | Tier | Items | Behaviour |
 |---|---|---|
@@ -635,7 +635,7 @@ GET /api/internal/forecast/when-done?contract=…&items=…&training_window_days
 GET /api/internal/forecast/how-many?contract=…&days=…&training_window_days=…&filter[…]=…
 GET /api/internal/items?contract=…&cursor=…&limit=…
 GET /api/internal/dimensions?contract=…
-POST /api/internal/contracts/{id}/refresh    # invokes flow materialise as a subprocess
+POST /api/internal/contracts/{id}/refresh    # invokes flow materialize as a subprocess
 PUT  /api/internal/contracts/{id}            # YAML upload + validate; admin = operator
 ```
 
@@ -706,7 +706,7 @@ forecast_how_many(contract: str, days: int, start: date,
                   filters: dict[str, list[str]] = {}) -> ForecastResult
 
 refresh(contract: str) -> RefreshResult
-  # Invokes `flow materialise` as a subprocess. Streams progress to
+  # Invokes `flow materialize` as a subprocess. Streams progress to
   # the MCP client. Idempotent — concurrent calls coalesce.
 
 explain_item(contract: str, source: "github"|"jira",
@@ -767,7 +767,7 @@ Slimmed for single-operator + possibly-network-exposed reality.
 
 - GitHub: PAT in OS keyring or `$GITHUB_TOKEN` env. Per-instance.
 - Jira: API token in OS keyring or `$JIRA_TOKEN` env. Per-instance.
-- Tokens read into memory only during `flow materialise` run. Never
+- Tokens read into memory only during `flow materialize` run. Never
   written to Parquet, never returned in API responses, never logged.
 
 ### 9.3 Network access
@@ -810,7 +810,7 @@ Three shapes, all from the same `flow` binary.
 ### 10.1 Laptop (single instance, single operator)
 
 ```
-$ flow materialise personal-projects    # run by cron, /Users/me/.crontab
+$ flow materialize personal-projects    # run by cron, /Users/me/.crontab
 $ flow serve --port 8000 --data-dir ./data --workflows-dir ./contracts
 $ flow mcp --data-dir ./data --workflows-dir ./contracts   # spawned by Claude Desktop
 ```
@@ -837,7 +837,7 @@ once per directory on different ports.
 my-vm:
   /opt/flowmetrics/data/
   /opt/flowmetrics/contracts/
-  systemd-timer: flow-materialise@{contract}.timer for each contract
+  systemd-timer: flow-materialize@{contract}.timer for each contract
   systemd-service: flow-serve.service binding 127.0.0.1:8000
   Caddy: TLS termination on :443 → 127.0.0.1:8000
 ```
@@ -885,7 +885,7 @@ the application source (the operator's choice of remote).
 - Public REST API + versioning policy + deprecation procedure.
 - GitHub App / Jira OAuth.
 - Bulk export / agent API keys / agent confirmation flow.
-- K8s manifests as a first-class deliverable. (`flow materialise`
+- K8s manifests as a first-class deliverable. (`flow materialize`
   works as a CronJob; the rest is left to the operator.)
 - Real-time / sub-minute dashboards.
 - Per-engineer scoring / individual surfacing.
@@ -913,11 +913,11 @@ the application source (the operator's choice of remote).
 ## 14. Migration from current CLI
 
 The existing CLI commands (`flow efficiency`, `flow aging`, etc.)
-keep working in v1 unchanged. The new commands (`flow materialise`,
+keep working in v1 unchanged. The new commands (`flow materialize`,
 `flow serve`, `flow mcp`) are additive. After Slice 4 the existing
 commands gain a `--from-warehouse` flag that reads Parquet instead
 of fetching live; the live-fetch path remains the default and the
-fallback for repos without a materialised contract.
+fallback for repos without a materialized contract.
 
 `scripts/generate_samples.py` continues to use the live-fetch path
 for the sample regen flow.
@@ -931,13 +931,13 @@ tool. **No slice is "data layer in isolation."** Slice acceptance
 includes a Playwright e2e test asserting what the slice promised
 (per `SPEC.md` §6 credibility rule).
 
-### Slice 1 — `flow materialise` writes Parquet
+### Slice 1 — `flow materialize` writes Parquet
 
 **Goal.** CLI command that fetches GitHub PRs for one hardcoded
 contract and writes `work_items.parquet` + `stage_transitions.parquet`.
 Tested via external cron locally.
 
-**Acceptance.** Run `flow materialise personal` from cron at 06:00;
+**Acceptance.** Run `flow materialize personal` from cron at 06:00;
 on inspection the next morning, Parquet files exist with the
 expected rows, and a run manifest is in `data/runs/`. DuckDB can
 query the result.
@@ -986,7 +986,7 @@ trail.
 ### Slice 6 — Contract switcher + editor
 
 **Goal.** Dropdown for switching active contract. YAML textarea +
-"validate" + "refresh" buttons. Refresh invokes `flow materialise`
+"validate" + "refresh" buttons. Refresh invokes `flow materialize`
 as a subprocess; streams output to a log panel.
 
 **Acceptance.** Operator edits a contract in browser, sees

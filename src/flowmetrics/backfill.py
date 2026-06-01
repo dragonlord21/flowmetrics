@@ -1,8 +1,8 @@
 """Backfill status — a tiny per-workflow JSON file recording an
-in-progress / finished `flow materialise` run.
+in-progress / finished `flow materialize` run.
 
 A browser-triggered backfill (the Data Source page) spawns
-`flow materialise` as a detached subprocess; that process writes
+`flow materialize` as a detached subprocess; that process writes
 this file (running → done/failed) and the page polls it. The
 file doubles as a lock: one backfill per workflow at a time.
 """

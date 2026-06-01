@@ -544,7 +544,7 @@ Parquet → DuckDB → API → HTML), and widens from there.
 
 Aligned to `docs/ideas/flowmetrics-single-operator-multi-instance.md`.
 
-1. **`flow materialise` writes Parquet.** CLI command; external cron
+1. **`flow materialize` writes Parquet.** CLI command; external cron
    invokes it. No web yet.
 2. **`flow serve` one chart with port + password gate.** Single
    dashboard page, one scatterplot, `--host` / `--port` flags.
@@ -554,7 +554,7 @@ Aligned to `docs/ideas/flowmetrics-single-operator-multi-instance.md`.
    filter widget driven by `/api/internal/dimensions`.
 5. **Jira source on the same UI.** Cross-source stitching works.
 6. **Contract switcher + editor.** YAML textarea, validate, refresh
-   button invokes `flow materialise` subprocess.
+   button invokes `flow materialize` subprocess.
 7. **MCP server.** `flow mcp --data-dir …` exposes tools, resources,
    prompts. Configured in Claude Desktop.
 8. **Multi-instance + hardening.** `--data-dir`, `--workflows-dir`,

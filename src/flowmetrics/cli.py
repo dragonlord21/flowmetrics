@@ -1057,11 +1057,11 @@ def forecast_how_many(
 
 
 # ---------------------------------------------------------------------------
-# Warehouse: `flow materialise <name>` — Slice 1.
+# Warehouse: `flow materialize <name>` — Slice 1.
 # ---------------------------------------------------------------------------
 
 
-@cli.command(short_help="Materialise a contract — fetch + write Parquet")
+@cli.command(short_help="Materialize a contract — fetch + write Parquet")
 @click.argument("name", type=str)
 @click.option(
     "--data-dir",
@@ -1121,7 +1121,7 @@ def forecast_how_many(
         "browser-triggered backfill."
     ),
 )
-def materialise(
+def materialize(
     name: str,
     data_dir: Path,
     contracts_dir: Path,
@@ -1149,7 +1149,7 @@ def materialise(
 
     from .backfill import write_status
     from .contracts_db import ContractStore
-    from .materialise import materialise as run_materialise
+    from .materialize import materialize as run_materialize
 
     since_iso = since.date().isoformat() if since is not None else None
     until_iso = until.date().isoformat() if until is not None else None
@@ -1201,7 +1201,7 @@ def materialise(
         contract = contract.model_copy(update=overrides)
 
     try:
-        manifest = run_materialise(
+        manifest = run_materialize(
             contract=contract,
             data_dir=data_dir,
             cache_dir=cache_dir,
@@ -1216,7 +1216,7 @@ def materialise(
         sys.exit(1)
 
     msg = (
-        f"materialised {manifest.contract_id} (run_id={manifest.run_id}): "
+        f"materialized {manifest.contract_id} (run_id={manifest.run_id}): "
         f"{manifest.items_fetched} items in "
         f"{(manifest.completed_at - manifest.started_at).total_seconds():.1f}s"
     )
@@ -1225,14 +1225,14 @@ def materialise(
 
 
 # ---------------------------------------------------------------------------
-# `flow materialise-all` — daily-ingest wrapper for cron / launchd / Task
+# `flow materialize-all` — daily-ingest wrapper for cron / launchd / Task
 # Scheduler. Iterates every YAML in --workflows-dir; one bad contract
 # doesn't block the others. Writes a JSON manifest the user's monitoring
 # tool can grep for failures.
 # ---------------------------------------------------------------------------
 
 
-def _materialise_all_now() -> datetime:
+def _materialize_all_now() -> datetime:
     """Indirection so tests can pin the timestamp without touching
     the global `datetime.now`. Plain function, not a constant — the
     monkeypatch needs a name to rebind."""
@@ -1240,8 +1240,8 @@ def _materialise_all_now() -> datetime:
 
 
 @cli.command(
-    name="materialise-all",
-    short_help="Run materialise for every workflow YAML in --workflows-dir",
+    name="materialize-all",
+    short_help="Run materialize for every workflow YAML in --workflows-dir",
 )
 @click.option(
     "--data-dir",
@@ -1272,14 +1272,14 @@ def _materialise_all_now() -> datetime:
         "<data-dir>/_status/daily-<UTC-date>.json."
     ),
 )
-def materialise_all(
+def materialize_all(
     data_dir: Path,
     contracts_dir: Path,
     cache_dir: Path,
     offline: bool,
     manifest_path: Path | None,
 ) -> None:
-    """Iterate every workflow YAML and materialise each one.
+    """Iterate every workflow YAML and materialize each one.
 
     Scheduler-friendly: a single failing contract doesn't block the
     rest. Exit code is 0 when at least one workflow succeeded (so
@@ -1289,14 +1289,14 @@ def materialise_all(
 
     from .contract import ContractError
     from .contracts_db import ContractStore
-    from .materialise import materialise as run_materialise
+    from .materialize import materialize as run_materialize
 
     # Migrate any leftover YAMLs into the DB first so this single
     # command handles both first-boot and the steady-state cron path.
     store = ContractStore(contracts_dir)
     store.ensure_initialized()
 
-    started = _materialise_all_now()
+    started = _materialize_all_now()
 
     # `list()` already excludes archived rows, so a retired workflow
     # isn't re-imported by the daily cron.
@@ -1307,7 +1307,7 @@ def materialise_all(
         name = meta.contract.name
         entry: dict = {"workflow": name, "status": "failed", "error": ""}
         try:
-            manifest = run_materialise(
+            manifest = run_materialize(
                 contract=meta.contract,
                 data_dir=data_dir,
                 cache_dir=cache_dir,
@@ -1322,9 +1322,9 @@ def materialise_all(
             entry["error"] = f"{type(exc).__name__}: {exc}"
         results.append(entry)
 
-    finished = _materialise_all_now()
+    finished = _materialize_all_now()
     payload = {
-        "schema": "flowmetrics.materialise_all.v1",
+        "schema": "flowmetrics.materialize_all.v1",
         "started_at": started.isoformat(),
         "finished_at": finished.isoformat(),
         "results": results,
@@ -1341,7 +1341,7 @@ def materialise_all(
     ok = sum(1 for r in results if r["status"] == "ok")
     failed = sum(1 for r in results if r["status"] == "failed")
     click.echo(
-        f"materialise-all: {ok} ok, {failed} failed, manifest at {manifest_path}"
+        f"materialize-all: {ok} ok, {failed} failed, manifest at {manifest_path}"
     )
 
     # Exit non-zero only when everything failed (or the dir was empty
@@ -1631,7 +1631,7 @@ def serve(
     """Serve the dashboard + per-metric detail pages.
 
     Reads from the local Parquet store under --data-dir (populated by
-    `flow materialise`). Never touches GitHub or Jira during a request.
+    `flow materialize`). Never touches GitHub or Jira during a request.
 
     Pass `--bg` to install + start as a persistent native service
     (macOS launchd or Linux systemd --user). `--bg --stop` tears it

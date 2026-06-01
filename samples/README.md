@@ -1,7 +1,7 @@
 # Sample workflow YAMLs
 
 Copy-paste starters. Drop one into your `contracts/` directory, edit
-the fields, then `flow materialise <name>` followed by `flow serve`.
+the fields, then `flow materialize <name>` followed by `flow serve`.
 
 | File | Source | Pattern |
 |------|--------|---------|
@@ -22,12 +22,12 @@ Every contract takes these keys:
 | `source` | yes | `github` or `jira`. |
 | `repo` | github only | `owner/name`, e.g. `astral-sh/uv`. |
 | `jira_url` + `jira_project` | jira only | The Jira base URL and the project key. |
-| `start` / `stop` | recommended | YYYY-MM-DD window. Materialise refuses to run without explicit dates today (a later slice will relax this). |
+| `start` / `stop` | recommended | YYYY-MM-DD window. Materialize refuses to run without explicit dates today (a later slice will relax this). |
 | `states` | no | Three-category classification of workflow states. When omitted, stages are inferred from data via pairwise precedence. |
 
 ## See also
 
-- [Tutorial](../docs/TUTORIAL.md) — install → materialise → serve in
+- [Tutorial](../docs/TUTORIAL.md) — install → materialize → serve in
   one linear walkthrough.
 - [How-to guides](../docs/HOWTO.md) — scheduling, backup, persistent
   server, Docker.

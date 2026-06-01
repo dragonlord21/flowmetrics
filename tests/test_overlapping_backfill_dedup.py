@@ -1,6 +1,6 @@
 """Overlapping backfills must not double-count in the charts.
 
-Re-running materialise over an overlapping (or identical) window writes
+Re-running materialize over an overlapping (or identical) window writes
 additive snapshot files on disk — that's intentional. The read views
 (`work_items`, `transitions`) must collapse those to exactly one
 canonical copy per item (latest run), so every metric reads each item
@@ -27,11 +27,11 @@ _YAML = """contract:
 """
 
 
-def _materialise(contracts: Path, data: Path) -> None:
+def _materialize(contracts: Path, data: Path) -> None:
     res = CliRunner().invoke(
         cli,
         [
-            "materialise", "uv",
+            "materialize", "uv",
             "--data-dir", str(data),
             "--workflows-dir", str(contracts),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -48,8 +48,8 @@ def test_two_overlapping_backfills_dedupe_in_the_read_views(tmp_path):
     data = tmp_path / "data"
     (contracts / "uv.yaml").write_text(_YAML)
 
-    _materialise(contracts, data)
-    _materialise(contracts, data)  # same window again — overlap
+    _materialize(contracts, data)
+    _materialize(contracts, data)  # same window again — overlap
 
     con = open_warehouse(data)
 

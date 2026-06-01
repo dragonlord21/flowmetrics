@@ -87,7 +87,7 @@ def server_url(tmp_path_factory):
     res = CliRunner().invoke(
         cli,
         [
-            "materialise",
+            "materialize",
             name,
             "--data-dir",
             str(data_dir),
@@ -99,7 +99,7 @@ def server_url(tmp_path_factory):
         ],
         catch_exceptions=False,
     )
-    assert res.exit_code == 0, f"fixture materialise failed: {res.output}"
+    assert res.exit_code == 0, f"fixture materialize failed: {res.output}"
 
     app = create_app(data_dir=data_dir, contracts_dir=contracts_dir)
     port = _free_port()

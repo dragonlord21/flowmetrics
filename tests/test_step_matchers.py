@@ -4,7 +4,7 @@ A step's `matches` is a list of typed mappings — `{event|label|status|
 stage: value}` — not bare strings. `event` values are short codes from
 the source's vocabulary (signals.event_codes_for). One evaluator,
 `matching.matcher_matches`, is shared by the dry-run preview and the
-materialise remap so they can never diverge.
+materialize remap so they can never diverge.
 """
 
 from __future__ import annotations

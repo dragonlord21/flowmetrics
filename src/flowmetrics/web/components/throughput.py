@@ -26,7 +26,7 @@ def render(
 ) -> ThroughputModel:
     """Query completed items and resolve the throughput model.
     `view` clamps the x-axis (and the rate's divisor) to its
-    inclusive window; None uses the full materialised history."""
+    inclusive window; None uses the full materialized history."""
     return build_throughput_model(
         completed_items(con, contract_name), view=view,
     )

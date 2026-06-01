@@ -50,7 +50,7 @@ def render(
     the aging-WIP model.
 
     `asof` is the in-flight snapshot date — the caller pins it to
-    the latest materialise (the warehouse holds one snapshot, so
+    the latest materialize (the warehouse holds one snapshot, so
     aging can only be faithfully computed at that date).
     `states.wip` restricts the chart to WIP states; `reference`
     windows the percentile sample.

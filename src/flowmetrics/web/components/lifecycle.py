@@ -2,7 +2,7 @@
 
 Answers "what happened to *this* item, in time order?". Reads from
 the `transitions` Parquet (stage entry events written by
-`flow materialise`) plus the item's `work_items` row (for title +
+`flow materialize`) plus the item's `work_items` row (for title +
 URL), and returns a typed payload the Jinja partial renders as a
 Vega-Lite timeline.
 

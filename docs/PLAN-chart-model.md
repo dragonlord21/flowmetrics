@@ -143,7 +143,7 @@ test what is expected, not how the spec is shaped.
   commit by hand). Render samples to `tmp_path`, or gitignore
   `samples/`. `test_cfd_horizontal_guideline.py` also reads
   `samples/` — give it its own render.
-- **Hoist the warehouse fixture.** The `materialise → CREATE
+- **Hoist the warehouse fixture.** The `materialize → CREATE
   VIEW` fixture is copy-pasted in six component test files.
   Move it to `conftest.py`, session-scoped. Most uses vanish
   once Layer 2 needs no warehouse; this de-risks the interim.

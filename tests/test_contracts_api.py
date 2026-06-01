@@ -7,7 +7,7 @@ Two endpoints, both intentionally simple:
 
   GET /api/internal/contracts/{id}
       → {id, label, parsed: {...}, yaml: STRING,
-         materialise: {last_run_at, status, items}}
+         materialize: {last_run_at, status, items}}
 
 These are the read foundation that the write API (B2) and the
 contract-builder UI (B3..B5) layer on. Auth posture matches the rest
@@ -101,15 +101,15 @@ class TestGetContractDetail:
         assert "contract:" in body["yaml"]
         assert "alpha" in body["yaml"]
 
-    def test_includes_materialise_status_block(self, workspace):
+    def test_includes_materialize_status_block(self, workspace):
         contracts, data = workspace
         _write(contracts, "alpha")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             body = client.get("/api/internal/contracts/alpha").json()
         # Always present; null when no run has happened yet.
-        assert "materialise" in body
-        m = body["materialise"]
+        assert "materialize" in body
+        m = body["materialize"]
         if m is not None:
             assert isinstance(m.get("last_run_at"), (str, type(None)))
             assert m.get("status") in (None, "ok", "done", "running", "failed")

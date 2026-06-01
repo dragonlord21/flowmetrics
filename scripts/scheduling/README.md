@@ -1,6 +1,6 @@
 # Scheduled ingest
 
-Templates for running `flow materialise-all` once a day under your
+Templates for running `flow materialize-all` once a day under your
 OS's native scheduler. Pick the directory for your platform and follow
 the README inside.
 
@@ -14,12 +14,12 @@ the README inside.
 Each template fires one command:
 
 ```
-flow materialise-all --workflows-dir $FLOWMETRICS_HOME/contracts \
+flow materialize-all --workflows-dir $FLOWMETRICS_HOME/contracts \
     --data-dir $FLOWMETRICS_HOME/data
 ```
 
 That command iterates every YAML in the workflows directory, runs
-`flow materialise` per workflow, and writes a JSON manifest to
+`flow materialize` per workflow, and writes a JSON manifest to
 `$FLOWMETRICS_HOME/data/_status/daily-<UTC-date>.json` summarising
 the results. One failing workflow doesn't block the rest — the
 manifest holds per-workflow status, the exit code only flags total
@@ -49,4 +49,4 @@ contracts directory is the source of truth.
   persistent server, Docker, troubleshooting.
 - [docs/REFERENCE.md](../../docs/REFERENCE.md) — every `flow` flag
   with defaults.
-- `flow materialise-all --help` — current flag list.
+- `flow materialize-all --help` — current flag list.

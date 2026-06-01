@@ -96,10 +96,10 @@ class TestWindowing:
 
 
 class TestEmptyState:
-    def test_empty_warehouse_headline_points_at_materialise(self):
+    def test_empty_warehouse_headline_points_at_materialize(self):
         m = build_cycle_time_model([], view=None)
         assert m.item_count == 0
-        assert "materialise" in m.headline.lower()
+        assert "materialize" in m.headline.lower()
 
     def test_window_with_data_elsewhere_says_widen(self):
         items = [_item(1, date(2026, 1, 1), 1.0)]
@@ -108,7 +108,7 @@ class TestEmptyState:
         )
         assert m.item_count == 0
         assert "warehouse covers" in m.headline.lower()
-        assert "materialise" not in m.headline.lower()
+        assert "materialize" not in m.headline.lower()
 
 
 class TestHeadline:

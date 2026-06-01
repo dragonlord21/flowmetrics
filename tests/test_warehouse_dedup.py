@@ -1,11 +1,11 @@
 """Warehouse read-side deduplication: items in multiple snapshots
 collapse to the latest row.
 
-The materialise step writes a fresh Parquet file per ETL-run day
+The materialize step writes a fresh Parquet file per ETL-run day
 (`data/work_items/contract_id={name}/year={Y}/month={M}/day={D}/`).
 Cross-day re-runs accumulate snapshots, so a single work item can
 appear in N partitions — N+1 if we run today and N days have
-already passed since first materialise. Each snapshot captures
+already passed since first materialize. Each snapshot captures
 the state of that item at the ETL time: in-flight on day 1
 (completed_at NULL), completed on day 5 (completed_at filled in),
 etc.
@@ -53,7 +53,7 @@ def two_snapshot_warehouse(tmp_path: Path) -> Path:
                 title VARCHAR, url VARCHAR, author VARCHAR, is_bot BOOLEAN,
                 created_at TIMESTAMP, completed_at TIMESTAMP,
                 cycle_time_days DOUBLE, contract_id VARCHAR,
-                materialised_at TIMESTAMP, run_id VARCHAR
+                materialized_at TIMESTAMP, run_id VARCHAR
             )"""
         )
         con.execute(
@@ -74,9 +74,9 @@ def two_snapshot_warehouse(tmp_path: Path) -> Path:
         con.execute(f"COPY wi TO '{p}' (FORMAT PARQUET)")
         con.close()
 
-    # Snapshot 1: in-flight on day 04 (materialised May 04 14:00).
+    # Snapshot 1: in-flight on day 04 (materialized May 04 14:00).
     _write(snap1, None, datetime(2026, 5, 4, 14, 0), None)
-    # Snapshot 2: completed on day 06 (materialised May 06 14:00).
+    # Snapshot 2: completed on day 06 (materialized May 06 14:00).
     _write(snap2, datetime(2026, 5, 5, 15, 0), datetime(2026, 5, 6, 14, 0), 2.0)
 
     return tmp_path
@@ -123,19 +123,19 @@ class TestWorkItemsDedup:
         finally:
             con.close()
 
-    def test_dedup_picks_latest_by_materialised_at(
+    def test_dedup_picks_latest_by_materialized_at(
         self, two_snapshot_warehouse: Path
     ):
-        """The chosen row is the LATEST `materialised_at`, not the
+        """The chosen row is the LATEST `materialized_at`, not the
         latest by some other column. Pin this so partition-order
         accidents don't pick the wrong row."""
         con = _open_warehouse_via_app(two_snapshot_warehouse)
         try:
             row = con.execute(
-                "SELECT materialised_at FROM work_items "
+                "SELECT materialized_at FROM work_items "
                 "WHERE item_id = '#1'"
             ).fetchone()
-            # materialised_at on the May 06 snapshot was 14:00 UTC.
+            # materialized_at on the May 06 snapshot was 14:00 UTC.
             assert row[0].strftime("%Y-%m-%d") == "2026-05-06"
         finally:
             con.close()

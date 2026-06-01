@@ -72,7 +72,7 @@ class _ServerThread(threading.Thread):
 
 @pytest.fixture(scope="module")
 def server_url(tmp_path_factory):
-    """Materialise the astral-uv-week fixture (the same one
+    """Materialize the astral-uv-week fixture (the same one
     test_cfd_window_e2e uses — 7-day window, cached responses)
     and serve it via a real uvicorn so Playwright sees the
     real chart + the real hover script."""
@@ -100,7 +100,7 @@ def server_url(tmp_path_factory):
     res = CliRunner().invoke(
         cli,
         [
-            "materialise",
+            "materialize",
             name,
             "--data-dir",
             str(data_dir),
@@ -112,7 +112,7 @@ def server_url(tmp_path_factory):
         ],
         catch_exceptions=False,
     )
-    assert res.exit_code == 0, f"fixture materialise failed: {res.output}"
+    assert res.exit_code == 0, f"fixture materialize failed: {res.output}"
 
     app = create_app(data_dir=data_dir, contracts_dir=contracts_dir)
     port = _free_port()

@@ -176,7 +176,7 @@ class TestSourceAgnosticDispatch:
 
 class TestWindowedBackfillKeepsFullHistory:
     """Verification for the Data Source backfill: a windowed
-    `flow materialise --since/--until` re-fetches each item with
+    `flow materialize --since/--until` re-fetches each item with
     its FULL lifecycle — the WorkItem → transition bridge emits a
     row for EVERY status interval and never clips by date. So a
     re-fetched item is always complete, never thinner than a

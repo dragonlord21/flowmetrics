@@ -1,6 +1,6 @@
 """ETL: contract → source fetch → canonical → Parquet.
 
-Invoked by `flow materialise NAME`. One-shot:
+Invoked by `flow materialize NAME`. One-shot:
 
   1. Load contract YAML.
   2. Build source adapter (GitHub or Jira) using existing factories.
@@ -136,7 +136,7 @@ def _compact_one(
         # compacted file's schema matches a normal snapshot —
         # year/month/day stay path-only, never baked in as columns.
         # union_by_name tolerates a schema bump across snapshots (e.g.
-        # transitions gaining materialised_at/run_id); older files get
+        # transitions gaining materialized_at/run_id); older files get
         # NULL for the new columns and are superseded at dedup time.
         con.execute(
             f"CREATE VIEW src AS SELECT * FROM read_parquet("
@@ -171,7 +171,7 @@ def compact_contract(
             "SELECT * EXCLUDE (_rn) FROM ("
             " SELECT *, ROW_NUMBER() OVER ("
             "  PARTITION BY contract_id, source, item_id"
-            "  ORDER BY materialised_at DESC, run_id DESC) AS _rn"
+            "  ORDER BY materialized_at DESC, run_id DESC) AS _rn"
             " FROM src) WHERE _rn = 1"
         ),
         now=now,
@@ -182,13 +182,13 @@ def compact_contract(
         ),
         stem="transitions",
         # Keep every transition from the LATEST run per item (DENSE_RANK
-        # so all rows sharing the winning (materialised_at, run_id) stay).
+        # so all rows sharing the winning (materialized_at, run_id) stay).
         # Must mirror the read view exactly.
         dedup_sql=(
             "SELECT * EXCLUDE (_rr) FROM ("
             " SELECT *, DENSE_RANK() OVER ("
             "  PARTITION BY contract_id, source, item_id"
-            "  ORDER BY materialised_at DESC NULLS LAST,"
+            "  ORDER BY materialized_at DESC NULLS LAST,"
             "           run_id DESC NULLS LAST) AS _rr"
             " FROM src) WHERE _rr = 1"
         ),
@@ -196,7 +196,7 @@ def compact_contract(
     )
 
 
-def materialise(
+def materialize(
     *,
     contract: Contract,
     data_dir: Path,
@@ -238,7 +238,7 @@ def materialise(
         )
 
     # The contract window is optional; fall back to a rolling default
-    # so a UI-built (windowless) contract still materialises.
+    # so a UI-built (windowless) contract still materializes.
     window_start, window_stop = _resolve_window(
         contract, today=started_at.date()
     )
@@ -255,7 +255,7 @@ def materialise(
     # Tolerate a cache miss in offline mode: the offline test
     # fixture doesn't carry `is:open` query responses (only
     # `is:merged ... in window`), so re-running an existing
-    # offline materialise shouldn't crash. The cost is an empty
+    # offline materialize shouldn't crash. The cost is an empty
     # aging chart until the next online refresh, which is exactly
     # the empty-state UI the user already sees.
     from .cache import CacheMiss
@@ -276,12 +276,12 @@ def materialise(
     completed_at = datetime.now(UTC)
 
     # Partition layout: contract_id/year/month/day, dated by the
-    # ETL run (materialised_at). The FILENAME carries the run_id,
+    # ETL run (materialized_at). The FILENAME carries the run_id,
     # so every run — daily cron OR a browser-triggered backfill —
     # writes its own Parquet and never overwrites another. A
     # narrow backfill therefore cannot clobber (or shrink) a
     # broader same-day snapshot. The read view globs every file
-    # and dedups by materialised_at.
+    # and dedups by materialized_at.
     year = completed_at.year
     month = completed_at.month
     day = completed_at.day
@@ -310,7 +310,7 @@ def materialise(
         items=items,
         contract=contract,
         run_id=run_id,
-        materialised_at=completed_at,
+        materialized_at=completed_at,
         out_path=work_items_path,
     )
 
@@ -336,7 +336,7 @@ def materialise(
         contract_source=contract.source,
         contract_id=contract.name,
         out_path=transitions_path,
-        materialised_at=completed_at,
+        materialized_at=completed_at,
         run_id=run_id,
     )
 
@@ -368,7 +368,7 @@ CREATE TEMPORARY TABLE work_items (
     completed_at        TIMESTAMP,
     cycle_time_days     DOUBLE,
     contract_id         VARCHAR,
-    materialised_at     TIMESTAMP,
+    materialized_at     TIMESTAMP,
     run_id              VARCHAR
 )
 """
@@ -381,7 +381,7 @@ CREATE TEMPORARY TABLE transitions (
     stage               VARCHAR,
     signal              VARCHAR,
     contract_id         VARCHAR,
-    materialised_at     TIMESTAMP,
+    materialized_at     TIMESTAMP,
     run_id              VARCHAR
 )
 """
@@ -421,7 +421,7 @@ def cycle_time_days(
     return float((fd - sd).days + 1)
 
 
-def _work_item_row(item, contract: Contract, run_id: str, materialised_at: datetime):
+def _work_item_row(item, contract: Contract, run_id: str, materialized_at: datetime):
     cycle_days = cycle_time_days(item.created_at, item.completed_at)
     return (
         contract.source,
@@ -435,7 +435,7 @@ def _work_item_row(item, contract: Contract, run_id: str, materialised_at: datet
         item.completed_at,
         cycle_days,
         contract.name,
-        materialised_at,
+        materialized_at,
         run_id,
     )
 
@@ -445,7 +445,7 @@ def _write_work_items_parquet(
     items,
     contract: Contract,
     run_id: str,
-    materialised_at: datetime,
+    materialized_at: datetime,
     out_path: Path,
 ) -> None:
     """Atomic Parquet write: build TEMP TABLE, COPY TO `.tmp`, rename.
@@ -453,7 +453,7 @@ def _write_work_items_parquet(
     Atomic rename means concurrent readers either see the previous
     snapshot or the new one — never a torn half-written file.
     """
-    rows = [_work_item_row(i, contract, run_id, materialised_at) for i in items]
+    rows = [_work_item_row(i, contract, run_id, materialized_at) for i in items]
     tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
     con = duckdb.connect()
     try:
@@ -482,14 +482,14 @@ def _write_transitions_parquet(
     contract_source: str,
     contract_id: str,
     out_path: Path,
-    materialised_at: datetime,
+    materialized_at: datetime,
     run_id: str,
 ) -> None:
     # `source` comes from the contract — we already dispatched on it
     # to build the transitions, so the column is constant per call.
-    # `materialised_at` + `run_id` stamp the run so the read view can
+    # `materialized_at` + `run_id` stamp the run so the read view can
     # keep only the latest run per item (remap rewrites `stage`, so
-    # otherwise stale stage vocab would linger across re-materialises).
+    # otherwise stale stage vocab would linger across re-materializes).
     rows = [
         (
             contract_source,
@@ -498,7 +498,7 @@ def _write_transitions_parquet(
             t.stage,
             t.signal,
             contract_id,
-            materialised_at,
+            materialized_at,
             run_id,
         )
         for t in transitions

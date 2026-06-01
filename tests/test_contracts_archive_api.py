@@ -12,8 +12,8 @@ List + detail:
                                                        archived; 200 with
                                                        ?include_archived=true
 
-Materialise:
-  `flow materialise-all` skips rows with archived_at set.
+Materialize:
+  `flow materialize-all` skips rows with archived_at set.
 """
 
 from __future__ import annotations
@@ -193,12 +193,12 @@ class TestHardDeleteInvariant:
             assert r.status_code == 409
 
 
-class TestArchivedExclusionFromMaterialise:
-    """`flow materialise-all` must skip archived contracts so the
+class TestArchivedExclusionFromMaterialize:
+    """`flow materialize-all` must skip archived contracts so the
     cron path doesn't accidentally re-import data for retired
     workflows."""
 
-    def test_materialise_all_skips_archived(self, workspace, tmp_path):
+    def test_materialize_all_skips_archived(self, workspace, tmp_path):
         from click.testing import CliRunner
 
         from flowmetrics.cli import cli
@@ -209,12 +209,12 @@ class TestArchivedExclusionFromMaterialise:
             _seed(client, "live-one")
             _seed(client, "to-archive")
             _archive(client, "to-archive")
-        # materialise-all reads from the DB at this point.
+        # materialize-all reads from the DB at this point.
         cache_dir = (
             Path(__file__).parent / "fixtures" / "cache"
         )
         CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(cache_dir),

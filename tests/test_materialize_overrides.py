@@ -1,9 +1,9 @@
-"""`flow materialise --since/--until` for targeted backfills.
+"""`flow materialize --since/--until` for targeted backfills.
 
 The contract YAML defines a default fetch window (start / stop).
 Operators sometimes need to backfill a specific range without
 editing the YAML — e.g., the aging page's empty-state message
-suggests `flow materialise <name> --since X --until Y` to fill a
+suggests `flow materialize <name> --since X --until Y` to fill a
 coverage gap. These tests pin the CLI surface and the override
 semantics:
 
@@ -13,7 +13,7 @@ semantics:
     that endpoint; the other keeps the contract default.
   - Both expect ISO `YYYY-MM-DD` (UTC). Invalid → exit non-zero
     with a clear message.
-  - When set, the materialise step calls
+  - When set, the materialize step calls
     `source.fetch_completed_in_window(since, until)` with the
     overrides, NOT the contract's start/stop.
 
@@ -57,16 +57,16 @@ def _make_contracts_dir(tmp: Path) -> Path:
 
 
 def _capture(captured: dict):
-    """Replacement for `materialise.materialise` that records the
+    """Replacement for `materialize.materialize` that records the
     Contract it was called with and returns a stub manifest. The
     CLI's only side effect we care about for these tests is the
     contract it produced — the fetch + Parquet write is the
-    materialise unit's responsibility, separately tested."""
+    materialize unit's responsibility, separately tested."""
 
     from datetime import UTC
     from datetime import datetime as _dt
 
-    from flowmetrics.materialise import RunManifest
+    from flowmetrics.materialize import RunManifest
 
     def stub(*, contract, data_dir, cache_dir, offline):
         captured["contract"] = contract
@@ -88,14 +88,14 @@ class TestSinceUntilFlags:
         captured: dict = {}
 
         with patch(
-            "flowmetrics.cli.run_materialise" if False else
-            "flowmetrics.materialise.materialise",
+            "flowmetrics.cli.run_materialize" if False else
+            "flowmetrics.materialize.materialize",
             side_effect=_capture(captured),
         ):
             res = CliRunner().invoke(
                 cli,
                 [
-                    "materialise", "demo",
+                    "materialize", "demo",
                     "--data-dir", str(tmp / "data"),
                     "--workflows-dir", str(contracts_dir),
                     "--cache-dir", str(FIXTURE_CACHE),
@@ -114,13 +114,13 @@ class TestSinceUntilFlags:
         captured: dict = {}
 
         with patch(
-            "flowmetrics.materialise.materialise",
+            "flowmetrics.materialize.materialize",
             side_effect=_capture(captured),
         ):
             res = CliRunner().invoke(
                 cli,
                 [
-                    "materialise", "demo",
+                    "materialize", "demo",
                     "--since", "2026-05-06",
                     "--data-dir", str(tmp / "data"),
                     "--workflows-dir", str(contracts_dir),
@@ -142,13 +142,13 @@ class TestSinceUntilFlags:
         captured: dict = {}
 
         with patch(
-            "flowmetrics.materialise.materialise",
+            "flowmetrics.materialize.materialize",
             side_effect=_capture(captured),
         ):
             res = CliRunner().invoke(
                 cli,
                 [
-                    "materialise", "demo",
+                    "materialize", "demo",
                     "--until", "2026-05-08",
                     "--data-dir", str(tmp / "data"),
                     "--workflows-dir", str(contracts_dir),
@@ -168,13 +168,13 @@ class TestSinceUntilFlags:
         captured: dict = {}
 
         with patch(
-            "flowmetrics.materialise.materialise",
+            "flowmetrics.materialize.materialize",
             side_effect=_capture(captured),
         ):
             res = CliRunner().invoke(
                 cli,
                 [
-                    "materialise", "demo",
+                    "materialize", "demo",
                     "--since", "2026-05-06",
                     "--until", "2026-05-08",
                     "--data-dir", str(tmp / "data"),
@@ -198,7 +198,7 @@ class TestSinceUntilFlags:
         res = CliRunner().invoke(
             cli,
             [
-                "materialise",
+                "materialize",
                 "demo",
                 "--since",
                 "not-a-date",

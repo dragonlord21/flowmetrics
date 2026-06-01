@@ -10,7 +10,7 @@ by `parse_windows`); it does not re-decide dates. The model:
     and the NODATA state explains it.
   - The **reference period** is anchored to the most recent data
     (`data_max`), independent of the view.
-  - Aging's `asof` is pinned to the latest materialise (the
+  - Aging's `asof` is pinned to the latest materialize (the
     in-flight snapshot date), independent of the Period picker.
   - The completion-data coverage (`data_min_date` /
     `data_max_date`) is exposed so the filter-bar date input can
@@ -36,7 +36,7 @@ FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
 @pytest.fixture
 def view_factory():
-    """Materialise the `astral-uv-week` fixture (data May 4–10,
+    """Materialize the `astral-uv-week` fixture (data May 4–10,
     2026) and return a builder for `WorkflowView` instances."""
     tmp = Path(tempfile.mkdtemp())
     contracts_dir = tmp / "contracts"
@@ -58,7 +58,7 @@ def view_factory():
     res = CliRunner().invoke(
         cli,
         [
-            "materialise",
+            "materialize",
             "astral-uv-week",
             "--data-dir",
             str(data_dir),
@@ -160,13 +160,13 @@ class TestAgingPinnedToSnapshot:
         self, view_factory
     ):
         """Aging is a "right now" snapshot — its `asof` is pinned to
-        the latest materialise (the in-flight snapshot date), NOT
+        the latest materialize (the in-flight snapshot date), NOT
         the Period anchor. A custom anchor in the past must not
         move it."""
         view = view_factory(window_query(custom_ending="2026-05-06"))
         with view.warehouse() as con:
             snapshot = con.execute(
-                "SELECT max(materialised_at) FROM work_items "
+                "SELECT max(materialized_at) FROM work_items "
                 "WHERE contract_id = ?",
                 ["astral-uv-week"],
             ).fetchone()[0]

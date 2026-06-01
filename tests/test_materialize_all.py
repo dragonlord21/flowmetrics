@@ -1,5 +1,5 @@
-"""`flow materialise-all` — iterate every YAML in `--workflows-dir`,
-run materialise per contract, write a daily JSON manifest with
+"""`flow materialize-all` — iterate every YAML in `--workflows-dir`,
+run materialize per contract, write a daily JSON manifest with
 per-contract outcomes.
 
 The scheduler templates (cron / launchd / Task Scheduler) point at
@@ -52,7 +52,7 @@ class TestEmpty:
     def test_no_contracts_writes_an_empty_manifest_and_exits_clean(self, workspace):
         contracts, data = workspace
         res = CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -65,7 +65,7 @@ class TestEmpty:
         manifests = list((data / "_status").glob("daily-*.json"))
         assert len(manifests) == 1
         m = json.loads(manifests[0].read_text())
-        assert m["schema"] == "flowmetrics.materialise_all.v1"
+        assert m["schema"] == "flowmetrics.materialize_all.v1"
         assert m["results"] == []
 
 
@@ -74,7 +74,7 @@ class TestHappyPath:
         contracts, data = workspace
         _write_contract(contracts, "astral-uv-week", "astral-sh/uv")
         res = CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -96,7 +96,7 @@ class TestHappyPath:
 class TestMixedOutcomes:
     def test_unparseable_yaml_is_skipped_at_import_time(self, workspace):
         """A YAML that fails parse never enters the DB (per the C1
-        migration semantics); materialise-all therefore doesn't
+        migration semantics); materialize-all therefore doesn't
         attempt to run it. The good contract still processes; the
         bad YAML is left in the dir for the user to fix."""
         contracts, data = workspace
@@ -104,7 +104,7 @@ class TestMixedOutcomes:
         # Intentionally broken — no `source:`.
         (contracts / "broken.yaml").write_text("contract: {name: broken}\n")
         res = CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -124,18 +124,18 @@ class TestMixedOutcomes:
         # The good contract still wrote Parquet despite the bad one.
         assert (data / "work_items").exists()
 
-    def test_all_materialise_failures_exit_non_zero(self, workspace):
-        """When every DB-row workflow's materialise call fails (e.g.
+    def test_all_materialize_failures_exit_non_zero(self, workspace):
+        """When every DB-row workflow's materialize call fails (e.g.
         cache miss in offline mode), the exit code is non-zero so
         on-call gets paged. Contrast with the empty-dir case
         (no rows → exit 0)."""
         contracts, data = workspace
         # Valid YAML but the cache won't carry data for these
-        # synthetic repos → materialise() raises (offline+miss).
+        # synthetic repos → materialize() raises (offline+miss).
         _write_contract(contracts, "alpha-only", "no-such/repo-alpha")
         _write_contract(contracts, "beta-only", "no-such/repo-beta")
         res = CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -154,7 +154,7 @@ class TestManifestPathOverride:
         _write_contract(contracts, "astral-uv-week", "astral-sh/uv")
         out = tmp_path / "custom-manifest.json"
         res = CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(FIXTURE_CACHE),
@@ -179,10 +179,10 @@ class TestDateStamping:
         from flowmetrics import cli as cli_mod
         pinned = datetime(2026, 5, 26, 23, 30, tzinfo=UTC)
         monkeypatch.setattr(
-            cli_mod, "_materialise_all_now", lambda: pinned, raising=False,
+            cli_mod, "_materialize_all_now", lambda: pinned, raising=False,
         )
         res = CliRunner().invoke(cli, [
-            "materialise-all",
+            "materialize-all",
             "--workflows-dir", str(contracts),
             "--data-dir", str(data),
             "--cache-dir", str(FIXTURE_CACHE),

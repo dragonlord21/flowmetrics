@@ -56,7 +56,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     res = CliRunner().invoke(
         cli,
         [
-            "materialise", "demo",
+            "materialize", "demo",
             "--data-dir", str(data_dir),
             "--workflows-dir", str(contracts_dir),
             "--cache-dir", str(FIXTURE_CACHE),

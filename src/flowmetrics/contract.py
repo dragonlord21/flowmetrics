@@ -123,7 +123,7 @@ class WorkflowStates:
 
 class Step(BaseModel):
     """One workflow step: a user-defined logical bucket that
-    materialised source data lands in.
+    materialized source data lands in.
 
     Fields:
       - `name`: the user's display name ("Ready", "In Review", …).

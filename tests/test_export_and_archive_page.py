@@ -60,9 +60,9 @@ class TestExportYaml:
         assert "contract:" in r.text
         assert "name: alpha" in r.text
 
-    def test_yaml_round_trips_through_materialise_from_yaml(self, workspace, tmp_path):
+    def test_yaml_round_trips_through_materialize_from_yaml(self, workspace, tmp_path):
         """Exported YAML, written to a file, feeds
-        `flow materialise --from-yaml PATH`. (Here we just confirm
+        `flow materialize --from-yaml PATH`. (Here we just confirm
         the exported text re-parses identically.)"""
         from flowmetrics.contract import parse_contract_text
         contracts, data = workspace

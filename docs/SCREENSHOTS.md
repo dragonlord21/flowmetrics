@@ -15,7 +15,7 @@ The landing page lists every contract YAML under `--workflows-dir`.
 ## GitHub source — `astral-sh/uv`
 
 Full dashboard. **Current state** holds Aging WIP, pinned to the most
-recent materialise. **Time slice** holds Throughput, Cycle Time,
+recent materialize. **Time slice** holds Throughput, Cycle Time,
 Cumulative Flow, and Forecast — all driven by the Period picker
 (`Last 7 days`, `Last 30 days`, …).
 
@@ -73,8 +73,8 @@ dashboard at `http://127.0.0.1:8000`, run against the warehouse
 populated by:
 
 ```
-flow materialise astral-uv-week        # GitHub PR cycle
-flow materialise apache-cassandra-week  # Jira changelog
+flow materialize astral-uv-week        # GitHub PR cycle
+flow materialize apache-cassandra-week  # Jira changelog
 flow serve --workflows-dir contracts/ --data-dir data/
 ```
 

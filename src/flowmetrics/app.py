@@ -1,7 +1,7 @@
 """FastAPI application factory for `flow serve`.
 
 The runtime process reads from the Parquet store written by
-`flow materialise` (Slice 1). It never calls GitHub or Jira during
+`flow materialize` (Slice 1). It never calls GitHub or Jira during
 a request — all data comes from local Parquet via DuckDB.
 
 Slice 2 ships two routes:
@@ -46,7 +46,7 @@ from .contract import (
 )
 from .utc_dates import to_utc_display_date
 from .warehouse.connection import open_warehouse
-from .warehouse.queries import completion_date_range, latest_materialised_at
+from .warehouse.queries import completion_date_range, latest_materialized_at
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
 from .web.components.cycle_time import render as render_cycle_time
@@ -108,7 +108,7 @@ def _default_probe_stages(kind: str, target: dict) -> dict:
         "stages": [],
         "hint": (
             "no stages found in the warehouse. Run "
-            "`flow materialise <name>` against this source first, "
+            "`flow materialize <name>` against this source first, "
             "then re-probe."
         ),
     }
@@ -236,7 +236,7 @@ class WorkflowView:
 
     def _aging_snapshot_date(self) -> date | None:
         """The aging snapshot's asof — the date of the latest
-        materialise for this workflow. `None` when the warehouse
+        materialize for this workflow. `None` when the warehouse
         has no rows yet. The Aging tile pins itself to this
         moment; the dashboard's snapshot-section header names it."""
         try:
@@ -244,7 +244,7 @@ class WorkflowView:
         except duckdb.IOException:
             return None
         try:
-            return latest_materialised_at(con, self.id)
+            return latest_materialized_at(con, self.id)
         finally:
             con.close()
 
@@ -353,11 +353,11 @@ class WorkflowView:
         metric_thresholds: tuple[float, float, float] | None = None,
     ):
         # Aging WIP is a "right now" snapshot — pinned to the
-        # in-flight snapshot date (the latest materialise), NOT
+        # in-flight snapshot date (the latest materialize), NOT
         # the Period anchor. The warehouse holds one in-flight
         # snapshot, so aging can only be faithfully computed at
         # that date.
-        asof = latest_materialised_at(con, self.id) or self.today
+        asof = latest_materialized_at(con, self.id) or self.today
         return render_aging(
             con, self.id,
             asof=asof,
@@ -429,7 +429,7 @@ def create_app(
     subprocess of uvicorn, started by `flow serve`.
 
     `cache_dir` is the source-API response cache (used by the
-    materialise endpoint when the operator clicks "import data" on
+    materialize endpoint when the operator clicks "import data" on
     an empty aging chart). Defaults to the CLI's `DEFAULT_CACHE_DIR`
     if not supplied.
 
@@ -652,8 +652,8 @@ def create_app(
         meta = contracts_db.get_meta(name)
         return meta.yaml if meta else None
 
-    def _materialise_status(name: str) -> dict | None:
-        """Latest known per-workflow materialise outcome. Reads the
+    def _materialize_status(name: str) -> dict | None:
+        """Latest known per-workflow materialize outcome. Reads the
         status file the browser-backfill flow writes; returns None
         if no run has happened yet."""
         spath = status_path(data_dir, name)
@@ -835,7 +835,7 @@ def create_app(
             "label": c.label or c.name,
             "parsed": parsed,
             "yaml": meta.yaml,
-            "materialise": _materialise_status(contract_id),
+            "materialize": _materialize_status(contract_id),
             "archived": meta.archived_at is not None,
             "archived_at": meta.archived_at,
             "archived_reason": meta.archived_reason,
@@ -1105,7 +1105,7 @@ def create_app(
     )
     def probe_stages(payload: dict, request: Request) -> dict:
         """Discover the workflow stages from the source. Runs a
-        bounded materialise into a scratch dir (last 30 days, no
+        bounded materialize into a scratch dir (last 30 days, no
         status file), reads the transitions to extract distinct
         stage names, deletes the scratch dir, returns `{stages,
         hint?}`. Caches per-target for 15 minutes so the wizard's
@@ -1370,7 +1370,7 @@ def create_app(
     ) -> HTMLResponse:
         """Per-workflow Data Source page: a completion-coverage
         timeline plus a browser-driven backfill the operator runs
-        without ever touching the `flow materialise` CLI."""
+        without ever touching the `flow materialize` CLI."""
         view = _open_view(workflow_id, request)
         with view.warehouse() as con:
             coverage = render_data_source(con, workflow_id)
@@ -1404,7 +1404,7 @@ def create_app(
         since: str = Form(...),
         until: str = Form(...),
     ) -> HTMLResponse:
-        """Kick off a backfill: spawn a detached `flow materialise`
+        """Kick off a backfill: spawn a detached `flow materialize`
         subprocess that writes a JSON status file the page polls.
         The status file is the lock — one backfill per workflow."""
         _ensure_contract_exists(workflow)
@@ -1440,7 +1440,7 @@ def create_app(
             "finished_at": None, "message": "",
         })
         cmd = [
-            sys.executable, "-m", "flowmetrics", "materialise", workflow,
+            sys.executable, "-m", "flowmetrics", "materialize", workflow,
             "--data-dir", str(data_dir),
             "--workflows-dir", str(contracts_dir),
             "--cache-dir", str(cache_dir),

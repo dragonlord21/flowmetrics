@@ -485,7 +485,7 @@ def render(
         """Age = CD - SD + 1 (same +1 inclusive rule as
         cycle time; same-day items are 1d, never 0d). Computed
         here at query/view time because `asof` is a runtime
-        parameter — materialise can't precompute it."""
+        parameter — materialize can't precompute it."""
         if asof_date is None or created_at is None:
             return None
         aware = attach_utc(created_at)

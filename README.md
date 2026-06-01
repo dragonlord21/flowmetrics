@@ -111,7 +111,7 @@ facts, plus background explainers.
 **Get started**
 
 - **[Tutorial](docs/TUTORIAL.md)** — zero to dashboard in five
-  minutes. Install, write a YAML, materialise, serve.
+  minutes. Install, write a YAML, materialize, serve.
 
 **Task-specific guides**
 
