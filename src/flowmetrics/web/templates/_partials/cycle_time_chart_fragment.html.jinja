@@ -19,7 +19,12 @@
      hx-get="/api/internal/cycle-time?workflow={{ contract.name }}"
      hx-trigger="flowmetrics:ptile-changed from:body"
      hx-swap="outerHTML"
-     hx-vals='js:{ptile_min: document.getElementById("work-items-state")?.dataset.ptileMin || "0", ptile_max: document.getElementById("work-items-state")?.dataset.ptileMax || "100"}'>
+     hx-vals='js:{
+       ptile_min: document.getElementById("work-items-state")?.dataset.ptileMin || "0",
+       ptile_max: document.getElementById("work-items-state")?.dataset.ptileMax || "100",
+       ptile_ranges: document.getElementById("work-items-state")?.dataset.ptileRanges || "",
+       ptile_thresholds: document.getElementById("work-items-state")?.dataset.ptileThresholds || ""
+     }'>
   {% if data.item_count == 0 %}
     <p class="aging-empty">
       <strong class="aging-empty-headline">No completed items in this window.</strong>

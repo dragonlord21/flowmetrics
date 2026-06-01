@@ -49,6 +49,7 @@ def render(
     ptile_min: int = 0,
     ptile_max: int = 100,
     ptile_ranges: list[tuple[int, int]] | None = None,
+    metric_thresholds: tuple[float, float, float] | None = None,
 ) -> CycleTimeModel:
     """Query completed items and resolve the cycle-time model.
 
@@ -72,12 +73,19 @@ def render(
     from dataclasses import replace
 
     from ...charts.ptile_filter import filter_by_rank
+    pct = model.percentiles
+    # Caller-supplied thresholds take precedence (the standalone
+    # fragment endpoint receives them from the URL); otherwise
+    # fall back to the model's own percentiles (the full-page
+    # render builds them locally).
+    thresholds = metric_thresholds or (pct.p50, pct.p85, pct.p95)
     kept = filter_by_rank(
         list(model.points),
         key=lambda p: p.cycle_time_days,
         ranges=ptile_ranges,
         ptile_min=ptile_min,
         ptile_max=ptile_max,
+        metric_thresholds=thresholds,
     )
     if len(kept) == len(model.points):
         return model

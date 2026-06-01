@@ -350,6 +350,7 @@ class WorkflowView:
         self, con, *,
         ptile_min: int = 0, ptile_max: int = 100,
         ptile_ranges: list[tuple[int, int]] | None = None,
+        metric_thresholds: tuple[float, float, float] | None = None,
     ):
         # Aging WIP is a "right now" snapshot — pinned to the
         # in-flight snapshot date (the latest materialise), NOT
@@ -364,12 +365,14 @@ class WorkflowView:
             reference=self.selection.reference,
             ptile_min=ptile_min, ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
+            metric_thresholds=metric_thresholds,
         )
 
     def render_cycle_time(
         self, con, *,
         ptile_min: int = 0, ptile_max: int = 100,
         ptile_ranges: list[tuple[int, int]] | None = None,
+        metric_thresholds: tuple[float, float, float] | None = None,
     ):
         return render_cycle_time(
             con, self.id,
@@ -379,6 +382,7 @@ class WorkflowView:
             view=self.selection.view,
             ptile_min=ptile_min, ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
+            metric_thresholds=metric_thresholds,
         )
 
     def render_throughput(self, con):
@@ -507,6 +511,24 @@ def create_app(
         so the route can pass it straight through to render()."""
         from .charts.ptile_filter import parse_ranges
         return parse_ranges(s)
+
+    def _parse_ptile_thresholds(
+        s: str | None,
+    ) -> tuple[float, float, float] | None:
+        """URL → `(p50, p85, p95)` floats for absolute-threshold
+        chip filtering. The detail page emits the chart model's
+        percentiles into the chip URL so the standalone
+        work-items endpoint can keep the chip semantics
+        consistent without re-rendering the chart."""
+        if not s:
+            return None
+        try:
+            parts = [float(p) for p in s.split(",")]
+        except ValueError:
+            return None
+        if len(parts) != 3:
+            return None
+        return (parts[0], parts[1], parts[2])
 
     # `vega_spec` Jinja global — turns a chart model into its
     # Vega-Lite spec JSON. The chart fragment templates call
@@ -1566,10 +1588,12 @@ def create_app(
                 con, ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
             )
+            pct = cycle_time.percentiles
             work_items = render_work_items_table(
                 con, workflow_id, view=view.view_window,
                 ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
+                metric_thresholds=(pct.p50, pct.p85, pct.p95),
             )
         return templates.TemplateResponse(
             request,
@@ -1601,14 +1625,17 @@ def create_app(
         request: Request, workflow: str,
         ptile_min: int = 0, ptile_max: int = 100,
         ptile_ranges: str | None = None,
+        ptile_thresholds: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         pranges = _parse_ptile_ranges(ptile_ranges)
+        pthr = _parse_ptile_thresholds(ptile_thresholds)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
                 con, ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
+                metric_thresholds=pthr,
             )
         return templates.TemplateResponse(
             request,
@@ -1693,6 +1720,7 @@ def create_app(
             # aging-WIP and don't belong here. Sort by start date
             # ascending so the oldest open item — the one most
             # likely past P85 — is at the top.
+            pct = aging.percentiles
             work_items = render_work_items_table(
                 con,
                 workflow_id,
@@ -1705,6 +1733,15 @@ def create_app(
                 ),
                 ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
+                # Aging's reference percentiles come from
+                # completed cycle times — a different population
+                # than the in-flight ages the chip filters on.
+                # Passing these absolute thresholds makes the
+                # chips agree with the chart's dashed reference
+                # lines (the bug the user spotted: "> P95" chip
+                # showed zero rows while the chart showed dots
+                # above the P95 line).
+                metric_thresholds=(pct.p50, pct.p85, pct.p95),
             )
         return templates.TemplateResponse(
             request,
@@ -1844,14 +1881,17 @@ def create_app(
         request: Request, workflow: str,
         ptile_min: int = 0, ptile_max: int = 100,
         ptile_ranges: str | None = None,
+        ptile_thresholds: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         pranges = _parse_ptile_ranges(ptile_ranges)
+        pthr = _parse_ptile_thresholds(ptile_thresholds)
         with view.warehouse() as con:
             aging = view.render_aging(
                 con, ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
+                metric_thresholds=pthr,
             )
         return templates.TemplateResponse(
             request,
@@ -1936,6 +1976,7 @@ def create_app(
         ptile_min: int = 0,
         ptile_max: int = 100,
         ptile_ranges: str | None = None,
+        ptile_thresholds: str | None = None,
     ) -> HTMLResponse:
         """HTMX swap target for the work-items table: sort + filter
         + paginate round-trip, returning only the partial.
@@ -1993,6 +2034,7 @@ def create_app(
                 ptile_min=pmin,
                 ptile_max=pmax,
                 ptile_ranges=_parse_ptile_ranges(ptile_ranges),
+                metric_thresholds=_parse_ptile_thresholds(ptile_thresholds),
             )
         response = templates.TemplateResponse(
             request,

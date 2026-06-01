@@ -72,7 +72,12 @@
      data-sort="{{ data.sort }}"
      data-direction="{{ data.direction }}"
      data-ptile-min="{{ data.ptile_min }}"
-     data-ptile-max="{{ data.ptile_max }}"></div>
+     data-ptile-max="{{ data.ptile_max }}"
+     data-ptile-ranges="{{ data.ptile_ranges | map('join', '-') | join(',') }}"
+     {% if data.metric_thresholds -%}
+     data-ptile-thresholds="{{ data.metric_thresholds[0] }},{{ data.metric_thresholds[1] }},{{ data.metric_thresholds[2] }}"
+     {%- endif -%}
+></div>
 
 {% if data.completed_on %}
 <div class="work-items-active-filter">

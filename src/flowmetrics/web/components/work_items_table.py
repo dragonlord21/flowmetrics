@@ -119,6 +119,13 @@ class WorkItemsTableData:
     # active. Single-bucket selection collapses to a one-element
     # tuple.
     ptile_ranges: tuple[tuple[int, int], ...]
+    # The chart's reference percentile thresholds (p50, p85, p95)
+    # in the metric's units. The chip template embeds these in
+    # each chip's URL so the work-items endpoint can apply
+    # threshold-based filtering even when it doesn't have the
+    # chart model in scope (HTMX chip clicks call the endpoint
+    # directly).
+    metric_thresholds: tuple[float, float, float] | None
     # Pre-computed metric value at each snap stop on the slider —
     # the JS readout shows e.g. "P50 (4d) – P85 (12d)" by reading
     # this dict at the handles' current positions.
@@ -232,6 +239,14 @@ def render(
     ptile_min: int = 0,
     ptile_max: int = 100,
     ptile_ranges: list[tuple[int, int]] | None = None,
+    # The chart's reference percentile thresholds in the metric's
+    # units (P50, P85, P95). When provided, the standard chip
+    # ranges (0-50, 50-85, 85-95, 95-100) filter by ABSOLUTE
+    # metric value against these thresholds — so the user's "> P95"
+    # selection matches the dots they see above the P95 dashed
+    # line on the chart. Custom ranges still fall back to
+    # PERCENT_RANK.
+    metric_thresholds: tuple[float, float, float] | None = None,
 ) -> WorkItemsTableData:
     """Read a page of rows for the contract.
 
@@ -411,12 +426,28 @@ def render(
     ranked_params = [*rank_metric_params, *where_params]
     # Range filter: ANY of the selected `(lo, hi)` pairs — multi-
     # chip selection unions disjoint bands (e.g. [0,50] ∪ [85,95]).
-    rank_clause = " OR ".join(
-        "percentile_rank BETWEEN ? AND ?" for _ in effective_ranges
-    )
+    # The chip → predicate mapping (bucket buckets when
+    # thresholds present; rank-band fallback otherwise) lives in
+    # charts/ptile_filter.py so both this SQL builder AND the
+    # chart's Python filter agree on what each chip means.
+    from ...charts.ptile_filter import threshold_sql
+    rank_clause_parts: list[str] = []
     rank_clause_params: list = []
     for lo, hi in effective_ranges:
-        rank_clause_params.extend([lo, hi])
+        if lo == 0 and hi == 100:
+            rank_clause_parts.append("TRUE")
+            continue
+        threshold = threshold_sql(lo, hi, metric_thresholds, "rank_metric")
+        if threshold is not None:
+            frag, params = threshold
+            rank_clause_parts.append(frag)
+            rank_clause_params.extend(params)
+        else:
+            rank_clause_parts.append(
+                "percentile_rank BETWEEN ? AND ?"
+            )
+            rank_clause_params.extend([lo, hi])
+    rank_clause = " OR ".join(rank_clause_parts)
 
     # Total matching rows — feeds the pager.
     total_count = con.execute(
@@ -557,6 +588,7 @@ def render(
         ptile_min=ptile_min,
         ptile_max=ptile_max,
         ptile_ranges=tuple(effective_ranges),
+        metric_thresholds=metric_thresholds,
         ptile_values=ptile_values,
         ptile_unit="d",
     )

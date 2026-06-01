@@ -36,7 +36,10 @@
 <div class="ptile-toolbar">
   <span class="ptile-toolbar-label">Percentile</span>
   <div class="ptile-chips" id="ptile-chips"
-       role="group" aria-label="Percentile filter">
+       role="group" aria-label="Percentile filter"
+       {% if data.metric_thresholds -%}
+       data-thresholds="{{ data.metric_thresholds[0] }},{{ data.metric_thresholds[1] }},{{ data.metric_thresholds[2] }}"
+       {%- endif %}>
     {{ chip("All", 0, 100, active_ranges, is_full) }}
     {{ chip("≤ P50", 0, 50, active_ranges, is_full) }}
     {{ chip("P50–P85", 50, 85, active_ranges, is_full) }}
@@ -59,6 +62,12 @@
       }
       return out;
     }
+
+    // Thresholds emitted by the server so the standalone
+    // work-items endpoint can apply absolute-value chip filters
+    // (matching the chart's dashed P50/P85/P95 reference lines)
+    // without re-rendering the chart model.
+    const ptileThresholds = chips.dataset.thresholds || '';
 
     function fire() {
       const ranges = activeRanges();
@@ -84,6 +93,7 @@
         workflow: contract,
         from: 'slider',
         ptile_ranges: param,
+        ptile_thresholds: ptileThresholds,
         sort: sort || '',
         direction: dir || '',
         q: search ? search.value : '',
