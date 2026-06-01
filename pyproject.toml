@@ -1,6 +1,6 @@
 [project]
 name = "flowmetrics"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Vacanti-style flow efficiency and Monte Carlo forecasting from GitHub PR data"
 readme = "README.md"
 authors = [
@@ -64,8 +64,25 @@ flow = "flowmetrics:main"
 samples = "flowmetrics.serve:main"
 
 [build-system]
-requires = ["uv_build>=0.8.16,<0.9.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27", "hatch-vcs>=0.5"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+# Pull version from git tags. Tagged commits produce a clean PEP-440
+# version (e.g. `0.1.0`); untagged commits produce `0.1.0.devN+gSHA`
+# so `uv tool list` and `flow --version` show the exact build a user
+# is running.
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+# Drop the resolved version into a generated _version.py so the
+# `flow --version` flag can read it at runtime without importing
+# importlib.metadata (which is slower + relies on the dist being
+# installed under its canonical name).
+version-file = "src/flowmetrics/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flowmetrics"]
 
 [dependency-groups]
 dev = [

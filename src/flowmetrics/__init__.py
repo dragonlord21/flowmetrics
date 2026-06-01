@@ -27,7 +27,19 @@ from .service import (
 from .sources import Source
 from .throughput import daily_throughput
 
+try:
+    # Generated at build time by hatch-vcs. Untracked; present in
+    # any installed flowmetrics dist and any `uv sync`-ed checkout.
+    from ._version import __version__
+except ImportError:
+    # No build has run (raw clone, no editable install). Fall back
+    # to a string that's still PEP-440 valid so importers don't
+    # blow up; users will see this if they import flowmetrics
+    # straight from a clone with no install step.
+    __version__ = "0.0.0+unknown"
+
 __all__ = [
+    "__version__",
     "DEFAULT_CACHE_DIR",
     "DEFAULT_GAP",
     "DEFAULT_MIN_CLUSTER",

@@ -249,6 +249,15 @@ def _hint_for(exc: Exception) -> str | None:
 
 
 @click.group()
+@click.version_option(
+    # Resolve via importlib.metadata so the value matches what `uv
+    # tool list` and `pip show` report — the canonical source of
+    # truth for an installed package. hatch-vcs writes this value
+    # into the dist's METADATA at build time.
+    version=None,
+    package_name="flowmetrics",
+    message="%(prog)s %(version)s",
+)
 def cli() -> None:
     """Flow metrics and Monte Carlo forecasting from GitHub (PRs and
     Issues) and Atlassian Jira issue data.
