@@ -1356,6 +1356,17 @@ def materialise_all(
     help="Warehouse to back up.",
 )
 @click.option(
+    "--workflows-dir", "contracts_dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Directory holding `contracts.db` (the config DB). Pass this "
+        "to include config in the backup; omit it for a data-only "
+        "archive. The DB is snapshotted via SQLite's online backup "
+        "API so a running server can't corrupt it."
+    ),
+)
+@click.option(
     "--output",
     type=click.Path(path_type=Path),
     default=None,
@@ -1374,15 +1385,19 @@ def materialise_all(
 )
 def backup(
     data_dir: Path,
+    contracts_dir: Path | None,
     output: Path | None,
     include_cache: bool,
 ) -> None:
-    """Snapshot the warehouse into a single timestamped .tar.gz.
+    """Snapshot the warehouse (and optionally the config DB) into a
+    single timestamped .tar.gz.
 
     The archive carries every Parquet table + run manifest under
     `--data-dir` plus a `flowmetrics-backup.json` header with a
-    SHA-256 of every payload file. `flow restore` verifies the
-    header + checksums before extracting.
+    SHA-256 of every payload file. Pass `--workflows-dir` to also
+    include a consistent snapshot of `contracts.db` (taken via
+    SQLite's online backup API so a live server can't tear it).
+    `flow restore` verifies the header + checksums before extracting.
     """
     from .backup import write_backup
 
@@ -1390,7 +1405,12 @@ def backup(
         ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
         output = data_dir / "_backups" / f"flowmetrics-{ts}.tar.gz"
 
-    header = write_backup(data_dir, output, include_cache=include_cache)
+    header = write_backup(
+        data_dir,
+        output,
+        include_cache=include_cache,
+        contracts_dir=contracts_dir,
+    )
     size_mb = output.stat().st_size / (1024 * 1024)
     click.echo(
         f"wrote {output} ({size_mb:.1f} MB, "
@@ -1410,7 +1430,17 @@ def backup(
     "--data-dir",
     type=click.Path(path_type=Path),
     required=True,
-    help="Target directory to restore into.",
+    help="Target directory to restore the warehouse into.",
+)
+@click.option(
+    "--workflows-dir", "contracts_dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help=(
+        "Target directory for the restored `contracts.db`. Required "
+        "whenever the backup carries config (or when using "
+        "--config-only)."
+    ),
 )
 @click.option(
     "--force/--no-force",
@@ -1420,27 +1450,58 @@ def backup(
         "doesn't clobber a working warehouse."
     ),
 )
+@click.option(
+    "--data-only/--no-data-only",
+    default=False,
+    help="Restore only the data warehouse (skip contracts.db).",
+)
+@click.option(
+    "--config-only/--no-config-only",
+    default=False,
+    help="Restore only contracts.db (skip the data warehouse).",
+)
 def restore(
     input_path: Path,
     data_dir: Path,
+    contracts_dir: Path | None,
     force: bool,
+    data_only: bool,
+    config_only: bool,
 ) -> None:
-    """Verify + extract a `flow backup` tarball into --data-dir.
+    """Verify + extract a `flow backup` tarball.
 
-    Refuses to touch a non-empty target without --force. Verifies
-    every file's SHA-256 against the header before writing anything,
-    so a corrupted or tampered archive fails before it can damage
-    a half-restored warehouse.
+    Default extracts both the data warehouse and (if present)
+    `contracts.db`. Use `--data-only` to leave config untouched or
+    `--config-only` to leave the warehouse untouched. Refuses to
+    touch a non-empty target without `--force`. Verifies every
+    file's SHA-256 against the header before writing anything, so
+    a corrupted or tampered archive fails before it can damage
+    a half-restored install.
     """
     from .backup import BackupError, restore_backup
 
+    if data_only and config_only:
+        raise click.ClickException(
+            "--data-only and --config-only are mutually exclusive."
+        )
+
+    restore_data = not config_only
+    restore_config = not data_only
+
     try:
-        header = restore_backup(input_path, data_dir, force=force)
+        header = restore_backup(
+            input_path,
+            data_dir,
+            force=force,
+            contracts_dir=contracts_dir,
+            restore_data=restore_data,
+            restore_config=restore_config,
+        )
     except BackupError as exc:
         raise click.ClickException(str(exc)) from exc
 
     click.echo(
-        f"restored {len(header.files)} files into {data_dir} "
+        f"restored {len(header.files)} files "
         f"(from {input_path}, written {header.created_at})"
     )
 

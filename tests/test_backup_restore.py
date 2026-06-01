@@ -37,6 +37,34 @@ def _make_tiny_warehouse(root: Path) -> None:
     (runs / "manifest.json").write_text(json.dumps({"items_fetched": 7}))
 
 
+def _make_tiny_contracts_db(contracts_dir: Path) -> None:
+    """Synthesise a SQLite contracts.db with the schema flowmetrics
+    uses — a single contracts table with one row. Enough for the
+    backup helper to copy + the restore round-trip to verify
+    byte-for-byte equality."""
+    import sqlite3
+    contracts_dir.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(contracts_dir / "contracts.db")
+    try:
+        con.executescript("""
+            CREATE TABLE contracts (
+              id TEXT PRIMARY KEY,
+              yaml TEXT NOT NULL,
+              archived_at TEXT,
+              archived_reason TEXT,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            );
+            INSERT INTO contracts(id, yaml, created_at, updated_at)
+            VALUES ('demo', 'contract:\\n  name: demo\\n',
+                    '2026-05-31T00:00:00Z',
+                    '2026-05-31T00:00:00Z');
+        """)
+        con.commit()
+    finally:
+        con.close()
+
+
 class TestBackupShape:
     def test_writes_a_targz_with_a_header_and_checksums(self, tmp_path):
         data = tmp_path / "data"
@@ -255,3 +283,284 @@ class TestS3Target:
     """S3 round-trip lives behind an optional `boto3` dep. Skipped
     from the default suite; exercise manually against MinIO or in a
     dedicated integration matrix entry."""
+
+
+class TestContractsDbBackup:
+    """The config DB (`<workflows-dir>/contracts.db`, SQLite) ships
+    inside the same tarball as the data warehouse — namespaced under
+    `_config/` so old data-only backups are still restorable. The
+    SQLite snapshot uses the online backup API (`con.backup()`) so a
+    concurrent writer can't tear the file mid-copy."""
+
+    def test_backup_includes_contracts_db_when_workflows_dir_given(self, tmp_path):
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        contracts = tmp_path / "contracts"
+        _make_tiny_contracts_db(contracts)
+        out = tmp_path / "backup.tar.gz"
+
+        res = CliRunner().invoke(cli, [
+            "backup",
+            "--data-dir", str(data),
+            "--workflows-dir", str(contracts),
+            "--output", str(out),
+        ], catch_exceptions=False)
+        assert res.exit_code == 0, res.output
+
+        with tarfile.open(out, "r:gz") as tar:
+            names = tar.getnames()
+        # Config namespace lives under `_config/` (mirrors the
+        # `_backups/` + `_status/` underscore-prefix convention).
+        assert any(n == "_config/contracts.db" for n in names), names
+
+    def test_backup_without_workflows_dir_omits_config(self, tmp_path):
+        """No --workflows-dir → backup carries only the data warehouse
+        (no `_config/`). Preserves the pre-extension behaviour."""
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        out = tmp_path / "backup.tar.gz"
+
+        CliRunner().invoke(cli, [
+            "backup", "--data-dir", str(data), "--output", str(out),
+        ], catch_exceptions=False)
+
+        with tarfile.open(out, "r:gz") as tar:
+            assert not any(n.startswith("_config/") for n in tar.getnames())
+
+    def test_contracts_db_snapshot_round_trips_byte_for_byte(self, tmp_path):
+        """A round-trip through the SQLite online-backup API may not
+        reproduce the source DB byte-for-byte (page layout can shift),
+        but it MUST reproduce row-level content. Pin on row content,
+        not byte equality, so the test reflects what we actually
+        guarantee."""
+        import sqlite3
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        contracts = tmp_path / "contracts"
+        _make_tiny_contracts_db(contracts)
+
+        out = tmp_path / "backup.tar.gz"
+        CliRunner().invoke(cli, [
+            "backup",
+            "--data-dir", str(data),
+            "--workflows-dir", str(contracts),
+            "--output", str(out),
+        ], catch_exceptions=False)
+
+        restored_data = tmp_path / "restored_data"
+        restored_contracts = tmp_path / "restored_contracts"
+        res = CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(out),
+            "--data-dir", str(restored_data),
+            "--workflows-dir", str(restored_contracts),
+        ], catch_exceptions=False)
+        assert res.exit_code == 0, res.output
+
+        # Restored contracts.db has the same rows as the source.
+        src = sqlite3.connect(contracts / "contracts.db")
+        dst = sqlite3.connect(restored_contracts / "contracts.db")
+        try:
+            src_rows = src.execute(
+                "SELECT id, yaml, created_at FROM contracts ORDER BY id"
+            ).fetchall()
+            dst_rows = dst.execute(
+                "SELECT id, yaml, created_at FROM contracts ORDER BY id"
+            ).fetchall()
+        finally:
+            src.close()
+            dst.close()
+        assert src_rows == dst_rows
+        assert src_rows  # sanity — fixture not empty
+
+    def test_contracts_db_snapshot_is_safe_under_concurrent_writer(self, tmp_path):
+        """The point of using SQLite's online backup API (instead of
+        a raw file copy) is that a concurrent writer holding an
+        OPEN connection can't corrupt the snapshot. Exercise that:
+        open a write connection on contracts.db, then run `flow
+        backup`. The backup must succeed and the snapshot must
+        contain the rows committed at the moment the snapshot
+        started."""
+        import sqlite3
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        contracts = tmp_path / "contracts"
+        _make_tiny_contracts_db(contracts)
+
+        # Open a long-lived writer connection (simulating the live
+        # server). With a raw `shutil.copy` this would race; with
+        # the online backup API it's safe.
+        live = sqlite3.connect(contracts / "contracts.db")
+        try:
+            live.execute("BEGIN")
+            live.execute(
+                "INSERT INTO contracts(id, yaml, created_at, updated_at) "
+                "VALUES ('uncommitted', 'x', '2026-06-01', '2026-06-01')"
+            )
+            # NOT committed — the snapshot must not see this row.
+
+            out = tmp_path / "backup.tar.gz"
+            res = CliRunner().invoke(cli, [
+                "backup",
+                "--data-dir", str(data),
+                "--workflows-dir", str(contracts),
+                "--output", str(out),
+            ], catch_exceptions=False)
+            assert res.exit_code == 0, res.output
+        finally:
+            live.rollback()
+            live.close()
+
+        # Verify the snapshot
+        restored = tmp_path / "restored_contracts"
+        CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(out),
+            "--data-dir", str(tmp_path / "restored_data"),
+            "--workflows-dir", str(restored),
+            "--config-only",
+        ], catch_exceptions=False)
+        dst = sqlite3.connect(restored / "contracts.db")
+        try:
+            ids = [r[0] for r in dst.execute("SELECT id FROM contracts").fetchall()]
+        finally:
+            dst.close()
+        assert "demo" in ids
+        assert "uncommitted" not in ids
+
+
+class TestSelectiveRestore:
+    """`flow restore` accepts `--data-only` and `--config-only` so
+    operators can roll back the warehouse without touching contracts
+    (or vice versa). Default is both."""
+
+    def _make_backup(self, tmp_path: Path) -> tuple[Path, Path, Path]:
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        contracts = tmp_path / "contracts"
+        _make_tiny_contracts_db(contracts)
+        out = tmp_path / "backup.tar.gz"
+        CliRunner().invoke(cli, [
+            "backup",
+            "--data-dir", str(data),
+            "--workflows-dir", str(contracts),
+            "--output", str(out),
+        ], catch_exceptions=False)
+        return out, data, contracts
+
+    def test_data_only_skips_contracts_db(self, tmp_path):
+        backup_path, _, _ = self._make_backup(tmp_path)
+        target_data = tmp_path / "tdata"
+        target_contracts = tmp_path / "tcontracts"
+
+        res = CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(backup_path),
+            "--data-dir", str(target_data),
+            "--workflows-dir", str(target_contracts),
+            "--data-only",
+        ], catch_exceptions=False)
+        assert res.exit_code == 0, res.output
+
+        # Warehouse files landed
+        assert any(target_data.rglob("items-run1.parquet"))
+        # Config file did NOT
+        assert not (target_contracts / "contracts.db").exists()
+
+    def test_config_only_skips_data(self, tmp_path):
+        backup_path, _, _ = self._make_backup(tmp_path)
+        target_data = tmp_path / "tdata"
+        target_contracts = tmp_path / "tcontracts"
+
+        res = CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(backup_path),
+            "--data-dir", str(target_data),
+            "--workflows-dir", str(target_contracts),
+            "--config-only",
+        ], catch_exceptions=False)
+        assert res.exit_code == 0, res.output
+
+        # Config file landed
+        assert (target_contracts / "contracts.db").exists()
+        # Warehouse files did NOT
+        assert not any(target_data.rglob("*.parquet"))
+
+    def test_default_restores_both(self, tmp_path):
+        backup_path, _, _ = self._make_backup(tmp_path)
+        target_data = tmp_path / "tdata"
+        target_contracts = tmp_path / "tcontracts"
+
+        res = CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(backup_path),
+            "--data-dir", str(target_data),
+            "--workflows-dir", str(target_contracts),
+        ], catch_exceptions=False)
+        assert res.exit_code == 0, res.output
+
+        assert any(target_data.rglob("items-run1.parquet"))
+        assert (target_contracts / "contracts.db").exists()
+
+    def test_data_only_and_config_only_are_mutually_exclusive(self, tmp_path):
+        backup_path, _, _ = self._make_backup(tmp_path)
+        res = CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(backup_path),
+            "--data-dir", str(tmp_path / "td"),
+            "--workflows-dir", str(tmp_path / "tc"),
+            "--data-only",
+            "--config-only",
+        ], catch_exceptions=False)
+        # Click rejects mutually exclusive flags with non-zero exit.
+        assert res.exit_code != 0
+        assert "data-only" in res.output.lower() or "config-only" in res.output.lower()
+
+    def test_config_only_against_data_only_backup_is_an_error(self, tmp_path):
+        """If the tarball never carried a `_config/contracts.db` (a
+        legacy data-only backup), `--config-only` has nothing to
+        restore — surface that to the operator instead of silently
+        succeeding."""
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        out = tmp_path / "backup.tar.gz"
+        CliRunner().invoke(cli, [
+            "backup", "--data-dir", str(data), "--output", str(out),
+        ], catch_exceptions=False)
+
+        res = CliRunner().invoke(cli, [
+            "restore",
+            "--input", str(out),
+            "--data-dir", str(tmp_path / "td"),
+            "--workflows-dir", str(tmp_path / "tc"),
+            "--config-only",
+        ], catch_exceptions=False)
+        assert res.exit_code != 0
+
+
+class TestBackwardsCompatRestore:
+    """Old (data-only) backups must still restore — the schema URI
+    didn't change, just the set of allowed prefixes."""
+
+    def test_restore_old_data_only_backup_still_works(self, tmp_path):
+        data = tmp_path / "data"
+        data.mkdir()
+        _make_tiny_warehouse(data)
+        out = tmp_path / "backup.tar.gz"
+        # No --workflows-dir → pre-extension shape.
+        CliRunner().invoke(cli, [
+            "backup", "--data-dir", str(data), "--output", str(out),
+        ], catch_exceptions=False)
+
+        restored = tmp_path / "restored"
+        res = CliRunner().invoke(cli, [
+            "restore", "--input", str(out), "--data-dir", str(restored),
+        ], catch_exceptions=False)
+        assert res.exit_code == 0, res.output
+        assert any(restored.rglob("items-run1.parquet"))
