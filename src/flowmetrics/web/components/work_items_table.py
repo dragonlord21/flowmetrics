@@ -79,6 +79,11 @@ class WorkItemRow:
     completed_at_display: str  # "May 04, 2026"; "" for in-flight
     cycle_time_days: float | None
     age_days: int | None
+    # Percentile rank (0..100) of this row's cycle time (or, in
+    # in-flight scope, its current age) across the rest of the
+    # filtered set. Drives the two-handle Percentile slider on
+    # the cycle-time and aging detail pages.
+    percentile_rank: int | None
 
 
 @dataclass(frozen=True)
@@ -103,6 +108,11 @@ class WorkItemsTableData:
     page: int
     page_size: int
     total_pages: int
+    # Echoed slider bounds so the template can re-render the
+    # two-handle Percentile slider at the user's chosen values
+    # AND so sort / pagination links carry them forward.
+    ptile_min: int
+    ptile_max: int
 
 
 # Whitelist for sort keys so we can safely interpolate into SQL
@@ -117,6 +127,10 @@ _SORT_COLUMN_SQL: dict[str, str] = {
     # Virtual: maps to created_at; direction is inverted in
     # render() so "Age desc" reads as "oldest first".
     "age_days": "created_at",
+    # Virtual: the percentile_rank column produced by the ranked
+    # CTE — works on both completed (rank over cycle_time_days)
+    # and in-flight (rank over age) modes.
+    "percentile_rank": "percentile_rank",
 }
 
 
@@ -145,6 +159,12 @@ DEFAULT_COLUMNS: tuple[Column, ...] = (
         align="right",
         kind="int",
     ),
+    Column(
+        key="percentile_rank",
+        label="Pctile",
+        align="right",
+        kind="int",
+    ),
 )
 
 
@@ -168,6 +188,12 @@ IN_FLIGHT_COLUMNS: tuple[Column, ...] = (
         align="right",
         kind="int",
     ),
+    Column(
+        key="percentile_rank",
+        label="Pctile",
+        align="right",
+        kind="int",
+    ),
 )
 
 
@@ -185,6 +211,8 @@ def render(
     columns: tuple[Column, ...] | None = None,
     wip_states: tuple[str, ...] | None = None,
     view: Window | None = None,
+    ptile_min: int = 0,
+    ptile_max: int = 100,
 ) -> WorkItemsTableData:
     """Read a page of rows for the contract.
 
@@ -306,26 +334,72 @@ def render(
         where_params.extend(list(wip_states))
     where_params.extend(view_params)
 
+    # Ranking metric: cycle time when scope is completed items,
+    # age (asof - created_at) when scope is in-flight. The
+    # PERCENT_RANK gives (rank - 1) / (N - 1) ∈ [0, 1]; we round
+    # to 0..100 so the slider's integer bounds map directly.
+    if in_flight_at:
+        rank_metric_sql = (
+            "CAST(? AS DATE) - CAST(created_at AS DATE)"
+        )
+        rank_metric_params: list = [in_flight_at]
+    else:
+        rank_metric_sql = "cycle_time_days"
+        rank_metric_params = []
+
+    # Clamp slider bounds defensively — out-of-range values
+    # should never crash the query.
+    ptile_min = max(0, min(100, int(ptile_min)))
+    ptile_max = max(0, min(100, int(ptile_max)))
+    if ptile_min > ptile_max:
+        ptile_min, ptile_max = ptile_max, ptile_min
+
+    # Two CTEs: `base` filters + tags each row with the ranking
+    # metric; `ranked` adds PERCENT_RANK over that metric and
+    # rounds to 0..100. The data + count queries then share the
+    # ranked view.
+    ranked_cte = (
+        "WITH base AS ("
+        " SELECT source, item_id, title, url, created_at, "
+        "        completed_at, cycle_time_days, "
+        f"       {rank_metric_sql} AS rank_metric "
+        " FROM work_items"
+        + wip_join
+        + where_clause
+        + "), ranked AS ("
+        " SELECT *, "
+        "        CAST(ROUND("
+        "          PERCENT_RANK() OVER (ORDER BY rank_metric) * 100"
+        "        ) AS INTEGER) AS percentile_rank "
+        " FROM base"
+        ") "
+    )
+    ranked_params = [*rank_metric_params, *where_params]
+
     # Total matching rows — feeds the pager.
     total_count = con.execute(
-        "SELECT count(*) FROM work_items" + wip_join + where_clause,
-        where_params,
+        ranked_cte
+        + "SELECT count(*) FROM ranked "
+        + "WHERE percentile_rank BETWEEN ? AND ?",
+        [*ranked_params, ptile_min, ptile_max],
     ).fetchone()[0]
 
     # Stable secondary order by item_id so equal-key rows don't
     # flicker between requests.
     data_sql = (
-        "SELECT source, item_id, title, url, "
-        "       created_at, completed_at, cycle_time_days "
-        "FROM work_items"
-        + wip_join
-        + where_clause
+        ranked_cte
+        + "SELECT source, item_id, title, url, "
+        + "       created_at, completed_at, cycle_time_days, "
+        + "       percentile_rank "
+        + "FROM ranked "
+        + "WHERE percentile_rank BETWEEN ? AND ? "
         + f"ORDER BY {sql_column} {order}, item_id ASC "
         + "LIMIT ? OFFSET ?"
     )
     offset = (page - 1) * page_size
     rows = con.execute(
-        data_sql, [*where_params, page_size, offset]
+        data_sql,
+        [*ranked_params, ptile_min, ptile_max, page_size, offset],
     ).fetchall()
 
     # Pre-parse the asof date once so we can compute age per row
@@ -362,8 +436,14 @@ def render(
                 float(cycle_time_days) if cycle_time_days is not None else None
             ),
             age_days=_age(created_at),
+            percentile_rank=(
+                int(percentile_rank) if percentile_rank is not None else None
+            ),
         )
-        for (source, item_id, title, url, created_at, completed_at, cycle_time_days) in rows
+        for (
+            source, item_id, title, url, created_at, completed_at,
+            cycle_time_days, percentile_rank,
+        ) in rows
     )
 
     # Pre-format the date filter's display string so the template
@@ -402,4 +482,6 @@ def render(
         page=page,
         page_size=page_size,
         total_pages=total_pages,
+        ptile_min=ptile_min,
+        ptile_max=ptile_max,
     )

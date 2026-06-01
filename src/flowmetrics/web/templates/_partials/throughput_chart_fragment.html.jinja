@@ -73,10 +73,10 @@
           encodeURIComponent(contract) +
           "&completed_on=" + encodeURIComponent(item.datum.date_iso)
         );
-        // Preserve the table's current sort + direction across the
-        // drill-down. The state is mirrored into a hidden meta div
-        // inside the swap target, so it always reflects the last
-        // render.
+        // Preserve the table's current sort + direction AND the
+        // percentile slider bounds across the drill-down. The
+        // state is mirrored into a hidden meta div inside the
+        // swap target, so it always reflects the last render.
         const state = document.getElementById("work-items-state");
         if (state) {
           if (state.dataset.sort) {
@@ -84,6 +84,12 @@
           }
           if (state.dataset.direction) {
             url += "&direction=" + encodeURIComponent(state.dataset.direction);
+          }
+          if (state.dataset.ptileMin) {
+            url += "&ptile_min=" + encodeURIComponent(state.dataset.ptileMin);
+          }
+          if (state.dataset.ptileMax) {
+            url += "&ptile_max=" + encodeURIComponent(state.dataset.ptileMax);
           }
         }
         // Carry the page's filter params (period / anchor / …) so

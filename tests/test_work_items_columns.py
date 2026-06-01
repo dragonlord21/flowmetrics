@@ -80,14 +80,15 @@ def warehouse() -> duckdb.DuckDBPyConnection:
 class TestColumnConfig:
     def test_default_columns_cover_completed_view(self):
         """Default column set: id, title, started, completed,
-        cycle. Pinned here so the dashboard / cycle-time-detail /
-        throughput-detail tables stay consistent."""
+        cycle, percentile. Pinned so the dashboard /
+        cycle-time-detail / throughput-detail tables stay
+        consistent."""
         keys = [c.key for c in DEFAULT_COLUMNS]
         assert keys == [
             "item_id", "title", "created_at_display",
             "completed_at_display", "cycle_time_days",
+            "percentile_rank",
         ]
-        # All except item_id (the link) are sortable.
         sortable = {c.key for c in DEFAULT_COLUMNS if c.sort_key}
         assert "title" in sortable
         assert "completed_at_display" in sortable
@@ -95,10 +96,11 @@ class TestColumnConfig:
 
     def test_in_flight_columns_swap_completed_and_cycle_for_age(self):
         """The aging detail page's column set: drop Completed and
-        Cycle (always None for in-flight), add Age."""
+        Cycle (always None for in-flight), add Age + percentile."""
         keys = [c.key for c in IN_FLIGHT_COLUMNS]
         assert keys == [
-            "item_id", "title", "created_at_display", "age_days",
+            "item_id", "title", "created_at_display",
+            "age_days", "percentile_rank",
         ]
         # Age has a quantitative kind so the template right-aligns it.
         age_col = next(c for c in IN_FLIGHT_COLUMNS if c.key == "age_days")

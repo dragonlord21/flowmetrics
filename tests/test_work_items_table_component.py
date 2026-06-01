@@ -276,3 +276,89 @@ class TestWorkItemsTableShape:
         assert dates == sorted(dates, reverse=True), (
             "table default sort must be completed_at descending"
         )
+
+
+class TestPercentileRankAndFilter:
+    """Each row carries a `percentile_rank` derived from the
+    distribution of cycle times (or ages, on in-flight scope)
+    across the rest of the filtered set. The `ptile_min` /
+    `ptile_max` bounds (0..100, defaults 0/100) narrow the table
+    to rows in that percentile range — driven by the two-handle
+    slider on the cycle-time and aging detail pages."""
+
+    def test_row_carries_percentile_rank_in_zero_to_one_hundred(
+        self, warehouse,
+    ):
+        data = render(warehouse, "astral-uv-week")
+        for row in data.rows:
+            assert row.percentile_rank is not None, (
+                f"item {row.item_id} missing percentile_rank"
+            )
+            assert 0 <= row.percentile_rank <= 100
+
+    def test_smallest_cycle_time_sits_at_the_bottom_of_the_rank(
+        self, warehouse,
+    ):
+        # ORDER BY cycle_time_days ASC: the row with the smallest
+        # cycle time should be at the bottom of the rank (0).
+        data = render(
+            warehouse, "astral-uv-week",
+            sort="cycle_time_days", direction="asc",
+        )
+        assert data.rows[0].percentile_rank == 0
+
+    def test_ptile_max_filters_to_lower_percentile_only(
+        self, warehouse,
+    ):
+        # Only items at or below the 50th percentile of cycle time.
+        filtered = render(warehouse, "astral-uv-week", ptile_max=50)
+        assert filtered.count > 0, "expected some rows under p50"
+        for row in filtered.rows:
+            assert row.percentile_rank <= 50, (
+                f"row {row.item_id} has pr={row.percentile_rank}"
+                f" but ptile_max=50"
+            )
+        unfiltered = render(warehouse, "astral-uv-week")
+        assert filtered.count < unfiltered.count, (
+            "ptile_max=50 should reduce the row count"
+        )
+
+    def test_ptile_min_filters_to_upper_tail_only(
+        self, warehouse,
+    ):
+        filtered = render(warehouse, "astral-uv-week", ptile_min=85)
+        assert filtered.count > 0, "expected some rows above p85"
+        for row in filtered.rows:
+            assert row.percentile_rank >= 85, (
+                f"row {row.item_id} has pr={row.percentile_rank}"
+                f" but ptile_min=85"
+            )
+
+    def test_default_bounds_zero_and_hundred_preserve_full_set(
+        self, warehouse,
+    ):
+        unbounded = render(warehouse, "astral-uv-week")
+        defaulted = render(
+            warehouse, "astral-uv-week",
+            ptile_min=0, ptile_max=100,
+        )
+        assert unbounded.count == defaulted.count
+
+
+class TestPercentileColumn:
+    """The percentile bucket is a virtual column — surfaced on
+    both DEFAULT and IN_FLIGHT column sets so the reader can see
+    where each item lands without computing it in their head."""
+
+    def test_default_columns_include_a_percentile_column(self):
+        from flowmetrics.web.components.work_items_table import (
+            DEFAULT_COLUMNS, IN_FLIGHT_COLUMNS,
+        )
+        for cols, label in (
+            (DEFAULT_COLUMNS, "default"),
+            (IN_FLIGHT_COLUMNS, "in-flight"),
+        ):
+            keys = [c.key for c in cols]
+            assert "percentile_rank" in keys, (
+                f"{label} columns missing percentile_rank"
+            )

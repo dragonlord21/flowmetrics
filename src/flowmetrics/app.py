@@ -454,6 +454,7 @@ def create_app(
 
     _CARRIED_PARAMS = frozenset({
         "period", "anchor", "view_days", "ref_days",
+        "ptile_min", "ptile_max",
     })
 
     @pass_context
@@ -1864,6 +1865,8 @@ def create_app(
         sort: str = "completed_at",
         direction: str = "desc",
         page: int = 1,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
     ) -> HTMLResponse:
         """HTMX swap target for the work-items table: sort + filter
         + paginate round-trip, returning only the partial.
@@ -1883,7 +1886,16 @@ def create_app(
         sort_key: SortKey = sort if sort in (
             "item_id", "title", "created_at",
             "completed_at", "cycle_time_days", "age_days",
+            "percentile_rank",
         ) else "completed_at"
+        # Clamp slider bounds — the component clamps too, but
+        # catching obviously-malformed input here keeps the
+        # downstream SQL params clean.
+        try:
+            pmin = max(0, min(100, int(ptile_min)))
+            pmax = max(0, min(100, int(ptile_max)))
+        except (TypeError, ValueError):
+            pmin, pmax = 0, 100
         direction_key: SortDir = direction if direction in (
             "asc", "desc"
         ) else "desc"
@@ -1916,6 +1928,8 @@ def create_app(
                 # (cycle-time / throughput pages); the component
                 # auto-skips it when in_flight_at is set (aging).
                 view=view.view_window,
+                ptile_min=pmin,
+                ptile_max=pmax,
             )
         return templates.TemplateResponse(
             request,

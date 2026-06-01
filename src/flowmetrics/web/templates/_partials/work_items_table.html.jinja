@@ -21,6 +21,47 @@
            value="{{ data.completed_on }}">
     <input id="work-items-in-flight-at" type="hidden" name="in_flight_at"
            value="{{ data.in_flight_at }}">
+
+    {# Two-handle percentile slider. Each handle is an independent
+       <input type="range">; the script below clamps min <= max
+       and writes a live readout. Each fires its own HTMX request
+       on change, pulling in the OTHER handle + the search + the
+       scope filters via hx-include so the round-trip request is
+       complete. The current sort/direction come from the hidden
+       state meta that the body partial keeps fresh. #}
+    <div class="ptile-slider">
+      <div class="ptile-slider-label">
+        Percentile range:
+        <strong id="ptile-display">P<span id="ptile-min-disp">{{ data.ptile_min }}</span>–P<span id="ptile-max-disp">{{ data.ptile_max }}</span></strong>
+        <span class="ptile-slider-hint">drag to filter by cycle / age band</span>
+      </div>
+      <div class="ptile-slider-handles">
+        <input type="range" min="0" max="100" step="1"
+               id="ptile-min" name="ptile_min"
+               value="{{ data.ptile_min }}"
+               hx-get="/api/internal/work-items?workflow={{ contract.name }}"
+               hx-target="#work-items-body"
+               hx-swap="innerHTML"
+               hx-trigger="change"
+               hx-vals='js:{sort: document.getElementById("work-items-state")?.dataset.sort || "", direction: document.getElementById("work-items-state")?.dataset.direction || ""}'
+               hx-include="#ptile-max, #work-items-search, #work-items-completed-on, #work-items-in-flight-at">
+        <input type="range" min="0" max="100" step="1"
+               id="ptile-max" name="ptile_max"
+               value="{{ data.ptile_max }}"
+               hx-get="/api/internal/work-items?workflow={{ contract.name }}"
+               hx-target="#work-items-body"
+               hx-swap="innerHTML"
+               hx-trigger="change"
+               hx-vals='js:{sort: document.getElementById("work-items-state")?.dataset.sort || "", direction: document.getElementById("work-items-state")?.dataset.direction || ""}'
+               hx-include="#ptile-min, #work-items-search, #work-items-completed-on, #work-items-in-flight-at">
+        <div class="ptile-slider-ticks" aria-hidden="true">
+          <span style="left: 50%">P50</span>
+          <span style="left: 85%">P85</span>
+          <span style="left: 95%">P95</span>
+        </div>
+      </div>
+    </div>
+
     <input id="work-items-search"
            class="work-items-search"
            type="search"
@@ -31,9 +72,34 @@
            hx-get="{{ ('/api/internal/work-items?workflow=' ~ contract.name ~ '&sort=' ~ data.sort ~ '&direction=' ~ data.direction ~ '&page=1') | keep_filters }}"
            hx-target="#work-items-body"
            hx-swap="innerHTML"
-           hx-include="#work-items-completed-on, #work-items-in-flight-at"
+           hx-include="#work-items-completed-on, #work-items-in-flight-at, #ptile-min, #ptile-max"
            hx-trigger="keyup changed delay:200ms, search">
   </div>
+
+  <script>
+    (function () {
+      // Constrain min <= max on either handle moving, and keep the
+      // textual readout in sync as the user drags.
+      const pmin = document.getElementById('ptile-min');
+      const pmax = document.getElementById('ptile-max');
+      const minDisp = document.getElementById('ptile-min-disp');
+      const maxDisp = document.getElementById('ptile-max-disp');
+      function clampAndShow() {
+        let lo = parseInt(pmin.value, 10);
+        let hi = parseInt(pmax.value, 10);
+        if (lo > hi) {
+          // Whichever handle just crossed the other "pushes" it.
+          if (document.activeElement === pmin) hi = lo;
+          else lo = hi;
+          pmin.value = lo; pmax.value = hi;
+        }
+        minDisp.textContent = lo;
+        maxDisp.textContent = hi;
+      }
+      pmin.addEventListener('input', clampAndShow);
+      pmax.addEventListener('input', clampAndShow);
+    })();
+  </script>
 
   <div id="work-items-body">
     {% include "_partials/work_items_table_body.html.jinja" %}

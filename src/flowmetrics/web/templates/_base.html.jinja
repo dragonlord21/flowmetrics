@@ -754,7 +754,89 @@
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      flex-wrap: wrap;
       margin-bottom: 0.4rem;
+    }
+
+    /* Two-handle percentile slider. The two range inputs are
+       stacked on the same row so their tracks overlay; pointer
+       events still route to whichever handle the user grabs. */
+    .ptile-slider {
+      display: flex; flex-direction: column; gap: 0.15rem;
+      flex: 1 1 18rem; min-width: 16rem;
+      padding: 0.2rem 0.45rem 0.6rem 0.45rem;
+      background: var(--surface);
+      border: 0.0625rem solid var(--border);
+      border-radius: 0.3rem;
+    }
+    .ptile-slider-label {
+      display: flex; gap: 0.4rem; align-items: baseline;
+      font-size: 0.75rem; color: var(--muted);
+    }
+    .ptile-slider-label strong {
+      font-family: var(--mono-font);
+      color: var(--fg); font-weight: 600;
+    }
+    .ptile-slider-hint {
+      font-size: 0.7rem; color: var(--muted);
+      font-style: italic; margin-left: auto;
+    }
+    .ptile-slider-handles {
+      position: relative; height: 1.6rem;
+    }
+    .ptile-slider-handles > input[type="range"] {
+      position: absolute; inset: 0;
+      width: 100%; margin: 0;
+      background: transparent;
+      pointer-events: none;
+      -webkit-appearance: none; appearance: none;
+    }
+    /* Hide the default track on each input so the two stacked
+       ranges don't paint two faint tracks on top of each other. */
+    .ptile-slider-handles > input[type="range"]::-webkit-slider-runnable-track {
+      height: 0.3rem; background: transparent;
+    }
+    .ptile-slider-handles > input[type="range"]::-moz-range-track {
+      height: 0.3rem; background: transparent;
+    }
+    /* Background track behind both handles. */
+    .ptile-slider-handles::before {
+      content: "";
+      position: absolute; left: 0; right: 0;
+      top: 50%; height: 0.3rem;
+      transform: translateY(-50%);
+      background: var(--bg);
+      border: 0.0625rem solid var(--border);
+      border-radius: 0.15rem;
+    }
+    /* WebKit thumb. */
+    .ptile-slider-handles > input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 0.95rem; height: 0.95rem; border-radius: 50%;
+      background: var(--p-500); border: 0.125rem solid var(--white);
+      box-shadow: 0 0 0 0.0625rem var(--border);
+      pointer-events: auto; cursor: ew-resize;
+    }
+    .ptile-slider-handles > input[type="range"]::-moz-range-thumb {
+      width: 0.95rem; height: 0.95rem; border-radius: 50%;
+      background: var(--p-500); border: 0.125rem solid var(--white);
+      box-shadow: 0 0 0 0.0625rem var(--border);
+      pointer-events: auto; cursor: ew-resize;
+    }
+    .ptile-slider-ticks {
+      position: absolute; left: 0; right: 0; top: 100%;
+      pointer-events: none; height: 0.85rem;
+    }
+    .ptile-slider-ticks > span {
+      position: absolute; transform: translateX(-50%);
+      font-size: 0.6rem; color: var(--muted);
+      font-family: var(--mono-font); top: 0;
+    }
+    .ptile-slider-ticks > span::before {
+      content: ""; display: block;
+      position: absolute; left: 50%; top: -0.45rem;
+      width: 0.0625rem; height: 0.35rem;
+      background: var(--muted); transform: translateX(-50%);
     }
     .work-items-search {
       flex: 0 1 20rem;
