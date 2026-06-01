@@ -66,22 +66,32 @@ def render(
     )
     if ptile_min <= 0 and ptile_max >= 100:
         return model
-    sorted_pts = sorted(model.points, key=lambda p: p.cycle_time_days)
-    n = len(sorted_pts)
-    if n == 0:
-        return model
-    keep: list = []
-    for i, p in enumerate(sorted_pts):
-        rank = round((i / max(1, n - 1)) * 100) if n > 1 else 0
-        if ptile_min <= rank <= ptile_max:
-            keep.append(p)
-    # Replace points; percentiles + headline + ticks + cap stay
-    # as-computed from the full sample.
     from dataclasses import replace
+
+    from ...charts.ptile_filter import filter_by_rank
+    kept = filter_by_rank(
+        list(model.points),
+        key=lambda p: p.cycle_time_days,
+        ptile_min=ptile_min,
+        ptile_max=ptile_max,
+    )
+    if len(kept) == len(model.points):
+        return model
+    # Rebuild the headline so the count it carries reflects the
+    # currently-visible scatter. Percentile values stay full-set
+    # — they describe the reference lines, which don't move with
+    # the slider.
+    pct = model.percentiles
+    headline = (
+        f"{len(kept)} of {len(model.points)} items shown · "
+        f"P50 {pct.p50:.1f}d · P85 {pct.p85:.1f}d · "
+        f"P95 {pct.p95:.1f}d"
+    )
     return replace(
         model,
-        points=tuple(keep),
-        item_count=len(keep),
+        points=tuple(kept),
+        item_count=len(kept),
+        headline=headline,
     )
 
 

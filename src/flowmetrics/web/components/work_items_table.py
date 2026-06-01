@@ -123,14 +123,11 @@ class WorkItemsTableData:
 # Whitelist for sort keys so we can safely interpolate into SQL
 # without parameter binding (DuckDB doesn't support parameterised
 # ORDER BY column names). Keep the list closed.
-# Snap stops on the two-handle Percentile Filter slider: 0 and the
-# 5%-step ladder from P50 upward. The same ladder feeds the
-# server-side `percentile_cont` so the readout can show e.g.
-# "P50 (4d) – P85 (12d)" without an extra round-trip when the
-# user drags.
-PTILE_STOPS: tuple[int, ...] = (
-    0, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100,
-)
+# Snap stops on the two-handle Percentile Filter slider live in
+# the shared chart helper — the chart renders use the same ladder
+# for their Python-side filter so chart-vs-table counts stay in
+# sync.
+from ...charts.ptile_filter import PTILE_STOPS  # noqa: E402,F401  re-export
 
 
 _SORT_COLUMN_SQL: dict[str, str] = {

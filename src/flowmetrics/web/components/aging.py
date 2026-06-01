@@ -69,20 +69,32 @@ def render(
     )
     if ptile_min <= 0 and ptile_max >= 100:
         return model
-    sorted_items = sorted(model.items, key=lambda i: i.age_days)
-    n = len(sorted_items)
-    if n == 0:
-        return model
-    keep: list = []
-    for i, it in enumerate(sorted_items):
-        rank = round((i / max(1, n - 1)) * 100) if n > 1 else 0
-        if ptile_min <= rank <= ptile_max:
-            keep.append(it)
     from dataclasses import replace
+
+    from ...charts.ptile_filter import filter_by_rank
+    kept = filter_by_rank(
+        list(model.items),
+        key=lambda it: it.age_days,
+        ptile_min=ptile_min,
+        ptile_max=ptile_max,
+    )
+    if len(kept) == len(model.items):
+        return model
+    # Splice "showing N of total" into the headline's count phrase
+    # so the count reflects the filtered scatter without rebuilding
+    # the rest (percentile thresholds + reference window stay).
+    full_count = len(model.items)
+    visible = len(kept)
+    headline = model.headline.replace(
+        f"{full_count} in-flight item{'' if full_count == 1 else 's'}",
+        f"{visible} of {full_count} in-flight items shown",
+        1,
+    )
     return replace(
         model,
-        items=tuple(keep),
-        count=len(keep),
+        items=tuple(kept),
+        count=visible,
+        headline=headline,
     )
 
 

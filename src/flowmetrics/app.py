@@ -476,6 +476,22 @@ def create_app(
 
     templates.env.filters["keep_filters"] = _keep_filters
 
+    def _clamp_ptile(pmin, pmax) -> tuple[int, int]:
+        """Normalise the Percentile Filter slider's query-string
+        bounds: clamp to 0..100, swap if reversed, fall back to
+        (0, 100) on malformed input. Used by every route that
+        consumes the slider state (cycle-time + aging detail
+        pages, their HTMX fragments, and the work-items table
+        endpoint)."""
+        try:
+            lo = max(0, min(100, int(pmin)))
+            hi = max(0, min(100, int(pmax)))
+        except (TypeError, ValueError):
+            return 0, 100
+        if lo > hi:
+            lo, hi = hi, lo
+        return lo, hi
+
     # `vega_spec` Jinja global — turns a chart model into its
     # Vega-Lite spec JSON. The chart fragment templates call
     # `{{ vega_spec(data) | safe }}`; `to_vega` dispatches on the
@@ -1526,8 +1542,7 @@ def create_app(
         ptile_min: int = 0, ptile_max: int = 100,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
-        pmin = max(0, min(100, int(ptile_min)))
-        pmax = max(0, min(100, int(ptile_max)))
+        pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
                 con, ptile_min=pmin, ptile_max=pmax,
@@ -1567,8 +1582,7 @@ def create_app(
         ptile_min: int = 0, ptile_max: int = 100,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        pmin = max(0, min(100, int(ptile_min)))
-        pmax = max(0, min(100, int(ptile_max)))
+        pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
                 con, ptile_min=pmin, ptile_max=pmax,
@@ -1643,8 +1657,7 @@ def create_app(
         ptile_min: int = 0, ptile_max: int = 100,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
-        pmin = max(0, min(100, int(ptile_min)))
-        pmax = max(0, min(100, int(ptile_max)))
+        pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         with view.warehouse() as con:
             aging = view.render_aging(con, ptile_min=pmin, ptile_max=pmax)
             # Table scope mirrors the chart: in-flight items only,
@@ -1803,8 +1816,7 @@ def create_app(
         ptile_min: int = 0, ptile_max: int = 100,
     ) -> HTMLResponse:
         view = _open_view(workflow, request)
-        pmin = max(0, min(100, int(ptile_min)))
-        pmax = max(0, min(100, int(ptile_max)))
+        pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         with view.warehouse() as con:
             aging = view.render_aging(con, ptile_min=pmin, ptile_max=pmax)
         return templates.TemplateResponse(
@@ -1910,14 +1922,7 @@ def create_app(
             "completed_at", "cycle_time_days", "age_days",
             "percentile_rank",
         ) else "completed_at"
-        # Clamp slider bounds — the component clamps too, but
-        # catching obviously-malformed input here keeps the
-        # downstream SQL params clean.
-        try:
-            pmin = max(0, min(100, int(ptile_min)))
-            pmax = max(0, min(100, int(ptile_max)))
-        except (TypeError, ValueError):
-            pmin, pmax = 0, 100
+        pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
         direction_key: SortDir = direction if direction in (
             "asc", "desc"
         ) else "desc"
