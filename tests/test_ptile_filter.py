@@ -13,7 +13,9 @@ the dominant value for small PRs).
 from __future__ import annotations
 
 from flowmetrics.charts.ptile_filter import (
-    PTILE_STOPS, filter_by_rank, parse_ranges,
+    PTILE_STOPS,
+    filter_by_rank,
+    parse_ranges,
 )
 
 

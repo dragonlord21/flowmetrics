@@ -140,8 +140,7 @@ class WorkItemsTableData:
 # the shared chart helper — the chart renders use the same ladder
 # for their Python-side filter so chart-vs-table counts stay in
 # sync.
-from ...charts.ptile_filter import PTILE_STOPS  # noqa: E402,F401  re-export
-
+from ...charts.ptile_filter import PTILE_STOPS  # noqa: E402  re-export
 
 _SORT_COLUMN_SQL: dict[str, str] = {
     "item_id": "item_id",

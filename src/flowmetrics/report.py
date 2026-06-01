@@ -1,7 +1,11 @@
 """Typed report objects shared by every renderer.
 
-Each command builds a Report and hands it to a renderer (json / text /
-html). Renderers never recompute; they only format what's in the Report.
+Each command builds a Report and hands it to a renderer (json / text).
+Renderers never recompute; they only format what's in the Report.
+
+Chart-producing report types (aging / CFD / scatterplot) used to live
+here too. They were dropped when the CLI was narrowed to text + JSON
+only — the web UI is the home for every chart now.
 """
 
 from __future__ import annotations
@@ -9,8 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-from .aging import AgingItem
-from .cfd import CfdPoint
 from .compute import WindowResult
 from .forecast import ResultsHistogram
 
@@ -137,129 +139,7 @@ class HowManyReport:
     command: str = "forecast how-many"
 
 
-# ---------------------------------------------------------------------------
-# CFD
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class CfdInput:
-    repo: str
-    start: date
-    stop: date
-    workflow: tuple[str, ...]  # earliest → latest workflow state
-    interval_days: int
-    offline: bool
-    jira_url: str | None = None
-
-
-@dataclass(frozen=True)
-class CfdReport:
-    input: CfdInput
-    points: list[CfdPoint]
-    interpretation: Interpretation
-    generated_at: datetime = field(default_factory=lambda: datetime.now().astimezone())
-    schema: str = "flowmetrics.cfd.v1"
-    command: str = "cfd"
-
-
-# ---------------------------------------------------------------------------
-# Aging
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class AgingInput:
-    repo: str
-    asof: date
-    workflow: tuple[str, ...]  # column order for the chart; same tuple in both modes
-    history_start: date  # window of completed items used for percentile lines
-    history_end: date
-    offline: bool
-    # True when the user came in via --wip-labels (label mode) rather
-    # than --workflow. The workflow tuple itself is identical either way
-    # in label mode — this discriminator only changes which flag the
-    # reproducer command emits.
-    from_wip_labels: bool = False
-    # Opt-in: when set, in-flight items older than this are excluded
-    # from the chart and from past-P85/P95 counts. None means "show
-    # everything".
-    max_age_days: int | None = None
-    # When the report came from a Jira source, the base URL is needed
-    # to reconstruct a runnable reproducer command. The `repo` field
-    # carries "jira:PROJECT" but not the URL; we store it here.
-    jira_url: str | None = None
-
-
-@dataclass(frozen=True)
-class AgingReport:
-    input: AgingInput
-    items: list[AgingItem]
-    cycle_time_percentiles: dict[int, float]  # days
-    completed_count: int  # how many completed items fed the percentiles
-    interpretation: Interpretation
-    # Defaults preserve the pre-max-age behaviour: when the caller
-    # doesn't fill these in, total == len(items) and nothing was
-    # excluded. The CLI/service path sets them explicitly.
-    in_flight_total: int = -1
-    excluded_above_max_age: int = 0
-    generated_at: datetime = field(default_factory=lambda: datetime.now().astimezone())
-    schema: str = "flowmetrics.aging.v1"
-    command: str = "aging"
-
-    def __post_init__(self) -> None:
-        # If caller didn't pass in_flight_total, infer it (post-init
-        # write into a frozen dataclass needs object.__setattr__).
-        if self.in_flight_total == -1:
-            object.__setattr__(
-                self, "in_flight_total", len(self.items) + self.excluded_above_max_age
-            )
-
-
-# ---------------------------------------------------------------------------
-# Cycle-Time Scatterplot
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ScatterplotPoint:
-    """One completed item plotted on the scatterplot.
-
-    `completed_at` is when the item finished (= completed_at for GitHub
-    PRs, resolved at for Jira issues). `cycle_time_days` is the
-    elapsed time from creation to completion. `item_id` / `title` /
-    `url` carry display + drill-down context."""
-    item_id: str
-    title: str
-    completed_at: date
-    cycle_time_days: float
-    url: str | None = None
-
-
-@dataclass(frozen=True)
-class ScatterplotInput:
-    repo: str
-    start: date
-    stop: date
-    offline: bool
-    jira_url: str | None = None
-
-
-@dataclass(frozen=True)
-class ScatterplotReport:
-    input: ScatterplotInput
-    points: list[ScatterplotPoint]
-    cycle_time_percentiles: dict[int, float]  # P50, P70, P85, P95 in days
-    interpretation: Interpretation
-    generated_at: datetime = field(default_factory=lambda: datetime.now().astimezone())
-    schema: str = "flowmetrics.scatterplot.v1"
-    command: str = "scatterplot"
-
-
-Report = (
-    EfficiencyReport | WhenDoneReport | HowManyReport | CfdReport | AgingReport
-    | ScatterplotReport
-)
+Report = EfficiencyReport | WhenDoneReport | HowManyReport
 
 
 @dataclass(frozen=True)
@@ -342,67 +222,6 @@ _EFFICIENCY_VOCABULARY = {
 }
 
 
-_CFD_VOCABULARY = {
-    "Cumulative Flow Diagram": (
-        "Stacked area chart of cumulative counts per workflow state over time. "
-        "Each state's line counts items that have entered that state or any "
-        "later one — so the lines never cross and never decrease."
-    ),
-    "Arrivals": (
-        "Top line of a CFD. Cumulative count of items that have entered the "
-        "workflow (first state) by each sample date. Slope = arrival rate."
-    ),
-    "Departures": (
-        "Bottom line of a CFD. Cumulative count of items that have exited the "
-        "workflow (last state) by each sample date. Slope = throughput."
-    ),
-    "WIP": (
-        "Work In Progress. Vertical distance between two adjacent CFD lines "
-        "at a sample date = items currently in that workflow band. Per "
-        "(see DECISIONS.md for the math)."
-    ),
-    "Workflow state": (
-        "A named stage in your delivery process (e.g., Open, In Progress, "
-        "Done). CFDs require an ordered list — earliest stage to latest."
-    ),
-}
-
-
-_AGING_VOCABULARY = {
-    "WIP (Work In Progress)": (
-        "Items currently in any state the team treats as in-progress — for "
-        "this report, items whose current GitHub label is one of "
-        "--wip-labels, or whose current Jira status is in --workflow."
-    ),
-    "Aging Work In Progress": (
-        "How long each in-flight item has been open without exiting the "
-        "workflow. Aging only applies to items that haven't completed; a "
-        "completed item has a Cycle Time instead."
-    ),
-    "Work item age": (
-        "Elapsed days since an item entered the workflow. Computed as "
-        "today − createdAt for a PR; for Jira, today − issue creation."
-    ),
-    "In-flight items": (
-        "Items that have entered but not exited the workflow. Each in-flight "
-        "item is one dot on the Aging chart, in the column of its current state."
-    ),
-    "Cycle time percentile lines": (
-        "Reference checkpoints drawn from the cycle times of recently "
-        "completed items. An item still in flight past the P85 line has "
-        "already taken longer than 85% of the recently-completed items — "
-        "the team should expect to either expedite it or revise the "
-        "forecast it was committed under."
-    ),
-    "Aging chart": (
-        "Plots in-flight items by current workflow state (x) and Age in days "
-        "(y), with horizontal percentile lines drawn from recent completers' "
-        "cycle times."
-    ),
-    "Source": "Vacanti, _When Will It Be Done?_ (Leanpub).",
-}
-
-
 _FORECAST_VOCABULARY = {
     "Throughput": (
         "Items completed per unit time (here: per day). The empirical input "
@@ -432,39 +251,12 @@ _FORECAST_VOCABULARY = {
 }
 
 
-_SCATTERPLOT_VOCABULARY = {
-    "Cycle Time": (
-        "Days from when a work item entered the system (created) to when "
-        "it left (merged / resolved). One dot on the chart per completed "
-        "item; the dot's y-position is its cycle time."
-    ),
-    "Percentile Line": (
-        "A horizontal line on the scatterplot such that the given percent "
-        "of dots fall on or below it. P50 = median cycle time; 85% of "
-        "completed items finished in P85 days or less. A new item entering "
-        "the system has, by definition, the matching probability of "
-        "finishing in that time."
-    ),
-    "Completion date": (
-        "When the item was merged (GitHub) or resolved (Jira). The dot's "
-        "x-position on the chart."
-    ),
-    "Source": "Vacanti, _When Will It Be Done?_ (Leanpub).",
-}
-
-
 def report_vocabulary(report: Report) -> dict[str, str]:
     """Inline canonical definitions for the terms a reader will encounter."""
     if isinstance(report, EfficiencyReport):
         return dict(_EFFICIENCY_VOCABULARY)
     if isinstance(report, WhenDoneReport | HowManyReport):
         return dict(_FORECAST_VOCABULARY)
-    if isinstance(report, CfdReport):
-        return dict(_CFD_VOCABULARY)
-    if isinstance(report, AgingReport):
-        return dict(_AGING_VOCABULARY)
-    if isinstance(report, ScatterplotReport):
-        return dict(_SCATTERPLOT_VOCABULARY)
     raise TypeError(f"unknown report type: {type(report).__name__}")  # pragma: no cover
 
 
@@ -495,33 +287,6 @@ def report_definition(report: Report) -> str:
             "percentile lines mark confidence thresholds. Read BACKWARD: higher "
             "confidence = FEWER items, a more conservative commitment."
         )
-    if isinstance(report, CfdReport):
-        return (
-            "Stacked-area chart of items by workflow step over time. "
-            "The top line counts every item that has ever entered the "
-            "system; the bottom line counts items finished. The "
-            "vertical gap at any sample date is items still in flight "
-            "(WIP). Includes carry-over items that were already open "
-            "at window start AND items still open at window end — so "
-            "the chart shows real WIP, not just items that both "
-            "arrived and finished inside the window."
-        )
-    if isinstance(report, AgingReport):
-        return (
-            "Each dot is one in-flight item, placed in the column of its "
-            "current workflow state at a height equal to its Age (days since "
-            "entering the workflow). Percentile lines come from the cycle "
-            "times of recently completed items — read horizontally as risk "
-            "thresholds: an item aging past P85 likely misses its forecast."
-        )
-    if isinstance(report, ScatterplotReport):
-        return (
-            "Each dot is one completed item: x = completion date, "
-            "y = cycle time (days from creation to completion). "
-            "Horizontal percentile lines mark probability thresholds — a "
-            "new item entering the system has an 85% chance of finishing "
-            "in P85 days or less, by definition of the percentile."
-        )
     raise TypeError(f"unknown report type: {type(report).__name__}")  # pragma: no cover
 
 
@@ -529,14 +294,13 @@ _REPORT_TITLES: dict[type, str] = {}  # populated below to avoid forward refs
 
 
 def report_title(report: Report) -> str:
-    """Human-readable metric / question name for a report — what shows
-    up in `<title>` and as the H1 of the HTML output. Centralised so
-    renderers don't hardcode metric names in template-render calls.
+    """Human-readable metric / question name for a report — used by
+    renderers that need a one-line heading. Centralised so callers
+    don't hardcode metric names.
 
     Forecast titles incorporate the report's actual inputs (the N
     items, the target date) so the page heading itself answers the
-    question instead of just naming the report type. The other report
-    types use a static title lookup."""
+    question instead of just naming the report type."""
     if isinstance(report, WhenDoneReport):
         return f"Forecast when {report.input.items} items will be done"
     if isinstance(report, HowManyReport):
@@ -612,47 +376,6 @@ def cli_invocation(report: Report) -> str:
             parts.append("--offline")
         return " ".join(parts)
 
-    if isinstance(report, CfdReport):
-        parts = [
-            "uv run flow cfd",
-            *_source_args(report.input),
-            f"--start {report.input.start.isoformat()}",
-            f"--stop {report.input.stop.isoformat()}",
-            f"--workflow '{','.join(report.input.workflow)}'",
-            f"--interval-days {report.input.interval_days}",
-        ]
-        if report.input.offline:
-            parts.append("--offline")
-        return " ".join(parts)
-
-    if isinstance(report, AgingReport):
-        flag = "--wip-labels" if report.input.from_wip_labels else "--workflow"
-        source_parts = _source_args(report.input)
-        parts = [
-            "uv run flow aging",
-            *source_parts,
-            f"--asof {report.input.asof.isoformat()}",
-            f"{flag} '{','.join(report.input.workflow)}'",
-            f"--history-start {report.input.history_start.isoformat()}",
-            f"--history-end {report.input.history_end.isoformat()}",
-        ]
-        if report.input.max_age_days is not None:
-            parts.append(f"--max-age-days {report.input.max_age_days}")
-        if report.input.offline:
-            parts.append("--offline")
-        return " ".join(parts)
-
-    if isinstance(report, ScatterplotReport):
-        parts = [
-            "uv run flow scatterplot",
-            *_source_args(report.input),
-            f"--start {report.input.start.isoformat()}",
-            f"--stop {report.input.stop.isoformat()}",
-        ]
-        if report.input.offline:
-            parts.append("--offline")
-        return " ".join(parts)
-
     raise TypeError(f"unknown report type: {type(report).__name__}")  # pragma: no cover
 
 
@@ -671,9 +394,6 @@ def build_training_summary(daily_samples: list[int], start: date, end: date) -> 
 
 _REPORT_TITLES.update({
     EfficiencyReport: "Flow efficiency",
-    CfdReport: "Cumulative Flow Diagram",
     WhenDoneReport: "When will it be done?",
     HowManyReport: "How many items?",
-    AgingReport: "Aging Work In Progress",
-    ScatterplotReport: "Cycle Time Scatterplot",
 })

@@ -7,15 +7,11 @@ from dataclasses import asdict
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from ..aging import compute_aging_distribution, per_state_diagnostic, top_interventions
 from ..report import (
-    AgingReport,
-    CfdReport,
     EfficiencyReport,
     ForecastHorizon,
     HowManyReport,
     Report,
-    ScatterplotReport,
     WhenDoneReport,
     cli_invocation,
     forecast_horizon,
@@ -55,12 +51,6 @@ def render(report: Report, *, logs: list[str] | None = None) -> str:
         payload = _render_when_done(report)
     elif isinstance(report, HowManyReport):
         payload = _render_how_many(report)
-    elif isinstance(report, CfdReport):
-        payload = _render_cfd(report)
-    elif isinstance(report, AgingReport):
-        payload = _render_aging(report)
-    elif isinstance(report, ScatterplotReport):
-        payload = _render_scatterplot(report)
     else:  # pragma: no cover
         raise TypeError(f"unknown report type: {type(report).__name__}")
     payload["cli_invocation"] = cli_invocation(report)
@@ -204,157 +194,6 @@ def _render_when_done(report: WhenDoneReport) -> dict[str, Any]:
     }
 
 
-def _render_cfd(report: CfdReport) -> dict[str, Any]:
-    end = report.points[-1] if report.points else None
-    workflow = list(report.input.workflow)
-    arrivals = end.counts_by_state.get(workflow[0], 0) if end else 0
-    departures = end.counts_by_state.get(workflow[-1], 0) if end else 0
-    # WIP at start = top line minus bottom line at the first sample
-    # — i.e., the carry-over WIP we inherited from before the
-    # window. Peak WIP = max(top - bottom) across every sample.
-    # These two answer the question 'was the system already
-    # carrying inventory, and how high did the queue get?', which
-    # the (arrivals == departures, WIP = 0) summary masks.
-    start = report.points[0] if report.points else None
-    first_state, last_state = workflow[0], workflow[-1]
-    wip_at_start = (
-        start.counts_by_state.get(first_state, 0)
-        - start.counts_by_state.get(last_state, 0)
-    ) if start else 0
-    peak_wip = max(
-        (
-            p.counts_by_state.get(first_state, 0)
-            - p.counts_by_state.get(last_state, 0)
-        )
-        for p in report.points
-    ) if report.points else 0
-
-    # `bands` is the band-width view: for each (date, step) it carries
-    # `wip_in_state` (items currently in that step) alongside the
-    # cumulative line value. Computed once here so consumers — Vega
-    # specs, downstream tools, humans grep'ing the JSON — don't have
-    # to re-derive it. The invariant Σ wip_in_state_on_date = top line
-    # is enforced by tests.
-    bands: list[dict[str, Any]] = []
-    for pt in report.points:
-        for i, state in enumerate(workflow):
-            line = pt.counts_by_state.get(state, 0)
-            if i + 1 < len(workflow):
-                next_line = pt.counts_by_state.get(workflow[i + 1], 0)
-                wip = line - next_line
-            else:
-                wip = line  # bottom band = terminal-state cumulative
-            bands.append({
-                "sampled_on": pt.sampled_on.isoformat(),
-                "state": state,
-                "wip_in_state": wip,
-                "entered_at_or_later": line,
-            })
-
-    return {
-        "schema": report.schema,
-        "command": report.command,
-        "generated_at": report.generated_at.isoformat(),
-        "headline": report.interpretation.headline,
-        "definition": report_definition(report),
-        "summary": {
-            "workflow": workflow,
-            "samples": len(report.points),
-            "arrivals_at_end": arrivals,
-            "departures_at_end": departures,
-            "wip_at_start": wip_at_start,
-            "wip_at_end": arrivals - departures,
-            "peak_wip": peak_wip,
-        },
-        "key_insight": report.interpretation.key_insight,
-        "next_actions": list(report.interpretation.next_actions),
-        "caveats": list(report.interpretation.caveats),
-        "vocabulary": report_vocabulary(report),
-        "chart_data": {
-            "points": [
-                {
-                    "sampled_on": p.sampled_on.isoformat(),
-                    "counts_by_state": dict(p.counts_by_state),
-                }
-                for p in report.points
-            ],
-            "bands": bands,
-        },
-        "input": {
-            "repo": report.input.repo,
-            "start": report.input.start.isoformat(),
-            "stop": report.input.stop.isoformat(),
-            "workflow": list(report.input.workflow),
-            "interval_days": report.input.interval_days,
-            "offline": report.input.offline,
-        },
-        "docs": _DOCS,
-    }
-
-
-def _render_aging(report: AgingReport) -> dict[str, Any]:
-    wip_by_state: dict[str, int] = {}
-    for it in report.items:
-        wip_by_state[it.current_state] = wip_by_state.get(it.current_state, 0) + 1
-    return {
-        "schema": report.schema,
-        "command": report.command,
-        "generated_at": report.generated_at.isoformat(),
-        "headline": report.interpretation.headline,
-        "definition": report_definition(report),
-        "summary": {
-            "in_flight_count": len(report.items),
-            "in_flight_total": report.in_flight_total,
-            "in_flight_shown": len(report.items),
-            "excluded_above_max_age": report.excluded_above_max_age,
-            "wip_by_state": wip_by_state,
-            "cycle_time_percentiles_days": {
-                str(p): v for p, v in report.cycle_time_percentiles.items()
-            },
-            "completed_count_for_percentiles": report.completed_count,
-            "aging_distribution": compute_aging_distribution(
-                report.items, report.cycle_time_percentiles
-            ),
-            "per_state_diagnostic": per_state_diagnostic(
-                items=report.items,
-                workflow=report.input.workflow,
-                percentiles=report.cycle_time_percentiles,
-            ),
-            "top_interventions": top_interventions(
-                items=report.items,
-                workflow=report.input.workflow,
-                percentiles=report.cycle_time_percentiles,
-            ),
-        },
-        "key_insight": report.interpretation.key_insight,
-        "next_actions": list(report.interpretation.next_actions),
-        "caveats": list(report.interpretation.caveats),
-        "vocabulary": report_vocabulary(report),
-        "chart_data": {
-            "items": [
-                {
-                    "item_id": it.item_id,
-                    "title": it.title,
-                    "current_state": it.current_state,
-                    "age_days": it.age_days,
-                    "url": it.url,
-                }
-                for it in report.items
-            ],
-        },
-        "input": {
-            "repo": report.input.repo,
-            "asof": report.input.asof.isoformat(),
-            "workflow": list(report.input.workflow),
-            "history_start": report.input.history_start.isoformat(),
-            "history_end": report.input.history_end.isoformat(),
-            "offline": report.input.offline,
-            "max_age_days": report.input.max_age_days,
-        },
-        "docs": _DOCS,
-    }
-
-
 def _render_how_many(report: HowManyReport) -> dict[str, Any]:
     return {
         # ── Answer first ────────────────────────────────────────────────
@@ -387,43 +226,3 @@ def _render_how_many(report: HowManyReport) -> dict[str, Any]:
     }
 
 
-def _render_scatterplot(report: ScatterplotReport) -> dict[str, Any]:
-    points = report.points
-    return {
-        # ── Answer first ────────────────────────────────────────────────
-        "schema": report.schema,
-        "command": report.command,
-        "generated_at": report.generated_at.isoformat(),
-        "headline": report.interpretation.headline,
-        "definition": report_definition(report),
-        "summary": {
-            "completed_count": len(points),
-            "window": {
-                "start": report.input.start.isoformat(),
-                "stop": report.input.stop.isoformat(),
-                "days": (report.input.stop - report.input.start).days + 1,
-            },
-            "cycle_time_percentiles_days": {
-                str(p): v for p, v in report.cycle_time_percentiles.items()
-            },
-        },
-        "key_insight": report.interpretation.key_insight,
-        "next_actions": list(report.interpretation.next_actions),
-        "caveats": list(report.interpretation.caveats),
-        "vocabulary": report_vocabulary(report),
-        # ── Detail ──────────────────────────────────────────────────────
-        "chart_data": {
-            "points": [
-                {
-                    "item_id": p.item_id,
-                    "title": p.title,
-                    "completed_at": p.completed_at.isoformat(),
-                    "cycle_time_days": p.cycle_time_days,
-                    "url": p.url,
-                }
-                for p in points
-            ],
-        },
-        "input": _encode(asdict(report.input)),
-        "docs": _DOCS,
-    }

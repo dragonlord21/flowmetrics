@@ -352,7 +352,8 @@ class TestPercentileColumn:
 
     def test_default_columns_include_a_percentile_column(self):
         from flowmetrics.web.components.work_items_table import (
-            DEFAULT_COLUMNS, IN_FLIGHT_COLUMNS,
+            DEFAULT_COLUMNS,
+            IN_FLIGHT_COLUMNS,
         )
         for cols, label in (
             (DEFAULT_COLUMNS, "default"),

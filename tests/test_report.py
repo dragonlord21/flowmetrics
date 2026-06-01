@@ -13,14 +13,9 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
-from flowmetrics.cfd import CfdPoint
 from flowmetrics.compute import FlowEfficiency, WindowResult
 from flowmetrics.forecast import build_histogram
 from flowmetrics.report import (
-    AgingInput,
-    AgingReport,
-    CfdInput,
-    CfdReport,
     EfficiencyInput,
     EfficiencyReport,
     HowManyInput,
@@ -253,59 +248,6 @@ class TestReportVocabulary:
             assert term in vocab, f"missing term: {term}"
 
 
-class TestCfdReport:
-    def _report(self, *, repo="acme/widget", offline=False) -> CfdReport:
-        return CfdReport(
-            input=CfdInput(
-                repo=repo,
-                start=date(2026, 5, 4),
-                stop=date(2026, 5, 10),
-                workflow=("Open", "In Progress", "Done"),
-                interval_days=1,
-                offline=offline,
-            ),
-            points=[
-                CfdPoint(
-                    sampled_on=date(2026, 5, 4),
-                    counts_by_state={"Open": 0, "In Progress": 0, "Done": 0},
-                ),
-                CfdPoint(
-                    sampled_on=date(2026, 5, 10),
-                    counts_by_state={"Open": 5, "In Progress": 2, "Done": 3},
-                ),
-            ],
-            interpretation=_interp(),
-        )
-
-    def test_schema_and_command_pinned(self):
-        r = self._report()
-        assert r.schema == "flowmetrics.cfd.v1"
-        assert r.command == "cfd"
-
-    def test_frozen(self):
-        r = self._report()
-        with pytest.raises(FrozenInstanceError):
-            r.command = "nope"  # type: ignore[misc]
-
-    def test_vocabulary_defines_cfd_terms(self):
-        vocab = report_vocabulary(self._report())
-        for term in ["Arrivals", "Departures", "WIP", "Cumulative Flow Diagram"]:
-            assert term in vocab, f"missing term: {term}"
-
-    def test_cli_invocation_round_trips_inputs(self):
-        cmd = cli_invocation(self._report())
-        assert cmd.startswith("uv run flow cfd")
-        assert "--repo acme/widget" in cmd
-        assert "--start 2026-05-04" in cmd
-        assert "--stop 2026-05-10" in cmd
-        assert "--workflow 'Open,In Progress,Done'" in cmd
-        assert "--interval-days 1" in cmd
-        assert "--offline" not in cmd
-
-    def test_cli_invocation_includes_offline_when_set(self):
-        assert "--offline" in cli_invocation(self._report(offline=True))
-
-
 class TestCliInvocation:
     """Each Report can reconstruct the CLI command that produced it.
 
@@ -450,99 +392,16 @@ class TestCliInvocation:
         assert "--history-start 2026-04-11" in cmd
         assert "--history-end 2026-05-10" in cmd
 
-    @staticmethod
-    def _aging_report(*, from_wip_labels: bool = False):
-        return AgingReport(
-            input=AgingInput(
-                repo="acme/widget",
-                asof=date(2026, 5, 14),
-                workflow=("shaping", "in-progress", "in-review"),
-                history_start=date(2026, 4, 14),
-                history_end=date(2026, 5, 13),
-                offline=False,
-                from_wip_labels=from_wip_labels,
-            ),
-            items=[],
-            cycle_time_percentiles={50: 1.0, 70: 2.0, 85: 3.0, 95: 5.0},
-            completed_count=10,
-            interpretation=_interp(),
-        )
-
-    def test_aging_invocation_review_cycle_mode_uses_workflow(self):
-        cmd = cli_invocation(self._aging_report(from_wip_labels=False))
-        assert cmd.startswith("uv run flow aging")
-        assert "--repo acme/widget" in cmd
-        assert "--workflow 'shaping,in-progress,in-review'" in cmd
-        assert "--wip-labels" not in cmd
-
-    def test_aging_invocation_label_mode_uses_wip_labels(self):
-        cmd = cli_invocation(self._aging_report(from_wip_labels=True))
-        # The labels ARE the workflow in label mode — same tuple, just
-        # surfaced under the flag the user actually typed.
-        assert "--wip-labels 'shaping,in-progress,in-review'" in cmd
-        assert "--workflow" not in cmd
-
-    @staticmethod
-    def _aging_report_with_max_age(max_age_days: int | None) -> AgingReport:
-        return AgingReport(
-            input=AgingInput(
-                repo="acme/widget",
-                asof=date(2026, 5, 14),
-                workflow=("Awaiting Review", "Approved"),
-                history_start=date(2026, 4, 14),
-                history_end=date(2026, 5, 13),
-                offline=False,
-                max_age_days=max_age_days,
-            ),
-            items=[],
-            cycle_time_percentiles={50: 1.0, 70: 2.0, 85: 3.0, 95: 5.0},
-            completed_count=10,
-            interpretation=_interp(),
-        )
-
-    def test_aging_invocation_includes_max_age_days_when_set(self):
-        cmd = cli_invocation(self._aging_report_with_max_age(180))
-        assert "--max-age-days 180" in cmd
-
-    def test_aging_invocation_omits_max_age_days_when_unset(self):
-        cmd = cli_invocation(self._aging_report_with_max_age(None))
-        assert "--max-age-days" not in cmd
-
-    @staticmethod
-    def _aging_report_jira(jira_url: str | None = "https://issues.apache.org/jira"):
-        """Aging fixture for the Jira reproducer round-trip test."""
-        return AgingReport(
-            input=AgingInput(
-                repo="jira:BIGTOP",
-                asof=date(2026, 5, 14),
-                workflow=("Open", "In Progress", "Patch Available"),
-                history_start=date(2026, 4, 14),
-                history_end=date(2026, 5, 13),
-                offline=False,
-                jira_url=jira_url,
-            ),
-            items=[],
-            cycle_time_percentiles={50: 1.0, 70: 2.0, 85: 3.0, 95: 5.0},
-            completed_count=10,
-            interpretation=_interp(),
-        )
-
     def test_report_titles_are_centralised_and_consistent(self):
         """A single `report_title(report)` helper returns the metric
-        title used by the HTML renderer. Centralising it means metric
-        names live in one place — same place as report_definition and
-        cli_invocation."""
+        title used by callers that need a one-line heading. Centralising
+        it means metric names live in one place — same place as
+        report_definition and cli_invocation."""
         from flowmetrics.report import report_title
         eff = EfficiencyReport(
             input=EfficiencyInput("acme/x", date(2026, 5, 4), date(2026, 5, 10),
                                   4.0, 30.0, False),
             result=_window_result(), interpretation=_interp(),
-        )
-        cfd = CfdReport(
-            input=CfdInput("acme/x", date(2026, 5, 4), date(2026, 5, 10),
-                           ("Open", "Done"), 1, False),
-            points=[CfdPoint(date(2026, 5, 4), {"Open": 1, "Done": 0})],
-            interpretation=_interp(),
         )
         wd = WhenDoneReport(
             input=WhenDoneInput("acme/x", 50, date(2026, 5, 11),
@@ -570,14 +429,11 @@ class TestCliInvocation:
             percentiles={50: 60},
             interpretation=_interp(),
         )
-        aging = self._aging_report(from_wip_labels=False)
         assert report_title(eff) == "Flow efficiency"
-        assert report_title(cfd) == "Cumulative Flow Diagram"
         # Forecast titles incorporate the input N / target date so the
         # page heading answers the specific question being asked.
         assert report_title(wd) == "Forecast when 50 items will be done"
         assert report_title(hm) == "Forecast how many items finish by 2026-05-25"
-        assert report_title(aging) == "Aging Work In Progress"
 
     def test_efficiency_jira_invocation_emits_jira_url(self):
         """Pre-existing bug class: every report's cli_invocation must
@@ -594,28 +450,6 @@ class TestCliInvocation:
                 jira_url="https://issues.apache.org/jira",
             ),
             result=_window_result(),
-            interpretation=_interp(),
-        )
-        cmd = cli_invocation(report)
-        assert "--jira-url https://issues.apache.org/jira" in cmd
-        assert "--jira-project BIGTOP" in cmd
-        assert "--repo jira:" not in cmd
-
-    def test_cfd_jira_invocation_emits_jira_url(self):
-        report = CfdReport(
-            input=CfdInput(
-                repo="jira:BIGTOP",
-                start=date(2026, 5, 4),
-                stop=date(2026, 5, 10),
-                workflow=("Open", "Done"),
-                interval_days=1,
-                offline=False,
-                jira_url="https://issues.apache.org/jira",
-            ),
-            points=[
-                CfdPoint(date(2026, 5, 4), {"Open": 1, "Done": 0}),
-                CfdPoint(date(2026, 5, 10), {"Open": 2, "Done": 1}),
-            ],
             interpretation=_interp(),
         )
         cmd = cli_invocation(report)
@@ -677,22 +511,3 @@ class TestCliInvocation:
         assert "--jira-project BIGTOP" in cmd
         assert "--repo jira:" not in cmd
 
-    def test_aging_jira_invocation_emits_jira_url_and_project_not_repo(self):
-        """Pre-existing bug: when the source is Jira, the reproducer
-        emitted `--repo jira:BIGTOP` which is not a runnable command.
-        Fix: emit `--jira-url ... --jira-project ...` instead."""
-        cmd = cli_invocation(self._aging_report_jira())
-        assert "--jira-url https://issues.apache.org/jira" in cmd
-        assert "--jira-project BIGTOP" in cmd
-        # And the broken `--repo jira:BIGTOP` form is GONE.
-        assert "--repo jira:" not in cmd
-        assert "--repo BIGTOP" not in cmd
-
-    def test_aging_jira_invocation_falls_back_when_url_missing(self):
-        """Defensive: a Jira-prefixed repo without a stored URL still
-        emits a runnable-looking command rather than crashing. The user
-        will have to fill in --jira-url manually."""
-        cmd = cli_invocation(self._aging_report_jira(jira_url=None))
-        # Project still extracted; URL is a placeholder the user fixes.
-        assert "--jira-project BIGTOP" in cmd
-        assert "--jira-url" in cmd

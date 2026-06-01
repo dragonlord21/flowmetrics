@@ -39,7 +39,6 @@ except ImportError:
     __version__ = "0.0.0+unknown"
 
 __all__ = [
-    "__version__",
     "DEFAULT_CACHE_DIR",
     "DEFAULT_GAP",
     "DEFAULT_MIN_CLUSTER",
@@ -49,6 +48,7 @@ __all__ = [
     "Source",
     "WindowResult",
     "WorkItem",
+    "__version__",
     "aggregate",
     "backward_percentile",
     "build_histogram",

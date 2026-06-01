@@ -16,7 +16,8 @@ module's `filter_by_rank` does the same.
 
 from __future__ import annotations
 
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 # Snap stops on the two-handle slider: 0 then the 5%-step ladder
 # from P50 upward. The same ladder feeds `PERCENTILE_CONT` so

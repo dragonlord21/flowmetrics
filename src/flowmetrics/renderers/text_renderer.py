@@ -25,12 +25,9 @@ from rich.rule import Rule
 from rich.table import Table
 
 from ..report import (
-    AgingReport,
-    CfdReport,
     EfficiencyReport,
     HowManyReport,
     Report,
-    ScatterplotReport,
     WhenDoneReport,
     cli_invocation,
 )
@@ -89,12 +86,6 @@ def render(
         _render_when_done(report, console)
     elif isinstance(report, HowManyReport):
         _render_how_many(report, console)
-    elif isinstance(report, CfdReport):
-        _render_cfd(report, console)
-    elif isinstance(report, AgingReport):
-        _render_aging(report, console)
-    elif isinstance(report, ScatterplotReport):
-        _render_scatterplot(report, console)
     else:  # pragma: no cover
         raise TypeError(f"unknown report type: {type(report).__name__}")
     return _ascii_safe(buf.getvalue())
@@ -229,130 +220,12 @@ def _render_when_done(report: WhenDoneReport, console: Console) -> None:
         ("Seed", str(report.simulation.seed) if report.simulation.seed is not None else "random"),
     ]
     console.print(_input_table(report, rows))
-    console.print("[dim](Distribution chart: use --format html.)[/dim]")
     _reproduce(console, report)
 
 
 # ---------------------------------------------------------------------------
 # Forecast: how-many
 # ---------------------------------------------------------------------------
-
-
-def _render_cfd(report: CfdReport, console: Console) -> None:
-    _top(console, report)
-
-    if not report.points:
-        _detail_divider(console)
-        _reproduce(console, report)
-        return
-
-    end = report.points[-1]
-    arrivals = end.counts_by_state.get(report.input.workflow[0], 0)
-    departures = end.counts_by_state.get(report.input.workflow[-1], 0)
-    summary = Table(title=f"End-of-window WIP — {arrivals - departures} items")
-    summary.add_column("State")
-    summary.add_column("Count", justify="right")
-    for state in report.input.workflow:
-        summary.add_row(state, str(end.counts_by_state.get(state, 0)))
-    console.print(summary)
-
-    _caveats(console, report)
-    _detail_divider(console)
-
-    rows = [
-        ("Repo", report.input.repo),
-        ("Workflow", " → ".join(report.input.workflow)),
-        ("Window", f"{report.input.start} → {report.input.stop}"),
-        ("Samples", f"{len(report.points)} (every {report.input.interval_days}d)"),
-    ]
-    console.print(_input_table(report, rows))
-    console.print("[dim](Stacked-area chart: use --format html.)[/dim]")
-    _reproduce(console, report)
-
-
-def _render_aging(report: AgingReport, console: Console) -> None:
-    from ..aging import per_state_diagnostic, top_interventions
-
-    _top(console, report)
-
-    if not report.items:
-        _detail_divider(console)
-        _reproduce(console, report)
-        return
-
-    # Promote the divergence caveat — the most important signal-quality
-    # warning — out of the caveat list and into a prominent banner.
-    other_caveats: list[str] = []
-    for c in report.interpretation.caveats:
-        low = c.lower()
-        if "diverge" in low or "doesn't resemble" in low:
-            console.print(Panel(c, title="⚠ Signal quality", style="red"))
-        else:
-            other_caveats.append(c)
-
-    # Interventions — the actionable list. One PR per stuck workflow
-    # stage, rightmost-first, capped at 5.
-    interventions = top_interventions(
-        items=report.items,
-        workflow=report.input.workflow,
-        percentiles=report.cycle_time_percentiles,
-    )
-    if interventions:
-        iv_table = Table(title="Highest-leverage interventions")
-        iv_table.add_column("State")
-        iv_table.add_column("#")
-        iv_table.add_column("Age", justify="right")
-        iv_table.add_column("Title")
-        for iv in interventions:
-            iv_table.add_row(
-                iv["current_state"],
-                iv["item_id"],
-                f"{iv['age_days']}d",
-                iv["title"][:60],
-            )
-        console.print(iv_table)
-    else:
-        console.print("[green]✓ No items past P85 — pipeline on track.[/green]")
-
-    # Per-state diagnostic — bottleneck where age is accumulating.
-    diag_rows = per_state_diagnostic(
-        items=report.items,
-        workflow=report.input.workflow,
-        percentiles=report.cycle_time_percentiles,
-    )
-    diag = Table(title="Per-state aging")
-    diag.add_column("State")
-    diag.add_column("Count", justify="right")
-    diag.add_column("Age P50", justify="right")
-    diag.add_column("Oldest", justify="right")
-    diag.add_column("Past P85", justify="right")
-    diag.add_column("Past P95", justify="right")
-    for row in diag_rows:
-        diag.add_row(
-            row["state"],
-            str(row["count"]),
-            "—" if row["median_age_days"] is None else f"{row['median_age_days']}d",
-            "—" if row["oldest_age_days"] is None else f"{row['oldest_age_days']}d",
-            str(row["past_p85"]),
-            str(row["past_p95"]),
-        )
-    console.print(diag)
-    console.print(
-        f"[dim](Percentile thresholds from {report.completed_count} PRs completed "
-        f"{report.input.history_start} → {report.input.history_end}; "
-        f"P85={report.cycle_time_percentiles.get(85, 0):.1f}d, "
-        f"P95={report.cycle_time_percentiles.get(95, 0):.1f}d.)[/dim]"
-    )
-    console.print("[dim](Interactive chart: use --format html.)[/dim]")
-
-    # Remaining caveats (max-age exclusion notes, etc.) — kept terse.
-    if other_caveats:
-        console.print("[dim]Caveats[/dim]")
-        for caveat in other_caveats:
-            console.print(f"  - {caveat}", style="dim")
-
-    _detail_divider(console)
-    _reproduce(console, report)
 
 
 def _render_how_many(report: HowManyReport, console: Console) -> None:
@@ -386,59 +259,6 @@ def _render_how_many(report: HowManyReport, console: Console) -> None:
         ("Seed", str(report.simulation.seed) if report.simulation.seed is not None else "random"),
     ]
     console.print(_input_table(report, rows))
-    console.print("[dim](Distribution chart: use --format html.)[/dim]")
     _reproduce(console, report)
 
 
-def _render_scatterplot(report: ScatterplotReport, console: Console) -> None:
-    _top(console, report)
-
-    if not report.points:
-        _detail_divider(console)
-        _reproduce(console, report)
-        return
-
-    pct = Table(title="Cycle-time percentiles (days)")
-    pct.add_column("Percentile")
-    pct.add_column("Days", justify="right")
-    pct.add_column("How to use it")
-    use_hints = {
-        50: "half of items finish in this time or less",
-        70: "internal planning estimate",
-        85: "external commitment threshold",
-        95: "high-stakes commitment / deep-tail risk",
-    }
-    for p in [50, 70, 85, 95]:
-        v = report.cycle_time_percentiles.get(p, 0.0)
-        pct.add_row(f"P{p}", f"{v:.1f}", use_hints.get(p, ""))
-    console.print(pct)
-
-    # Slowest 10 finishers — deep-tail items to retrospect.
-    slowest = sorted(
-        report.points, key=lambda p: p.cycle_time_days, reverse=True
-    )[:10]
-    slow_table = Table(title="Slowest finishers")
-    slow_table.add_column("#")
-    slow_table.add_column("Cycle (d)", justify="right")
-    slow_table.add_column("Completed")
-    slow_table.add_column("Title")
-    for p in slowest:
-        slow_table.add_row(
-            p.item_id,
-            f"{p.cycle_time_days:.1f}",
-            p.completed_at.isoformat(),
-            p.title[:60],
-        )
-    console.print(slow_table)
-
-    _caveats(console, report)
-    _detail_divider(console)
-
-    rows = [
-        ("Repo", report.input.repo),
-        ("Window", f"{report.input.start} -> {report.input.stop}"),
-        ("Completed items", str(len(report.points))),
-    ]
-    console.print(_input_table(report, rows))
-    console.print("[dim](Scatterplot chart: use --format html.)[/dim]")
-    _reproduce(console, report)
