@@ -212,7 +212,10 @@ class TestNoInChartCapSlider:
 
 
 class TestToVegaInteraction:
-    def test_zoom_is_bound_to_the_x_axis_only(self):
+    def test_zoom_is_bound_to_the_y_age_axis(self):
+        # The aging chart's x axis is nominal (current_state) — an
+        # interval-bound zoom on x is meaningless. The interactive
+        # zoom drives the y (age_days) scale instead.
         dot_layer = to_vega(_model())["layer"][0]
         zoom = next(p for p in dot_layer["params"] if p.get("bind") == "scales")
-        assert zoom["select"]["encodings"] == ["x"]
+        assert zoom["select"]["encodings"] == ["y"]

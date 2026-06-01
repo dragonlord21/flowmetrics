@@ -35,21 +35,37 @@
 {%- endmacro -%}
 <div class="ptile-toolbar">
   <span class="ptile-toolbar-label">Percentile</span>
-  <div class="ptile-chips" role="group" aria-label="Percentile filter">
+  <div class="ptile-chips" id="ptile-chips"
+       role="group" aria-label="Percentile filter">
     {{ chip("All", 0, 100, data.ptile_min, data.ptile_max) }}
     {{ chip("≤ P50", 0, 50, data.ptile_min, data.ptile_max) }}
     {{ chip("P50–P85", 50, 85, data.ptile_min, data.ptile_max) }}
     {{ chip("P85–P95", 85, 95, data.ptile_min, data.ptile_max) }}
     {{ chip("> P95", 95, 100, data.ptile_min, data.ptile_max) }}
   </div>
-  <span class="ptile-toolbar-bounds">
-    {%- set p50 = values.get(50) -%}
-    {%- set p85 = values.get(85) -%}
-    {%- set p95 = values.get(95) -%}
-    {%- if p50 is not none -%}
-      P50 {{ p50 | round(1) }}{{ unit }}
-      · P85 {{ p85 | round(1) }}{{ unit }}
-      · P95 {{ p95 | round(1) }}{{ unit }}
-    {%- endif -%}
-  </span>
+  {# No numeric readout here — the metric strip above already
+     names P50 / P85 / P95 for the metric's predictive
+     percentile lines (e.g. cycle-time thresholds on aging). A
+     second set of numbers from a DIFFERENT distribution (the
+     in-flight age distribution that the slider actually ranks
+     against) reads as inconsistent. Chips speak in relative
+     buckets; the strip carries the absolute values. #}
 </div>
+
+<script>
+  (function () {
+    // Only the table body and the chart re-fetch on chip click;
+    // the chip bar itself isn't part of the swap, so the active
+    // class has to flip client-side at click time.
+    const chips = document.getElementById('ptile-chips');
+    if (!chips) return;
+    chips.addEventListener('click', function (e) {
+      const btn = e.target.closest('.ptile-chip');
+      if (!btn) return;
+      for (const sibling of chips.querySelectorAll('.ptile-chip')) {
+        sibling.classList.remove('ptile-chip--active');
+      }
+      btn.classList.add('ptile-chip--active');
+    });
+  })();
+</script>

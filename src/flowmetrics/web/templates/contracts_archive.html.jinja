@@ -72,12 +72,33 @@
 <a class="back-link" href="/">← Back to workflows</a>
 
 <script>
-  function restore(id) {
-    fetch("/api/internal/contracts/" + encodeURIComponent(id) + "/restore", {
-      method: "POST", headers: { "X-Requested-With": "fetch" },
-    }).then(function (r) { if (r.ok) window.location.reload(); });
+  async function _show_failure(r, label) {
+    let detail = '';
+    try {
+      const body = await r.json();
+      detail = body.detail || JSON.stringify(body);
+    } catch (_) {
+      try { detail = await r.text(); } catch (_) { /* nothing */ }
+    }
+    window.alert(label + ' failed (HTTP ' + r.status + '): ' + (detail || 'no detail returned'));
   }
-  function hardDelete(id) {
+  async function _remove_row_or_reload(id) {
+    // Drop the row inline if we can find it — no full page reload
+    // flicker — and fall back to a reload if the DOM shape
+    // changes underneath us.
+    const row = document.querySelector('.archive-row[data-id="' + id + '"]');
+    if (row) row.remove();
+    if (!document.querySelector('.archive-row')) window.location.reload();
+  }
+  async function restore(id) {
+    const r = await fetch(
+      "/api/internal/contracts/" + encodeURIComponent(id) + "/restore",
+      { method: "POST", headers: { "X-Requested-With": "fetch" } }
+    );
+    if (r.ok) { _remove_row_or_reload(id); return; }
+    await _show_failure(r, 'Restore');
+  }
+  async function hardDelete(id) {
     var typed = window.prompt(
       "Permanently delete '" + id + "'? This cannot be undone. " +
       "Type the id to confirm:"
@@ -88,9 +109,11 @@
     );
     var url = "/api/internal/contracts/" + encodeURIComponent(id);
     if (purge) url += "?purge_data=true";
-    fetch(url, {
+    const r = await fetch(url, {
       method: "DELETE", headers: { "X-Requested-With": "fetch" },
-    }).then(function (r) { if (r.ok) window.location.reload(); });
+    });
+    if (r.ok) { _remove_row_or_reload(id); return; }
+    await _show_failure(r, 'Delete');
   }
 </script>
 {% endblock %}

@@ -161,17 +161,18 @@ def _aging_to_vega(model: AgingModel) -> dict[str, Any]:
             # In-flight item dots — painted FIRST so the threshold
             # rules above sit on top against the dot cloud.
             {
-                # Wheel/drag zoom bound to scales. `params` lives
-                # on this (data-bearing) layer — a top-level
-                # selection on a layered spec makes duplicate
-                # per-layer signals. Zoom is x-only; the y axis is
-                # the cap slider's.
+                # Wheel/drag zoom bound to the y (age) scale.
+                # The x axis is nominal (`current_state`) — interval
+                # zoom on a nominal scale is meaningless.
+                # `params` lives on this data-bearing layer; a
+                # top-level selection on a layered spec produces
+                # duplicate per-layer signals.
                 "params": [
                     {
                         "name": "aging_zoom",
                         "select": {
                             "type": "interval",
-                            "encodings": ["x"],
+                            "encodings": ["y"],
                         },
                         "bind": "scales",
                     },

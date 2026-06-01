@@ -174,15 +174,18 @@ def _cycle_time_to_vega(model: CycleTimeModel) -> dict[str, Any]:
                 "as": "completed_at_jittered",
             },
         ],
-        # Wheel/drag zoom on the date (x) axis only — the y axis is
-        # owned by the cap slider. The interval selection must live
-        # on this layer (a top-level selection on a layered spec
-        # produces duplicate per-layer signals); the cap is a plain
-        # value param and goes top-level.
+        # Wheel/drag zoom on both axes — the cap slider that used
+        # to own the y axis is gone, the page-level Percentile
+        # Filter handles cropping outliers. The interval selection
+        # lives on this layer (a top-level selection on a layered
+        # spec makes duplicate per-layer signals).
         "params": [
             {
                 "name": "cycle_zoom",
-                "select": {"type": "interval", "encodings": ["x"]},
+                "select": {
+                    "type": "interval",
+                    "encodings": ["x", "y"],
+                },
                 "bind": "scales",
             },
         ],

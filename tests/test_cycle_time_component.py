@@ -206,10 +206,14 @@ class TestNoInChartCapSlider:
 
 
 class TestToVegaInteraction:
-    def test_zoom_is_bound_to_the_x_axis_only(self):
+    def test_zoom_is_bound_to_both_axes(self):
+        # Both axes are quantitative / temporal — wheel-zoom and
+        # drag-pan apply to date AND cycle-time. The cap slider
+        # that used to crop the y-axis is gone, so y has to be
+        # zoomable too.
         scatter = to_vega(_model())["layer"][0]
         zoom = next(p for p in scatter["params"] if p.get("bind") == "scales")
-        assert zoom["select"]["encodings"] == ["x"]
+        assert sorted(zoom["select"]["encodings"]) == ["x", "y"]
 
     def test_jitter_offsets_dots_forward_within_their_day(self):
         transform = to_vega(_model())["layer"][0]["transform"]
