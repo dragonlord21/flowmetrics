@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: site.lang | default: "en-US" }}">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+{% seo %}
+    <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
+    {% include head-custom.html %}
+
+    <style>
+      /* Local docs nav — overrides nothing in the primer theme;
+         lives outside the .markdown-body container so it isn't
+         restyled as prose. */
+      .docs-nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: #ffffff;
+        border-bottom: 1px solid #d8dee4;
+        padding: 0 1rem;
+      }
+      .docs-nav__inner {
+        max-width: 1012px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1.25rem;
+        min-height: 48px;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+                        Helvetica, Arial, sans-serif;
+      }
+      .docs-nav__brand {
+        font-weight: 600;
+        color: #24292e;
+        text-decoration: none;
+        margin-right: auto;
+      }
+      .docs-nav__brand:hover { color: #0366d6; }
+      .docs-nav__link {
+        color: #586069;
+        text-decoration: none;
+        padding: 0.25rem 0;
+        border-bottom: 2px solid transparent;
+      }
+      .docs-nav__link:hover {
+        color: #0366d6;
+        border-bottom-color: #0366d6;
+      }
+      .docs-nav__link.is-current {
+        color: #24292e;
+        border-bottom-color: #24292e;
+      }
+      .docs-nav__github {
+        color: #586069;
+        text-decoration: none;
+      }
+      .docs-nav__github:hover { color: #0366d6; }
+
+      /* Tighten the markdown-body top spacing now that we have a
+         sticky nav above it. */
+      .container-lg.my-5 { margin-top: 1.5rem !important; }
+    </style>
+  </head>
+  <body>
+    <nav class="docs-nav" aria-label="Documentation">
+      <div class="docs-nav__inner">
+        <a class="docs-nav__brand" href="{{ '/' | relative_url }}">flowmetrics</a>
+        <a class="docs-nav__link {% if page.url contains '/docs/tutorial' %}is-current{% endif %}"
+           href="{{ '/docs/tutorial' | relative_url }}">Tutorial</a>
+        <a class="docs-nav__link {% if page.url contains '/docs/howto' %}is-current{% endif %}"
+           href="{{ '/docs/howto/' | relative_url }}">How-to</a>
+        <a class="docs-nav__link {% if page.url contains '/docs/reference' %}is-current{% endif %}"
+           href="{{ '/docs/reference' | relative_url }}">Reference</a>
+        <a class="docs-nav__link {% if page.url contains '/docs/explain' %}is-current{% endif %}"
+           href="{{ '/docs/explain/' | relative_url }}">Explanation</a>
+        <a class="docs-nav__github"
+           href="https://github.com/dvhthomas/flowmetrics">GitHub</a>
+      </div>
+    </nav>
+    <div class="container-lg px-3 my-5 markdown-body">
+      {% if site.title and site.title != page.title %}
+      <h1><a href="{{ "/" | absolute_url }}">{{ site.title }}</a></h1>
+      {% endif %}
+
+      {{ content }}
+
+      {% if site.github.private != true and site.github.license %}
+      <div class="footer border-top border-gray-light mt-5 pt-3 text-right text-gray">
+        This site is open source. {% github_edit_link "Improve this page" %}.
+      </div>
+      {% endif %}
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/anchor-js/4.1.0/anchor.min.js" integrity="sha256-lZaRhKri35AyJSypXXs4o6OPFTbTmUoltBbDCbdzegg=" crossorigin="anonymous"></script>
+    <script>anchors.add();</script>
+  </body>
+</html>
