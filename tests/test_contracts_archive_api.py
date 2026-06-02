@@ -1,14 +1,14 @@
 """C2 — archive / restore / hard-delete lifecycle via the public API.
 
 Endpoints:
-  POST /api/internal/contracts/{id}/archive  — soft delete
-  POST /api/internal/contracts/{id}/restore  — undo archive
-  DELETE /api/internal/contracts/{id}        — hard delete; requires
+  POST /api/internal/workflows/{id}/archive  — soft delete
+  POST /api/internal/workflows/{id}/restore  — undo archive
+  DELETE /api/internal/workflows/{id}        — hard delete; requires
                                                 already-archived
 
 List + detail:
-  GET /api/internal/contracts?include_archived=true  — surfaces archived rows
-  GET /api/internal/contracts/{id}                   — 404 by default on
+  GET /api/internal/workflows?include_archived=true  — surfaces archived rows
+  GET /api/internal/workflows/{id}                   — 404 by default on
                                                        archived; 200 with
                                                        ?include_archived=true
 
@@ -37,7 +37,7 @@ def workspace(tmp_path):
 def _seed(client, contract_id: str, label: str = "demo") -> None:
     """Insert a contract via the public API (the canonical path)."""
     r = client.put(
-        f"/api/internal/contracts/{contract_id}",
+        f"/api/internal/workflows/{contract_id}",
         json={"yaml":
             f"contract:\n  name: {contract_id}\n  label: {label}\n"
             "  source: github\n  repo: a/b\n"
@@ -50,14 +50,14 @@ def _seed(client, contract_id: str, label: str = "demo") -> None:
 def _archive(client, contract_id: str, reason: str | None = None):
     body = {"reason": reason} if reason is not None else {}
     return client.post(
-        f"/api/internal/contracts/{contract_id}/archive",
+        f"/api/internal/workflows/{contract_id}/archive",
         json=body, headers={"X-Requested-With": "fetch"},
     )
 
 
 def _restore(client, contract_id: str):
     return client.post(
-        f"/api/internal/contracts/{contract_id}/restore",
+        f"/api/internal/workflows/{contract_id}/restore",
         headers={"X-Requested-With": "fetch"},
     )
 
@@ -65,7 +65,7 @@ def _restore(client, contract_id: str):
 def _delete(client, contract_id: str, **kwargs):
     kwargs.setdefault("headers", {})["X-Requested-With"] = "fetch"
     return client.delete(
-        f"/api/internal/contracts/{contract_id}", **kwargs
+        f"/api/internal/workflows/{contract_id}", **kwargs
     )
 
 
@@ -78,9 +78,9 @@ class TestArchiveEndpoint:
             r = _archive(client, "alpha", reason="rotating out")
             assert r.status_code == 200, r.text
             # Default list excludes archived.
-            assert client.get("/api/internal/contracts").json() == []
+            assert client.get("/api/internal/workflows").json() == []
             # Detail returns 404 by default.
-            assert client.get("/api/internal/contracts/alpha").status_code == 404
+            assert client.get("/api/internal/workflows/alpha").status_code == 404
 
     def test_include_archived_surfaces_the_row(self, workspace):
         contracts, data = workspace
@@ -89,7 +89,7 @@ class TestArchiveEndpoint:
             _seed(client, "alpha")
             _archive(client, "alpha", reason="rotating out")
             r = client.get(
-                "/api/internal/contracts?include_archived=true"
+                "/api/internal/workflows?include_archived=true"
             )
             assert r.status_code == 200
             body = r.json()
@@ -98,7 +98,7 @@ class TestArchiveEndpoint:
             assert body[0]["archived"] is True
             # Detail also accessible with the flag.
             detail = client.get(
-                "/api/internal/contracts/alpha?include_archived=true"
+                "/api/internal/workflows/alpha?include_archived=true"
             ).json()
             assert detail["archived"] is True
             assert detail["archived_reason"] == "rotating out"
@@ -112,7 +112,7 @@ class TestArchiveEndpoint:
             r = _archive(client, "alpha", reason="second")
             assert r.status_code == 200
             detail = client.get(
-                "/api/internal/contracts/alpha?include_archived=true"
+                "/api/internal/workflows/alpha?include_archived=true"
             ).json()
             # Reason rolls forward; archive timestamp stayed put
             # (we can't easily compare floor timestamps in this
@@ -131,7 +131,7 @@ class TestRestoreEndpoint:
             assert r.status_code == 200, r.text
             # Back in the live list.
             assert [c["id"] for c in client.get(
-                "/api/internal/contracts"
+                "/api/internal/workflows"
             ).json()] == ["alpha"]
 
     def test_restore_on_live_row_is_a_no_op(self, workspace):
@@ -165,7 +165,7 @@ class TestHardDeleteInvariant:
             assert "archive" in r.text.lower()
             # Still there.
             assert client.get(
-                "/api/internal/contracts/alpha"
+                "/api/internal/workflows/alpha"
             ).status_code == 200
 
     def test_delete_after_archive_succeeds(self, workspace):
@@ -178,7 +178,7 @@ class TestHardDeleteInvariant:
             assert r.status_code == 200, r.text
             # Not visible even with include_archived.
             body = client.get(
-                "/api/internal/contracts?include_archived=true"
+                "/api/internal/workflows?include_archived=true"
             ).json()
             assert body == []
 

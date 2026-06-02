@@ -611,7 +611,7 @@ def forecast_how_many(
     default=Path("./contracts"),
     show_default=True,
     help=(
-        "Directory holding contracts.db (the wizard's store, "
+        "Directory holding workflows.db (the wizard's store, "
         "DB-first lookup) and any un-migrated workflow YAMLs."
     ),
 )
@@ -671,7 +671,7 @@ def materialize(
 ) -> None:
     """Fetch + canonicalise + write Parquet for one contract.
 
-    NAME is looked up DB-first in `<workflows-dir>/contracts.db`
+    NAME is looked up DB-first in `<workflows-dir>/workflows.db`
     (where the wizard writes), then falls back to a `NAME.yaml` file
     in the same directory. `flow workflows list` shows what's
     resolvable. Use `flow materialize-all` for the whole set.
@@ -825,7 +825,7 @@ def materialize_all(
 ) -> None:
     """Iterate every configured workflow and materialize each one.
 
-    Workflows come from contracts.db (the wizard's store) plus any
+    Workflows come from workflows.db (the wizard's store) plus any
     un-migrated YAML files in --workflows-dir. `flow workflows list`
     shows what would run.
 
@@ -904,7 +904,7 @@ def materialize_all(
 # `flow contracts ...` — read-only peek at the configured workflows.
 # Mirrors the home page of the dashboard for operators who never open
 # the browser; closes a long-standing discoverability gap where the
-# materialize commands silently read contracts.db but no CLI surfaced it.
+# materialize commands silently read workflows.db but no CLI surfaced it.
 # ---------------------------------------------------------------------------
 
 
@@ -921,7 +921,7 @@ def workflows() -> None:
     default=Path("./contracts"),
     show_default=True,
     help=(
-        "Directory holding contracts.db (DB-first) and any "
+        "Directory holding workflows.db (DB-first) and any "
         "un-migrated workflow YAMLs."
     ),
 )
@@ -934,7 +934,7 @@ def contracts_list(contracts_dir: Path, include_archived: bool) -> None:
     """Enumerate every workflow `flow materialize` / `flow serve`
     would resolve.
 
-    Source markers: `db` for rows in contracts.db (wizard-managed);
+    Source markers: `db` for rows in workflows.db (wizard-managed);
     `yaml` for un-migrated YAML files in the workflows-dir. When
     both exist for the same name, the DB row wins — same precedence
     as `ContractStore.get()`.
@@ -971,7 +971,7 @@ def contracts_list(contracts_dir: Path, include_archived: bool) -> None:
             "\n"
             "To add one, run `flow serve` and click '+ New workflow' in\n"
             "the browser — the wizard probes your repo and writes a\n"
-            "contracts.db row for you.\n"
+            "workflows.db row for you.\n"
             "\n"
             "Or drop a workflow YAML into the directory; see\n"
             "docs/HOWTO.md#write-a-workflow-yaml-by-hand."
@@ -1030,7 +1030,7 @@ def _contract_target(contract) -> str:
     type=click.Path(path_type=Path),
     default=None,
     help=(
-        "Directory holding `contracts.db` (the config DB). Pass this "
+        "Directory holding `workflows.db` (the config DB). Pass this "
         "to include config in the backup; omit it for a data-only "
         "archive. The DB is snapshotted via SQLite's online backup "
         "API so a running server can't corrupt it."
@@ -1065,7 +1065,7 @@ def backup(
     The archive carries every Parquet table + run manifest under
     `--data-dir` plus a `flowmetrics-backup.json` header with a
     SHA-256 of every payload file. Pass `--workflows-dir` to also
-    include a consistent snapshot of `contracts.db` (taken via
+    include a consistent snapshot of `workflows.db` (taken via
     SQLite's online backup API so a live server can't tear it).
     `flow restore` verifies the header + checksums before extracting.
     """
@@ -1107,7 +1107,7 @@ def backup(
     type=click.Path(path_type=Path),
     default=None,
     help=(
-        "Target directory for the restored `contracts.db`. Required "
+        "Target directory for the restored `workflows.db`. Required "
         "whenever the backup carries config (or when using "
         "--config-only)."
     ),
@@ -1123,12 +1123,12 @@ def backup(
 @click.option(
     "--data-only/--no-data-only",
     default=False,
-    help="Restore only the data warehouse (skip contracts.db).",
+    help="Restore only the data warehouse (skip workflows.db).",
 )
 @click.option(
     "--config-only/--no-config-only",
     default=False,
-    help="Restore only contracts.db (skip the data warehouse).",
+    help="Restore only workflows.db (skip the data warehouse).",
 )
 def restore(
     input_path: Path,
@@ -1141,7 +1141,7 @@ def restore(
     """Verify + extract a `flow backup` tarball.
 
     Default extracts both the data warehouse and (if present)
-    `contracts.db`. Use `--data-only` to leave config untouched or
+    `workflows.db`. Use `--data-only` to leave config untouched or
     `--config-only` to leave the warehouse untouched. Refuses to
     touch a non-empty target without `--force`. Verifies every
     file's SHA-256 against the header before writing anything, so

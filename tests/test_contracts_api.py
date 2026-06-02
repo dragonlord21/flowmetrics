@@ -2,10 +2,10 @@
 
 Two endpoints, both intentionally simple:
 
-  GET /api/internal/contracts
+  GET /api/internal/workflows
       → [{id, label, source}]  for every YAML in --workflows-dir
 
-  GET /api/internal/contracts/{id}
+  GET /api/internal/workflows/{id}
       → {id, label, parsed: {...}, yaml: STRING,
          materialize: {last_run_at, status, items}}
 
@@ -50,7 +50,7 @@ class TestListContracts:
                jira_project="BIGTOP", repo=None)
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/api/internal/contracts")
+            r = client.get("/api/internal/workflows")
         assert r.status_code == 200
         body = r.json()
         # The shape is documented: id + label + source per entry.
@@ -64,7 +64,7 @@ class TestListContracts:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/api/internal/contracts")
+            r = client.get("/api/internal/workflows")
         assert r.status_code == 200
         assert r.json() == []
 
@@ -79,7 +79,7 @@ class TestListContracts:
         )
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            ids = {c["id"] for c in client.get("/api/internal/contracts").json()}
+            ids = {c["id"] for c in client.get("/api/internal/workflows").json()}
         assert ids == {"alpha", "gamma"}
 
 
@@ -89,7 +89,7 @@ class TestGetContractDetail:
         _write(contracts, "alpha", label="Alpha workflow")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/api/internal/contracts/alpha")
+            r = client.get("/api/internal/workflows/alpha")
         assert r.status_code == 200
         body = r.json()
         assert body["id"] == "alpha"
@@ -106,7 +106,7 @@ class TestGetContractDetail:
         _write(contracts, "alpha")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            body = client.get("/api/internal/contracts/alpha").json()
+            body = client.get("/api/internal/workflows/alpha").json()
         # Always present; null when no run has happened yet.
         assert "materialize" in body
         m = body["materialize"]
@@ -118,7 +118,7 @@ class TestGetContractDetail:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/api/internal/contracts/does-not-exist")
+            r = client.get("/api/internal/workflows/does-not-exist")
         assert r.status_code == 404
 
     def test_malformed_yaml_is_skipped_by_migration_and_returns_404(self, workspace):
@@ -130,14 +130,14 @@ class TestGetContractDetail:
         (contracts / "broken.yaml").write_text("contract: {name: broken}\n")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/api/internal/contracts/broken")
+            r = client.get("/api/internal/workflows/broken")
         assert r.status_code == 404
         # The original file is still on disk for the user to fix.
         assert (contracts / "broken.yaml").exists()
 
 
 class TestValidateEndpoint:
-    """`POST /api/internal/contracts/_validate` is the structured
+    """`POST /api/internal/workflows/_validate` is the structured
     parser the UI calls live to surface errors without touching disk.
     Returns the same outcome `load_contract` would, but as JSON the
     UI can render inline."""
@@ -146,7 +146,7 @@ class TestValidateEndpoint:
         # Writes require the "this came from our UI" header so a
         # drive-by cross-origin POST can't forge them.
         kwargs.setdefault("headers", {})["X-Requested-With"] = "fetch"
-        return client.post("/api/internal/contracts/_validate", **kwargs)
+        return client.post("/api/internal/workflows/_validate", **kwargs)
 
     def test_valid_yaml_returns_valid_true(self, workspace):
         contracts, data = workspace
@@ -195,7 +195,7 @@ class TestValidateEndpoint:
 class TestWriteContract:
     def _put(self, client, contract_id, yaml_text):
         return client.put(
-            f"/api/internal/contracts/{contract_id}",
+            f"/api/internal/workflows/{contract_id}",
             json={"yaml": yaml_text},
             headers={"X-Requested-With": "fetch"},
         )
@@ -210,7 +210,7 @@ class TestWriteContract:
             body = r.json()
             assert body["id"] == "alpha"
             # The detail endpoint sees it immediately.
-            assert client.get("/api/internal/contracts/alpha").status_code == 200
+            assert client.get("/api/internal/workflows/alpha").status_code == 200
 
     def test_overwrites_an_existing_contract_atomically(self, workspace):
         contracts, data = workspace
@@ -221,7 +221,7 @@ class TestWriteContract:
                 "contract:\n  name: alpha\n  label: new\n  source: github\n  repo: a/b\n")
             assert r.status_code == 200, r.text
             # New label visible through the API (DB-backed).
-            body = client.get("/api/internal/contracts/alpha").json()
+            body = client.get("/api/internal/workflows/alpha").json()
         assert body["parsed"]["label"] == "new"
 
     def test_invalid_yaml_rejects_with_422_and_does_not_write(self, workspace):
@@ -233,7 +233,7 @@ class TestWriteContract:
             body = r.json()
             assert "errors" in body or "detail" in body
             # Nothing stored.
-            assert client.get("/api/internal/contracts/broken").status_code == 404
+            assert client.get("/api/internal/workflows/broken").status_code == 404
 
     def test_id_must_match_contract_name(self, workspace):
         contracts, data = workspace
@@ -243,20 +243,20 @@ class TestWriteContract:
             r = self._put(client, "alpha",
                 "contract:\n  name: beta\n  source: github\n  repo: a/b\n")
             assert r.status_code == 422
-            assert client.get("/api/internal/contracts/alpha").status_code == 404
-            assert client.get("/api/internal/contracts/beta").status_code == 404
+            assert client.get("/api/internal/workflows/alpha").status_code == 404
+            assert client.get("/api/internal/workflows/beta").status_code == 404
 
 
 class TestDeleteContract:
     def _delete(self, client, contract_id, **kwargs):
         kwargs.setdefault("headers", {})["X-Requested-With"] = "fetch"
         return client.delete(
-            f"/api/internal/contracts/{contract_id}", **kwargs
+            f"/api/internal/workflows/{contract_id}", **kwargs
         )
 
     def _archive(self, client, contract_id):
         return client.post(
-            f"/api/internal/contracts/{contract_id}/archive",
+            f"/api/internal/workflows/{contract_id}/archive",
             json={}, headers={"X-Requested-With": "fetch"},
         )
 
@@ -271,7 +271,7 @@ class TestDeleteContract:
             assert r.status_code == 409
             # Still visible.
             assert client.get(
-                "/api/internal/contracts/alpha"
+                "/api/internal/workflows/alpha"
             ).status_code == 200
 
     def test_delete_after_archive_removes_row(self, workspace):
@@ -285,7 +285,7 @@ class TestDeleteContract:
             r = self._delete(client, "alpha")
             assert r.status_code == 200, r.text
             assert client.get(
-                "/api/internal/contracts/alpha"
+                "/api/internal/workflows/alpha"
             ).status_code == 404
 
     def test_delete_leaves_warehouse_data_alone_without_purge(self, workspace):
@@ -321,13 +321,13 @@ class TestDeleteContract:
             self._archive(client, "alpha")
             r = client.request(
                 "DELETE",
-                "/api/internal/contracts/alpha",
+                "/api/internal/workflows/alpha",
                 json={"purge_data": True},
                 headers={"X-Requested-With": "fetch"},
             )
             assert r.status_code == 200, r.text
             assert client.get(
-                "/api/internal/contracts/alpha"
+                "/api/internal/workflows/alpha"
             ).status_code == 404
         # Warehouse partition gone.
         assert not (data / "work_items" / "contract_id=alpha").exists()
@@ -344,23 +344,23 @@ class TestCSRFOnWrites:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = client.put(
-                "/api/internal/contracts/alpha",
+                "/api/internal/workflows/alpha",
                 json={"yaml":
                     "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"
                 },
             )
             assert r.status_code == 403
-            assert client.get("/api/internal/contracts/alpha").status_code == 404
+            assert client.get("/api/internal/workflows/alpha").status_code == 404
 
     def test_delete_without_header_is_blocked(self, workspace):
         contracts, data = workspace
         _write(contracts, "alpha")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.delete("/api/internal/contracts/alpha")
+            r = client.delete("/api/internal/workflows/alpha")
             assert r.status_code == 403
             # Still in the DB after the blocked DELETE.
-            assert client.get("/api/internal/contracts/alpha").status_code == 200
+            assert client.get("/api/internal/workflows/alpha").status_code == 200
 
     def test_validate_without_header_is_also_blocked(self, workspace):
         # _validate is a POST that takes user input — same CSRF
@@ -369,7 +369,7 @@ class TestCSRFOnWrites:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = client.post(
-                "/api/internal/contracts/_validate",
+                "/api/internal/workflows/_validate",
                 json={"yaml": "x: y"},
             )
             assert r.status_code == 403
@@ -383,8 +383,8 @@ class TestAuthPosture:
         _write(contracts, "alpha")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            assert client.get("/api/internal/contracts").status_code == 200
-            assert client.get("/api/internal/contracts/alpha").status_code == 200
+            assert client.get("/api/internal/workflows").status_code == 200
+            assert client.get("/api/internal/workflows/alpha").status_code == 200
 
     def test_password_set_requires_basic_auth(self, workspace):
         contracts, data = workspace
@@ -393,10 +393,10 @@ class TestAuthPosture:
             data_dir=data, contracts_dir=contracts, password="secret",
         )
         with TestClient(app) as client:
-            unauth = client.get("/api/internal/contracts")
+            unauth = client.get("/api/internal/workflows")
             assert unauth.status_code == 401
             authd = client.get(
-                "/api/internal/contracts",
+                "/api/internal/workflows",
                 auth=("operator", "secret"),
             )
             assert authd.status_code == 200

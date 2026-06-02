@@ -36,7 +36,7 @@ def _post(client, payload, mock_probe=None):
     if mock_probe is not None:
         client.app.state.probe_source_vocab = mock_probe
     return client.post(
-        "/api/internal/contracts/_probe-source-vocab",
+        "/api/internal/workflows/_probe-source-vocab",
         json=payload, headers=headers,
     )
 
@@ -166,7 +166,7 @@ class TestProbeCache:
             payload = {"source": "github", "repo": "owner/x"}
             _post(client, payload, mock_probe=probe)
             r = client.post(
-                "/api/internal/contracts/_probe-source-vocab?force=true",
+                "/api/internal/workflows/_probe-source-vocab?force=true",
                 json=payload, headers={"X-Requested-With": "fetch"},
             )
             assert r.status_code == 200
@@ -183,7 +183,7 @@ class TestBackwardsCompatibility:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = client.post(
-                "/api/internal/contracts/_probe-stages",
+                "/api/internal/workflows/_probe-stages",
                 json={"source": "github", "repo": "astral-sh/uv"},
                 headers={"X-Requested-With": "fetch"},
             )
@@ -199,7 +199,7 @@ class TestWizardUIIncludesSuggestionsPanel:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            html = client.get("/admin/contracts/new").text
+            html = client.get("/admin/workflows/new").text
         # The new probe is referenced (the UI calls it on
         # "Discover from data source").
         assert "_probe-source-vocab" in html

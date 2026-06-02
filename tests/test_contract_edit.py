@@ -1,4 +1,4 @@
-"""Edit-existing-contract page — `/admin/contracts/{id}/edit`.
+"""Edit-existing-contract page — `/admin/workflows/{id}/edit`.
 
 Reuses the wizard template with `mode: edit`. Pre-fills every field
 from the existing YAML; save routes through PUT (idempotent
@@ -39,7 +39,7 @@ class TestEditPage:
         _write(contracts, "alpha", label="Alpha workflow")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/admin/contracts/alpha/edit")
+            r = client.get("/admin/workflows/alpha/edit")
         assert r.status_code == 200
         html = r.text
         # Edit mode bakes the contract id into the page so the JS
@@ -55,7 +55,7 @@ class TestEditPage:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/admin/contracts/missing/edit")
+            r = client.get("/admin/workflows/missing/edit")
         assert r.status_code == 404
 
     def test_dashboard_links_to_edit_for_existing_contract(self, workspace):
@@ -66,7 +66,7 @@ class TestEditPage:
             html = client.get("/workflows/alpha").text
         # The data-source strip (or somewhere visible on the
         # dashboard) carries an Edit link to this contract.
-        assert "/admin/contracts/alpha/edit" in html
+        assert "/admin/workflows/alpha/edit" in html
 
 
 class TestEditRoundTrip:
@@ -82,7 +82,7 @@ class TestEditRoundTrip:
         )
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            body = client.get("/api/internal/contracts/alpha").json()
+            body = client.get("/api/internal/workflows/alpha").json()
         parsed = body["parsed"]
         for field in ("name", "source", "repo", "label", "start", "stop"):
             assert field in parsed, f"missing {field} from parsed payload"
@@ -102,7 +102,7 @@ class TestEditRoundTrip:
         }))
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            body = client.get("/api/internal/contracts/alpha").json()
+            body = client.get("/api/internal/workflows/alpha").json()
         assert body["parsed"]["states"] == {
             "backlog": [], "wip": ["Draft", "Awaiting Review"],
             "done": ["Merged"],

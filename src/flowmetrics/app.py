@@ -616,7 +616,7 @@ def create_app(
                 detail=(
                     f"contract {name!r} not found in the workflows "
                     f"store at {contracts_dir / 'contracts.db'}. "
-                    "Create one through /admin/contracts/new, or "
+                    "Create one through /admin/workflows/new, or "
                     "drop a YAML in this directory and restart."
                 ),
             )
@@ -635,7 +635,7 @@ def create_app(
                 detail=(
                     f"no live contracts in the store at "
                     f"{contracts_dir / 'contracts.db'}. Create one "
-                    "through /admin/contracts/new, or drop a YAML "
+                    "through /admin/workflows/new, or drop a YAML "
                     "in this directory and restart."
                 ),
             )
@@ -753,7 +753,7 @@ def create_app(
 
     write_dep = [Depends(_require_csrf), *auth_dep]
 
-    @app.get("/api/internal/contracts", dependencies=auth_dep)
+    @app.get("/api/internal/workflows", dependencies=auth_dep)
     def list_contracts(include_archived: bool = False) -> list[dict]:
         """List contracts in the live store.
 
@@ -775,7 +775,7 @@ def create_app(
             out.append(entry)
         return out
 
-    @app.get("/api/internal/contracts/{contract_id}", dependencies=auth_dep)
+    @app.get("/api/internal/workflows/{contract_id}", dependencies=auth_dep)
     def get_contract(
         contract_id: str, include_archived: bool = False,
     ) -> dict:
@@ -842,13 +842,13 @@ def create_app(
         }
 
     @app.get(
-        "/admin/contracts/new",
+        "/admin/workflows/new",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
     def new_contract_wizard(request: Request) -> HTMLResponse:
         """The new-contract wizard. Pure form + JS — the actual
-        write goes through PUT /api/internal/contracts/{id}."""
+        write goes through PUT /api/internal/workflows/{id}."""
         return templates.TemplateResponse(
             request,
             "contracts_new.html.jinja",
@@ -862,7 +862,7 @@ def create_app(
         )
 
     @app.get(
-        "/admin/contracts/{contract_id}/edit",
+        "/admin/workflows/{contract_id}/edit",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
@@ -871,7 +871,7 @@ def create_app(
     ) -> HTMLResponse:
         """Edit-existing-contract page. Reuses the wizard template;
         the JS detects `mode=edit` and hydrates fields from
-        GET /api/internal/contracts/{id} on load."""
+        GET /api/internal/workflows/{id} on load."""
         _ensure_contract_exists(contract_id)
         return templates.TemplateResponse(
             request,
@@ -886,7 +886,7 @@ def create_app(
         )
 
     @app.get(
-        "/api/internal/contracts/{contract_id}/yaml",
+        "/api/internal/workflows/{contract_id}/yaml",
         dependencies=auth_dep,
     )
     def export_contract_yaml(
@@ -922,7 +922,7 @@ def create_app(
         )
 
     @app.get(
-        "/admin/contracts/archive",
+        "/admin/workflows/archive",
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
@@ -954,7 +954,7 @@ def create_app(
         )
 
     @app.post(
-        "/api/internal/contracts/_dry-run",
+        "/api/internal/workflows/_dry-run",
         dependencies=write_dep,
     )
     def dry_run(payload: dict, request: Request) -> dict:
@@ -1050,7 +1050,7 @@ def create_app(
         return result
 
     @app.post(
-        "/api/internal/contracts/_probe-source-vocab",
+        "/api/internal/workflows/_probe-source-vocab",
         dependencies=write_dep,
     )
     def probe_source_vocab(payload: dict, request: Request) -> dict:
@@ -1101,7 +1101,7 @@ def create_app(
         return result
 
     @app.post(
-        "/api/internal/contracts/_probe-stages", dependencies=write_dep,
+        "/api/internal/workflows/_probe-stages", dependencies=write_dep,
     )
     def probe_stages(payload: dict, request: Request) -> dict:
         """Discover the workflow stages from the source. Runs a
@@ -1151,7 +1151,7 @@ def create_app(
         return result
 
     @app.post(
-        "/api/internal/contracts/_probe-source", dependencies=write_dep,
+        "/api/internal/workflows/_probe-source", dependencies=write_dep,
     )
     def probe_source(payload: dict) -> dict:
         """Check whether the named source target (GitHub repo or
@@ -1177,7 +1177,7 @@ def create_app(
             return {"ok": False, "error": f"probe failed: {exc}"}
 
     @app.post(
-        "/api/internal/contracts/_validate", dependencies=write_dep,
+        "/api/internal/workflows/_validate", dependencies=write_dep,
     )
     def validate_contract(payload: dict) -> dict:
         """Validate a YAML body without touching disk. Always returns
@@ -1188,7 +1188,7 @@ def create_app(
         return {"valid": not errors, "errors": errors}
 
     @app.put(
-        "/api/internal/contracts/{contract_id}", dependencies=write_dep,
+        "/api/internal/workflows/{contract_id}", dependencies=write_dep,
     )
     def put_contract(contract_id: str, payload: dict) -> dict:
         """Create or overwrite a contract. Body must carry a `yaml`
@@ -1216,7 +1216,7 @@ def create_app(
         return get_contract(contract_id)
 
     @app.post(
-        "/api/internal/contracts/{contract_id}/archive",
+        "/api/internal/workflows/{contract_id}/archive",
         dependencies=write_dep,
     )
     def archive_contract(contract_id: str, payload: dict | None = None) -> dict:
@@ -1239,7 +1239,7 @@ def create_app(
         return {"id": contract_id, "archived": True, "reason": reason}
 
     @app.post(
-        "/api/internal/contracts/{contract_id}/restore",
+        "/api/internal/workflows/{contract_id}/restore",
         dependencies=write_dep,
     )
     def restore_contract(contract_id: str) -> dict:
@@ -1259,7 +1259,7 @@ def create_app(
         return {"id": contract_id, "archived": False}
 
     @app.delete(
-        "/api/internal/contracts/{contract_id}", dependencies=write_dep,
+        "/api/internal/workflows/{contract_id}", dependencies=write_dep,
     )
     async def delete_contract(
         contract_id: str, request: Request,
@@ -1281,7 +1281,7 @@ def create_app(
                 status_code=409,
                 detail=(
                     f"contract {contract_id!r} is live; archive it "
-                    "first (POST /api/internal/contracts/"
+                    "first (POST /api/internal/workflows/"
                     f"{contract_id}/archive) before hard-deleting."
                 ),
             )

@@ -7,11 +7,11 @@
     <h1>Workflows</h1>
     <p class="home-subtitle">Pick a workflow to view its flow metrics.</p>
     <p>
-      <a class="btn btn--primary" href="/admin/contracts/new">+ New workflow</a>
+      <a class="btn btn--primary" href="/admin/workflows/new">+ New workflow</a>
     </p>
     {% if archived_count and archived_count > 0 %}
     <p style="font-size: 0.8125rem;">
-      <a href="/admin/contracts/archive" style="color: var(--muted);">View archived ({{ archived_count }})</a>
+      <a href="/admin/workflows/archive" style="color: var(--muted);">View archived ({{ archived_count }})</a>
     </p>
     {% endif %}
   </section>
@@ -29,7 +29,7 @@
             </span>
             <span class="home-workflow-arrow" aria-hidden="true">→</span>
           </a>
-          <a class="home-workflow-edit" href="/admin/contracts/{{ w.name }}/edit"
+          <a class="home-workflow-edit" href="/admin/workflows/{{ w.name }}/edit"
              title="Edit this workflow (rename, change steps, archive / delete)">Edit</a>
         </li>
       {% endfor %}

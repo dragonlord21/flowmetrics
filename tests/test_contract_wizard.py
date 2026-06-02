@@ -1,10 +1,10 @@
 """New-contract wizard — UI + probe-source endpoint.
 
-The wizard lives at `/admin/contracts/new`. A single form: name +
+The wizard lives at `/admin/workflows/new`. A single form: name +
 label, source picker, and the steps editor (there is no date-window
 field — data is fetched via the Data Source page's backfill after
 save). The source field's on-blur fires `POST
-/api/internal/contracts/_probe-source` to confirm the repo / project
+/api/internal/workflows/_probe-source` to confirm the repo / project
 actually exists at the source.
 
 These tests cover the page render + the probe endpoint. The full
@@ -33,7 +33,7 @@ class TestWizardPage:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = client.get("/admin/contracts/new")
+            r = client.get("/admin/workflows/new")
         assert r.status_code == 200
         html = r.text
         # Three required fields: name, source, repo/jira.
@@ -50,11 +50,11 @@ class TestWizardPage:
         with TestClient(app) as client:
             home = client.get("/").text
         # "+ New contract" affordance lands users in the wizard.
-        assert "/admin/contracts/new" in home
+        assert "/admin/workflows/new" in home
 
 
 class TestProbeSourceEndpoint:
-    """`POST /api/internal/contracts/_probe-source` confirms the
+    """`POST /api/internal/workflows/_probe-source` confirms the
     target (GitHub repo or Jira project) actually exists. The
     request body is `{source, repo?, jira_url?, jira_project?}`;
     the response is `{ok: bool, label?: str, error?: str}`.
@@ -68,7 +68,7 @@ class TestProbeSourceEndpoint:
         if mock_probe is not None:
             client.app.state.probe_source = mock_probe
         return client.post(
-            "/api/internal/contracts/_probe-source",
+            "/api/internal/workflows/_probe-source",
             json=body, headers=headers,
         )
 

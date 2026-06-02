@@ -43,7 +43,7 @@ def _seed(client, contract_id: str, steps: list[dict] | None = None) -> None:
         body["steps"] = steps
     text = yaml.safe_dump({"contract": body})
     r = client.put(
-        f"/api/internal/contracts/{contract_id}",
+        f"/api/internal/workflows/{contract_id}",
         json={"yaml": text},
         headers={"X-Requested-With": "fetch"},
     )
@@ -55,7 +55,7 @@ class TestStepsEditorDom:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            html = client.get("/admin/contracts/new").text
+            html = client.get("/admin/workflows/new").text
         # The old three-bucket markup MUST be gone.
         assert 'data-bucket="backlog"' not in html
         assert 'data-bucket="wip"' not in html
@@ -69,7 +69,7 @@ class TestStepsEditorDom:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            html = client.get("/admin/contracts/new").text
+            html = client.get("/admin/workflows/new").text
         # The new editor's DOM hook.
         assert "steps-list" in html
         # The "+ Add step" affordance.
@@ -79,7 +79,7 @@ class TestStepsEditorDom:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            html = client.get("/admin/contracts/new").text
+            html = client.get("/admin/workflows/new").text
         # C4 swapped _probe-stages for the richer
         # _probe-source-vocab endpoint.
         assert "_probe-source-vocab" in html
@@ -99,7 +99,7 @@ class TestSaveRoundTrip:
                 {"name": "Review", "wip": True},
                 {"name": "Done", "wip": False},
             ])
-            detail = client.get("/api/internal/contracts/alpha").json()
+            detail = client.get("/api/internal/workflows/alpha").json()
         parsed_states = detail["parsed"].get("states")
         # The synthesised states compatibility shim:
         # leading non-WIP → backlog; contiguous WIP → wip; trailing
@@ -124,7 +124,7 @@ class TestEditPageDelete:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             _seed(client, "alpha")
-            html = client.get("/admin/contracts/alpha/edit").text
+            html = client.get("/admin/workflows/alpha/edit").text
         # The archive endpoint is what the Delete button hits.
         assert "/archive" in html
         # Copy reads "Archive" rather than "Delete".

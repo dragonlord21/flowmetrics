@@ -84,7 +84,7 @@ The wizard walks you through:
 5. **Window** — start + stop dates. Defaults are sensible; widen
    later if you want more history.
 
-Hit **Save**. The wizard writes to `contracts.db` and bounces you to
+Hit **Save**. The wizard writes to `workflows.db` and bounces you to
 the workflow's dashboard.
 
 ## 6. Fetch the data

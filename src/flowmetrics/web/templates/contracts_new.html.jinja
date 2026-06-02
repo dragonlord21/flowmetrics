@@ -505,7 +505,7 @@
       <a href="/" class="btn">Cancel</a>
       {% if wizard_mode == "edit" %}
       <a id="download-yaml-btn" class="btn" style="margin-left: auto;"
-         href="/api/internal/contracts/{{ edit_id }}/yaml">Download YAML</a>
+         href="/api/internal/workflows/{{ edit_id }}/yaml">Download YAML</a>
       <button type="button" class="btn" id="copy-yaml-btn" @click="copyYaml()"
               x-text="copied ? 'Copied ✓' : 'Copy YAML'">Copy YAML</button>
       <button type="button" class="btn btn--danger" id="archive-btn"
@@ -703,7 +703,7 @@
         if (!this.sourceComplete) return;
         this.probeStatus = 'Checking…'; this.probeClass = 'probe-status';
         try {
-          const r = await fetch('/api/internal/contracts/_probe-source', {
+          const r = await fetch('/api/internal/workflows/_probe-source', {
             method: 'POST', headers: HEADERS, body: JSON.stringify(this._target()),
           });
           const body = await r.json();
@@ -726,7 +726,7 @@
         if (!this.sourceComplete) return;
         this.vocabStatus = 'Discovering…'; this.vocabClass = 'probe-status';
         try {
-          const r = await fetch('/api/internal/contracts/_probe-source-vocab', {
+          const r = await fetch('/api/internal/workflows/_probe-source-vocab', {
             method: 'POST', headers: HEADERS, body: JSON.stringify(this._target()),
           });
           const body = await r.json();
@@ -780,7 +780,7 @@
       },
       async save() {
         this.errors = '';
-        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.name), {
+        const r = await fetch('/api/internal/workflows/' + encodeURIComponent(this.name), {
           method: 'PUT', headers: HEADERS, body: JSON.stringify({ yaml: this.buildYaml() }),
         });
         if (r.ok) { this.savedName = this.name; this.saved = true; return; }
@@ -789,7 +789,7 @@
       },
       async dryRun() {
         this.dryStatus = 'Running…'; this.dryClass = 'probe-status';
-        const r = await fetch('/api/internal/contracts/_dry-run', {
+        const r = await fetch('/api/internal/workflows/_dry-run', {
           method: 'POST', headers: HEADERS,
           body: JSON.stringify({ contract: this._contractBody(), since: this.drySince, items_cap: 200 }),
         });
@@ -804,7 +804,7 @@
         }
       },
       async copyYaml() {
-        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.editId) + '/yaml');
+        const r = await fetch('/api/internal/workflows/' + encodeURIComponent(this.editId) + '/yaml');
         const text = await r.text();
         if (navigator.clipboard) await navigator.clipboard.writeText(text);
         this.copied = true;
@@ -814,7 +814,7 @@
         const reason = window.prompt(
           `Archive '${this.editId}'? Optional reason for the audit log:`, '');
         if (reason === null) return;
-        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.editId) + '/archive', {
+        const r = await fetch('/api/internal/workflows/' + encodeURIComponent(this.editId) + '/archive', {
           method: 'POST', headers: HEADERS, body: JSON.stringify({ reason: reason || null }),
         });
         if (r.ok) { window.location.href = '/'; return; }
@@ -824,7 +824,7 @@
 
       // ---- edit-mode hydration ----
       async hydrate() {
-        const r = await fetch('/api/internal/contracts/' + encodeURIComponent(this.editId));
+        const r = await fetch('/api/internal/workflows/' + encodeURIComponent(this.editId));
         const body = await r.json();
         const p = body.parsed || {};
         this.name = p.name || '';

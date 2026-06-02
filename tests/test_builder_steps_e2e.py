@@ -112,14 +112,14 @@ class TestChipsLiveInsideActiveStep:
     ):
         """With a verified source but no step yet, there's no step to
         bind to — so no suggestion chips are rendered anywhere."""
-        page.goto(server_url + "/admin/contracts/new")
+        page.goto(server_url + "/admin/workflows/new")
         _verify_source(page)
         assert page.query_selector(".sugg-chip") is None
 
     def test_chip_binds_to_the_step_it_sits_in(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/admin/contracts/new")
+        page.goto(server_url + "/admin/workflows/new")
         _verify_source(page)
         _add_step(page, "Ready")
 
@@ -145,7 +145,7 @@ class TestChipsLiveInsideActiveStep:
     def test_selecting_a_row_retargets_the_chips(
         self, server_url: str, page: Page
     ):
-        page.goto(server_url + "/admin/contracts/new")
+        page.goto(server_url + "/admin/workflows/new")
         _verify_source(page)
         _add_step(page, "Ready")
         _add_step(page, "Done")  # this one is now active
@@ -180,7 +180,7 @@ class TestSaveProposesFetchData:
         empty dashboard, the builder confirms the save and offers to
         fetch data via the Data Source page (whose backfill picks the
         date range)."""
-        page.goto(server_url + "/admin/contracts/new")
+        page.goto(server_url + "/admin/workflows/new")
         page.fill("#f-name", "fetch-me")
         _verify_source(page)
         _add_step(page, "Ready")
@@ -208,7 +208,7 @@ class TestNoStepsContract:
         source's native stages (the exact intent of a plain YAML
         contract like astral-uv-week). The builder must let you save it
         without forcing a step."""
-        page.goto(server_url + "/admin/contracts/new")
+        page.goto(server_url + "/admin/workflows/new")
         page.fill("#f-name", "native-demo")
         _verify_source(page)
         # No steps added at all.
@@ -227,7 +227,7 @@ class TestAddStepIsVisuallyDistinct:
         """The add-step control must not read as just another step
         row — it carries a distinguishing label so users can tell the
         'create a step' field apart from committed steps."""
-        page.goto(server_url + "/admin/contracts/new")
+        page.goto(server_url + "/admin/workflows/new")
         _verify_source(page)
         expect(page.locator(".add-step-panel")).to_be_visible()
         expect(page.locator(".add-step-panel")).to_contain_text("Add a step")

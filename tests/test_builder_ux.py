@@ -29,7 +29,7 @@ def workspace(tmp_path):
 
 
 def _new(client):
-    return client.get("/admin/contracts/new").text
+    return client.get("/admin/workflows/new").text
 
 
 class TestRequiredFieldsMarked:
@@ -161,11 +161,11 @@ class TestWarehouseEmptyStateCopy:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             client.put(
-                "/api/internal/contracts/alpha",
+                "/api/internal/workflows/alpha",
                 json={"yaml":
                     "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"
                 },
                 headers={"X-Requested-With": "fetch"},
             )
-            html = client.get("/admin/contracts/alpha/edit").text
+            html = client.get("/admin/workflows/alpha/edit").text
         assert 'id="sugg-warehouse"' in html

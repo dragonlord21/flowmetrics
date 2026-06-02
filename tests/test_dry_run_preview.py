@@ -1,6 +1,6 @@
 """C5 — Dry-run preview against the live source.
 
-`POST /api/internal/contracts/_dry-run` takes the in-progress
+`POST /api/internal/workflows/_dry-run` takes the in-progress
 contract payload + `{since, items_cap}` and returns items bucketed
 per the user's steps — without persisting anything to the
 warehouse.
@@ -47,7 +47,7 @@ def _post(client, payload, mock_fetch=None):
     if mock_fetch is not None:
         client.app.state.dry_run_fetch = mock_fetch
     return client.post(
-        "/api/internal/contracts/_dry-run",
+        "/api/internal/workflows/_dry-run",
         json=payload, headers={"X-Requested-With": "fetch"},
     )
 
@@ -210,7 +210,7 @@ class TestCache:
         with TestClient(app) as client:
             _post(client, payload, mock_fetch=fetch)
             r = client.post(
-                "/api/internal/contracts/_dry-run?force=true",
+                "/api/internal/workflows/_dry-run?force=true",
                 json=payload, headers={"X-Requested-With": "fetch"},
             )
             assert r.status_code == 200
@@ -249,7 +249,7 @@ class TestWizardUIHasDryRunSection:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            html = client.get("/admin/contracts/new").text
+            html = client.get("/admin/workflows/new").text
         # The Dry-run panel exists.
         assert "dry-run-panel" in html
         # The endpoint is referenced in the JS.

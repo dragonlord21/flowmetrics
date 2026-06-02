@@ -20,7 +20,7 @@ def client(tmp_path):
     app = create_app(data_dir=tmp_path / "data", contracts_dir=contracts)
     with TestClient(app) as c:
         c.put(
-            "/api/internal/contracts/alpha",
+            "/api/internal/workflows/alpha",
             json={"yaml": "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"},
             headers={"X-Requested-With": "fetch"},
         )
@@ -29,4 +29,4 @@ def client(tmp_path):
 
 def test_home_row_has_an_edit_link_per_workflow(client):
     html = client.get("/").text
-    assert "/admin/contracts/alpha/edit" in html
+    assert "/admin/workflows/alpha/edit" in html

@@ -1,10 +1,10 @@
 """C6 + C7 — Export YAML endpoint and the archived-contracts page.
 
-C6: GET /api/internal/contracts/{id}/yaml returns the row's
+C6: GET /api/internal/workflows/{id}/yaml returns the row's
 canonical YAML as a downloadable attachment. Works on archived
 rows via ?include_archived=true.
 
-C7: /admin/contracts/archive lists archived contracts with
+C7: /admin/workflows/archive lists archived contracts with
 restore / export / hard-delete actions. The home page grows a
 "View archived (n)" link when n > 0.
 """
@@ -27,7 +27,7 @@ def workspace(tmp_path):
 
 def _seed(client, contract_id, label="demo"):
     r = client.put(
-        f"/api/internal/contracts/{contract_id}",
+        f"/api/internal/workflows/{contract_id}",
         json={"yaml":
             f"contract:\n  name: {contract_id}\n  label: {label}\n"
             "  source: github\n  repo: a/b\n"
@@ -39,7 +39,7 @@ def _seed(client, contract_id, label="demo"):
 
 def _archive(client, contract_id, reason=None):
     return client.post(
-        f"/api/internal/contracts/{contract_id}/archive",
+        f"/api/internal/workflows/{contract_id}/archive",
         json={"reason": reason} if reason else {},
         headers={"X-Requested-With": "fetch"},
     )
@@ -51,7 +51,7 @@ class TestExportYaml:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             _seed(client, "alpha")
-            r = client.get("/api/internal/contracts/alpha/yaml")
+            r = client.get("/api/internal/workflows/alpha/yaml")
         assert r.status_code == 200
         # Right content type + a filename in the disposition.
         assert "application/x-yaml" in r.headers["content-type"]
@@ -69,7 +69,7 @@ class TestExportYaml:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             _seed(client, "alpha", label="Round Trip")
-            text = client.get("/api/internal/contracts/alpha/yaml").text
+            text = client.get("/api/internal/workflows/alpha/yaml").text
         c = parse_contract_text(text, "alpha")
         assert c.name == "alpha"
         assert c.label == "Round Trip"
@@ -82,11 +82,11 @@ class TestExportYaml:
             _archive(client, "alpha")
             # Without the flag → 404 (archived hidden).
             assert client.get(
-                "/api/internal/contracts/alpha/yaml"
+                "/api/internal/workflows/alpha/yaml"
             ).status_code == 404
             # With the flag → 200.
             r = client.get(
-                "/api/internal/contracts/alpha/yaml?include_archived=true"
+                "/api/internal/workflows/alpha/yaml?include_archived=true"
             )
             assert r.status_code == 200
             assert "name: alpha" in r.text
@@ -96,7 +96,7 @@ class TestExportYaml:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             assert client.get(
-                "/api/internal/contracts/nope/yaml"
+                "/api/internal/workflows/nope/yaml"
             ).status_code == 404
 
 
@@ -108,7 +108,7 @@ class TestArchivePage:
             _seed(client, "alpha", label="Alpha")
             _seed(client, "beta", label="Beta")
             _archive(client, "beta", reason="rotated out")
-            html = client.get("/admin/contracts/archive").text
+            html = client.get("/admin/workflows/archive").text
         # Archived one shows; live one doesn't.
         assert "beta" in html
         assert "rotated out" in html
@@ -122,7 +122,7 @@ class TestArchivePage:
         with TestClient(app) as client:
             _seed(client, "beta")
             _archive(client, "beta")
-            html = client.get("/admin/contracts/archive").text
+            html = client.get("/admin/workflows/archive").text
         assert "/restore" in html
         # Hard-delete + export affordances reference the right endpoints.
         assert "/yaml?include_archived=true" in html
@@ -132,7 +132,7 @@ class TestArchivePage:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            html = client.get("/admin/contracts/archive").text
+            html = client.get("/admin/workflows/archive").text
         assert "rchive" in html  # "Archive" / "archived" heading present
 
 
@@ -145,7 +145,7 @@ class TestHomeArchiveLink:
             _seed(client, "beta")
             _archive(client, "beta")
             html = client.get("/").text
-        assert "/admin/contracts/archive" in html
+        assert "/admin/workflows/archive" in html
         # Count surfaced.
         assert "1" in html
 
@@ -155,4 +155,4 @@ class TestHomeArchiveLink:
         with TestClient(app) as client:
             _seed(client, "alpha")
             html = client.get("/").text
-        assert "/admin/contracts/archive" not in html
+        assert "/admin/workflows/archive" not in html

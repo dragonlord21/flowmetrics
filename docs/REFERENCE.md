@@ -35,7 +35,7 @@ hits the source API during a request.
 | `--port N` | 8000 | TCP port. |
 | `--host ADDR` | 127.0.0.1 | Any non-loopback value **requires** `--password`. |
 | `--data-dir PATH` | `data` | Parquet warehouse root. |
-| `--workflows-dir PATH` | `contracts` | YAMLs + `contracts.db` live here. |
+| `--workflows-dir PATH` | `contracts` | YAMLs + `workflows.db` live here. |
 | `--password TEXT` | — | HTTP Basic password. Also reads `$FLOW_PASSWORD`. |
 | `--bg / --no-bg` | off | macOS + Linux. Install + start as a persistent native service. Idempotent — re-run to reload. |
 | `--stop / --no-stop` | off | With `--bg`: stop + uninstall. Without `--bg`: error (the operator probably typed it wrong). |
@@ -89,7 +89,7 @@ timestamped `.tar.gz`.
 | Flag | Default | Notes |
 |----|----|----|
 | `--data-dir PATH` | `data` | Warehouse to back up. |
-| `--workflows-dir PATH` | — | If given, includes `contracts.db` via SQLite online-backup API. |
+| `--workflows-dir PATH` | — | If given, includes `workflows.db` via SQLite online-backup API. |
 | `--output PATH` | `<data-dir>/_backups/flowmetrics-<UTC-timestamp>.tar.gz` | |
 | `--include-cache / --no-include-cache` | off | Cache is re-fetchable. |
 
@@ -102,7 +102,7 @@ is verified **before** any byte is written.
 |----|----|----|
 | `--input FILE` | required | The `.tar.gz`. |
 | `--data-dir PATH` | required | Target for the warehouse. |
-| `--workflows-dir PATH` | — | Target for `contracts.db`. Required if the archive carries config or `--config-only` is set. |
+| `--workflows-dir PATH` | — | Target for `workflows.db`. Required if the archive carries config or `--config-only` is set. |
 | `--force / --no-force` | off | Allow overwriting a non-empty target. |
 | `--data-only / --no-data-only` | off | Skip config. |
 | `--config-only / --no-config-only` | off | Skip data. |
@@ -121,7 +121,7 @@ Read-only enumeration of configured workflows.
 | `--all / --no-all` | off | Include archived rows. |
 
 Output columns: `NAME`, `SOURCE` (`db` = wizard-managed in
-`contracts.db`, `yaml` = un-migrated YAML file), `TARGET` (GitHub
+`workflows.db`, `yaml` = un-migrated YAML file), `TARGET` (GitHub
 `owner/repo` or `JIRA_PROJECT @ jira_url`). Archived rows carry a
 `[archived]` suffix.
 
@@ -221,10 +221,10 @@ The `_`-prefixed directories carry meta (manifests, logs, backups) —
 ```
 WORKFLOWS_DIR/
 ├── *.yaml             # one workflow YAML per file
-└── contracts.db       # SQLite — server-managed contract store
+└── workflows.db       # SQLite — server-managed contract store
 ```
 
-`contracts.db` is created/managed by `flow serve` (the in-browser
+`workflows.db` is created/managed by `flow serve` (the in-browser
 contract editor); the YAMLs are the canonical text source. Both are
 included in a `flow backup --workflows-dir …` snapshot.
 

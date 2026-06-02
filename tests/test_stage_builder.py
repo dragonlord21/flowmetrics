@@ -1,7 +1,7 @@
 """Stage builder — the "Stages" fieldset of the new-contract wizard.
 
 The user clicks "Discover stages", which POSTs to
-`/api/internal/contracts/_probe-stages`. The server runs a bounded
+`/api/internal/workflows/_probe-stages`. The server runs a bounded
 materialize into a scratch dir, extracts distinct stage names from
 the transitions table, deletes the scratch dir, and returns
 {stages: [...]}. The result is cached for 15 minutes per source
@@ -31,7 +31,7 @@ def _post(client, payload, mock_probe=None):
     if mock_probe is not None:
         client.app.state.probe_stages = mock_probe
     return client.post(
-        "/api/internal/contracts/_probe-stages",
+        "/api/internal/workflows/_probe-stages",
         json=payload, headers=headers,
     )
 
@@ -127,7 +127,7 @@ class TestProbeStagesCache:
             _post(client, payload, mock_probe=probe)
             # ?force=true skips the cache check.
             r = client.post(
-                "/api/internal/contracts/_probe-stages?force=true",
+                "/api/internal/workflows/_probe-stages?force=true",
                 json=payload, headers={"X-Requested-With": "fetch"},
             )
             assert r.status_code == 200
