@@ -259,6 +259,40 @@ class ContractsDB:
 
 
 # ---------------------------------------------------------------------------
+# DB filename + one-time legacy rename.
+# ---------------------------------------------------------------------------
+
+_LEGACY_DB_FILENAME = "contracts.db"
+_DB_FILENAME = "workflows.db"
+
+
+def _resolve_db_path(workflows_dir: Path) -> Path:
+    """Return the path to the SQLite store, performing a one-time
+    rename from the legacy `contracts.db` filename if needed.
+
+    Behaviour:
+      - both `workflows.db` and `contracts.db` exist: ambiguous, raise.
+      - only `contracts.db` exists: os.replace it to `workflows.db`.
+      - only `workflows.db` exists, or neither: nothing to do.
+    """
+    legacy = workflows_dir / _LEGACY_DB_FILENAME
+    new = workflows_dir / _DB_FILENAME
+    if legacy.exists() and new.exists():
+        raise RuntimeError(
+            f"both {legacy} and {new} are present — this is ambiguous, "
+            "we don't know which is the source of truth. Move or "
+            "delete one and try again (workflows.db is the new "
+            "canonical name; contracts.db is the legacy name)."
+        )
+    if legacy.exists() and not new.exists():
+        # os.replace is atomic on the same filesystem — survives a
+        # crash mid-rename without leaving the user with neither file.
+        import os as _os
+        _os.replace(str(legacy), str(new))
+    return new
+
+
+# ---------------------------------------------------------------------------
 # First-boot migration: import legacy YAMLs into the DB.
 # ---------------------------------------------------------------------------
 
@@ -266,17 +300,18 @@ class ContractsDB:
 def ensure_initialized(workflows_dir: Path) -> None:
     """Idempotent first-boot migration.
 
-    1. Creates the DB at `<workflows-dir>/contracts.db` if missing.
-    2. For every `*.yaml` / `*.yml` in the workflows dir (top-level
+    1. Renames legacy `contracts.db` → `workflows.db` if applicable.
+    2. Creates the DB at `<workflows-dir>/workflows.db` if missing.
+    3. For every `*.yaml` / `*.yml` in the workflows dir (top-level
        only — `migrated/` is intentionally excluded), parse the
        YAML, INSERT it into the DB (skipping ids that already exist
        — the DB wins), then move the file into `migrated/`.
-    3. A YAML that fails to parse is left in place so the user can
+    4. A YAML that fails to parse is left in place so the user can
        see it and fix it; subsequent calls retry.
     """
     workflows_dir = Path(workflows_dir)
     workflows_dir.mkdir(parents=True, exist_ok=True)
-    db = ContractsDB(workflows_dir / "contracts.db")
+    db = ContractsDB(_resolve_db_path(workflows_dir))
     migrated_dir = workflows_dir / "migrated"
 
     for path in sorted(workflows_dir.iterdir()):
@@ -284,7 +319,7 @@ def ensure_initialized(workflows_dir: Path) -> None:
             continue
         if path.suffix not in (".yaml", ".yml"):
             continue
-        if path.name == "contracts.db":
+        if path.name in (_LEGACY_DB_FILENAME, _DB_FILENAME):
             continue
         name = path.stem
         try:
@@ -309,7 +344,7 @@ class ContractStore:
     the CLI, so the "YAML vs DB read/write" decision lives in exactly
     one place.
 
-    Backed by the SQLite store at `<workflows_dir>/contracts.db` plus
+    Backed by the SQLite store at `<workflows_dir>/workflows.db` plus
     the YAML files in that directory:
 
       - **writes** (put / archive / restore / hard_delete) go to the DB;
@@ -319,11 +354,18 @@ class ContractStore:
       - `ensure_initialized()` is the explicit, idempotent migration that
         imports leftover YAMLs into the DB. It is the only operation that
         moves files.
+
+    First-construction also performs a one-time rename of any legacy
+    `contracts.db` to `workflows.db` (the new canonical name).
     """
 
     def __init__(self, workflows_dir: Path) -> None:
         self.workflows_dir = Path(workflows_dir)
-        self.db = ContractsDB(self.workflows_dir / "contracts.db")
+        # Migration runs even when the dir doesn't exist yet — _resolve
+        # is a no-op when there's nothing to rename.
+        self.workflows_dir.mkdir(parents=True, exist_ok=True)
+        db_path = _resolve_db_path(self.workflows_dir)
+        self.db = ContractsDB(db_path)
 
     # -------------------------------------------------------- migration
 

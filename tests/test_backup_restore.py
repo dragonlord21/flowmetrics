@@ -37,14 +37,14 @@ def _make_tiny_warehouse(root: Path) -> None:
     (runs / "manifest.json").write_text(json.dumps({"items_fetched": 7}))
 
 
-def _make_tiny_contracts_db(contracts_dir: Path) -> None:
+def _make_tiny_workflows_db(contracts_dir: Path) -> None:
     """Synthesise a SQLite contracts.db with the schema flowmetrics
     uses — a single contracts table with one row. Enough for the
     backup helper to copy + the restore round-trip to verify
     byte-for-byte equality."""
     import sqlite3
     contracts_dir.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(contracts_dir / "contracts.db")
+    con = sqlite3.connect(contracts_dir / "workflows.db")
     try:
         con.executescript("""
             CREATE TABLE contracts (
@@ -297,7 +297,7 @@ class TestContractsDbBackup:
         data.mkdir()
         _make_tiny_warehouse(data)
         contracts = tmp_path / "contracts"
-        _make_tiny_contracts_db(contracts)
+        _make_tiny_workflows_db(contracts)
         out = tmp_path / "backup.tar.gz"
 
         res = CliRunner().invoke(cli, [
@@ -312,7 +312,7 @@ class TestContractsDbBackup:
             names = tar.getnames()
         # Config namespace lives under `_config/` (mirrors the
         # `_backups/` + `_status/` underscore-prefix convention).
-        assert any(n == "_config/contracts.db" for n in names), names
+        assert any(n == "_config/workflows.db" for n in names), names
 
     def test_backup_without_workflows_dir_omits_config(self, tmp_path):
         """No --workflows-dir → backup carries only the data warehouse
@@ -340,7 +340,7 @@ class TestContractsDbBackup:
         data.mkdir()
         _make_tiny_warehouse(data)
         contracts = tmp_path / "contracts"
-        _make_tiny_contracts_db(contracts)
+        _make_tiny_workflows_db(contracts)
 
         out = tmp_path / "backup.tar.gz"
         CliRunner().invoke(cli, [
@@ -361,8 +361,8 @@ class TestContractsDbBackup:
         assert res.exit_code == 0, res.output
 
         # Restored contracts.db has the same rows as the source.
-        src = sqlite3.connect(contracts / "contracts.db")
-        dst = sqlite3.connect(restored_contracts / "contracts.db")
+        src = sqlite3.connect(contracts / "workflows.db")
+        dst = sqlite3.connect(restored_contracts / "workflows.db")
         try:
             src_rows = src.execute(
                 "SELECT id, yaml, created_at FROM contracts ORDER BY id"
@@ -389,12 +389,12 @@ class TestContractsDbBackup:
         data.mkdir()
         _make_tiny_warehouse(data)
         contracts = tmp_path / "contracts"
-        _make_tiny_contracts_db(contracts)
+        _make_tiny_workflows_db(contracts)
 
         # Open a long-lived writer connection (simulating the live
         # server). With a raw `shutil.copy` this would race; with
         # the online backup API it's safe.
-        live = sqlite3.connect(contracts / "contracts.db")
+        live = sqlite3.connect(contracts / "workflows.db")
         try:
             live.execute("BEGIN")
             live.execute(
@@ -424,7 +424,7 @@ class TestContractsDbBackup:
             "--workflows-dir", str(restored),
             "--config-only",
         ], catch_exceptions=False)
-        dst = sqlite3.connect(restored / "contracts.db")
+        dst = sqlite3.connect(restored / "workflows.db")
         try:
             ids = [r[0] for r in dst.execute("SELECT id FROM contracts").fetchall()]
         finally:
@@ -443,7 +443,7 @@ class TestSelectiveRestore:
         data.mkdir()
         _make_tiny_warehouse(data)
         contracts = tmp_path / "contracts"
-        _make_tiny_contracts_db(contracts)
+        _make_tiny_workflows_db(contracts)
         out = tmp_path / "backup.tar.gz"
         CliRunner().invoke(cli, [
             "backup",
@@ -470,7 +470,7 @@ class TestSelectiveRestore:
         # Warehouse files landed
         assert any(target_data.rglob("items-run1.parquet"))
         # Config file did NOT
-        assert not (target_contracts / "contracts.db").exists()
+        assert not (target_contracts / "workflows.db").exists()
 
     def test_config_only_skips_data(self, tmp_path):
         backup_path, _, _ = self._make_backup(tmp_path)
@@ -487,7 +487,7 @@ class TestSelectiveRestore:
         assert res.exit_code == 0, res.output
 
         # Config file landed
-        assert (target_contracts / "contracts.db").exists()
+        assert (target_contracts / "workflows.db").exists()
         # Warehouse files did NOT
         assert not any(target_data.rglob("*.parquet"))
 
@@ -505,7 +505,7 @@ class TestSelectiveRestore:
         assert res.exit_code == 0, res.output
 
         assert any(target_data.rglob("items-run1.parquet"))
-        assert (target_contracts / "contracts.db").exists()
+        assert (target_contracts / "workflows.db").exists()
 
     def test_data_only_and_config_only_are_mutually_exclusive(self, tmp_path):
         backup_path, _, _ = self._make_backup(tmp_path)
@@ -522,7 +522,7 @@ class TestSelectiveRestore:
         assert "data-only" in res.output.lower() or "config-only" in res.output.lower()
 
     def test_config_only_against_data_only_backup_is_an_error(self, tmp_path):
-        """If the tarball never carried a `_config/contracts.db` (a
+        """If the tarball never carried a `_config/workflows.db` (a
         legacy data-only backup), `--config-only` has nothing to
         restore — surface that to the operator instead of silently
         succeeding."""

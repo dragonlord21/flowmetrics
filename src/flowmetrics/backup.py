@@ -49,7 +49,10 @@ _HEADER_NAME = "flowmetrics-backup.json"
 # the existing `_backups/` + `_status/` convention and guarantees
 # no collision with a real warehouse subdirectory.
 _CONFIG_PREFIX = "_config/"
-_CONFIG_DB_RELPATH = f"{_CONFIG_PREFIX}contracts.db"
+_CONFIG_DB_RELPATH = f"{_CONFIG_PREFIX}workflows.db"
+# Legacy backups (made before the rename) carry the DB at
+# `_config/contracts.db`. Restore extracts that filename as-is;
+# the next ContractStore init auto-renames it to workflows.db.
 
 # Header schema URI — bumped on any breaking change to the layout.
 SCHEMA_URI = "flowmetrics.backup.v1"
@@ -161,11 +164,21 @@ def _snapshot_sqlite(src: Path) -> bytes:
 
 def _collect_config_payload(contracts_dir: Path | None) -> dict[str, bytes]:
     """Snapshot any config DBs under `contracts_dir` worth including.
-    Today: just `contracts.db`. Returns {tarball-relpath: bytes}."""
+    Today: just `workflows.db`. Returns {tarball-relpath: bytes}.
+
+    Performs the one-time legacy filename rename inline (rather than
+    constructing ContractStore, which would open a connection and
+    fight with a live writer). `_resolve_db_path` is the canonical
+    rename helper and does not open the DB.
+    """
     if contracts_dir is None:
         return {}
+    from .contracts_db import _resolve_db_path
+    # Idempotent file-system rename; safe even if a concurrent server
+    # has the new file open (we don't touch the DB itself here).
+    contracts_dir.mkdir(parents=True, exist_ok=True)
+    src = _resolve_db_path(contracts_dir)
     out: dict[str, bytes] = {}
-    src = contracts_dir / "contracts.db"
     if src.exists():
         out[_CONFIG_DB_RELPATH] = _snapshot_sqlite(src)
     return out

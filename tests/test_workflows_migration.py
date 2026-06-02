@@ -32,7 +32,7 @@ class TestEnsureInitialized:
 
         ensure_initialized(workflows)
 
-        db = ContractsDB(workflows / "contracts.db")
+        db = ContractsDB(workflows / "workflows.db")
         ids = {c.name for c in db.list()}
         assert ids == {"alpha", "beta"}
 
@@ -62,7 +62,7 @@ class TestEnsureInitialized:
         # Run a second time — no YAMLs in the top-level dir now.
         ensure_initialized(workflows)
         # DB unchanged, no errors.
-        db = ContractsDB(workflows / "contracts.db")
+        db = ContractsDB(workflows / "workflows.db")
         assert [c.name for c in db.list()] == ["alpha"]
 
     def test_yaml_in_dir_after_first_run_imports_on_re_run(self, tmp_path):
@@ -74,7 +74,7 @@ class TestEnsureInitialized:
         # User drops a new YAML in later. Next call picks it up.
         _write_yaml(workflows, "gamma")
         ensure_initialized(workflows)
-        db = ContractsDB(workflows / "contracts.db")
+        db = ContractsDB(workflows / "workflows.db")
         assert {c.name for c in db.list()} == {"alpha", "gamma"}
 
     def test_existing_row_not_overwritten_if_yaml_returns(self, tmp_path):
@@ -87,7 +87,7 @@ class TestEnsureInitialized:
         workflows.mkdir()
         _write_yaml(workflows, "alpha", label="from-yaml")
         ensure_initialized(workflows)
-        db = ContractsDB(workflows / "contracts.db")
+        db = ContractsDB(workflows / "workflows.db")
         # User edits the DB row through the API (simulated here).
         from flowmetrics.contract import Contract
         c = db.get("alpha")
@@ -110,7 +110,7 @@ class TestEnsureInitialized:
         # Missing source: → contract parse fails.
         (workflows / "bad.yaml").write_text("contract: {name: bad}\n")
         ensure_initialized(workflows)
-        db = ContractsDB(workflows / "contracts.db")
+        db = ContractsDB(workflows / "workflows.db")
         assert [c.name for c in db.list()] == ["good"]
         # Bad YAML left where it was so the user can see it.
         assert (workflows / "bad.yaml").exists()

@@ -239,7 +239,7 @@ class TestSlice1Acceptance:
         name = "astral-uv-week"
 
         ensure_initialized(contracts_dir)
-        db = ContractsDB(contracts_dir / "contracts.db")
+        db = ContractsDB(contracts_dir / "workflows.db")
         db.put(
             parse_contract_text(
                 "contract:\n"
