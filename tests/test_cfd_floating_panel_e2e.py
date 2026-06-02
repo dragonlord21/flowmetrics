@@ -87,7 +87,7 @@ def server_url(tmp_path_factory):
     (contracts_dir / f"{name}.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": name,
                     "source": "github",
                     "repo": "astral-sh/uv",

@@ -13,7 +13,7 @@ The CFD invariants this preserves:
       adjacent pair (so the bands never cross).
 
 `infer_stage_order` is the pairwise-precedence resolver used when
-no contract YAML pins the workflow.
+no workflow YAML pins the workflow.
 """
 
 from __future__ import annotations

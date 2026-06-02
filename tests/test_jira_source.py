@@ -1,6 +1,6 @@
 """Behavioural spec for the Jira REST source.
 
-Contract:
+Workflow:
 - `JiraSource.fetch_completed_in_window(start, stop)` returns a list of
   WorkItem.
 - Each issue's `item_id` is the Jira key (e.g. "BIGTOP-4525").

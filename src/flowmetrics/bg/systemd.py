@@ -2,7 +2,7 @@
 
 Hides systemctl mechanics behind two verbs that mirror the launchd
 side (`install_and_start`, `stop_and_uninstall`). `render_serve_unit`
-is the pure render function — extracted so the unit contract is
+is the pure render function — extracted so the unit workflow is
 testable without systemd present.
 
 User-level by default (`~/.config/systemd/user/`). No root, no

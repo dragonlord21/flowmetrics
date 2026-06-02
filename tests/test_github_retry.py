@@ -5,7 +5,7 @@ example: huggingface/transformers returned 504 during a 30-day fetch).
 We retry transient failures up to `max_retries` times with exponential
 backoff. Persistent failures still propagate.
 
-Contract:
+Workflow:
 1. Successful request → no retry needed.
 2. 504 / 503 / 502 / 500 followed by success → returns the success.
 3. All attempts fail → raises after `max_retries`.

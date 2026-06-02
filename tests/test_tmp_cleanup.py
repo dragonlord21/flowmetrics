@@ -46,8 +46,8 @@ class TestCleanupTmpFiles:
         pq = tmp_path / "work_items" / "items-keep.parquet"
         pq.parent.mkdir(parents=True)
         pq.write_text("snapshot data")
-        yml = tmp_path / "contract.yaml"
-        yml.write_text("contract: {}")
+        yml = tmp_path / "workflow.yaml"
+        yml.write_text("workflow: {}")
         _age(pq, timedelta(days=365))
         _age(yml, timedelta(days=365))
         cleanup_tmp_files(tmp_path, now=datetime.now(UTC))

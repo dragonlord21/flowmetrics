@@ -7,7 +7,7 @@ are walked into a sequence of mutually-exclusive ``StatusInterval``s
 that the rest of the pipeline already understands.
 
 See ``docs/SPEC-github-labels.md`` for the determination rule and the
-signal-quality contract.
+signal-quality workflow.
 """
 
 from __future__ import annotations

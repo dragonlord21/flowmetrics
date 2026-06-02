@@ -7,10 +7,10 @@
 
    Required context:
      data            — WorkItemsTableData
-     contract.name   — for building per-item links
+     workflow.name   — for building per-item links
 #}
 <div id="work-items" class="work-items"
-     data-contract="{{ contract.name }}">
+     data-workflow="{{ workflow.name }}">
   <div class="work-items-controls">
     {# Hidden inputs survive HTMX swaps (they live outside the
        swap target) and HTMX serialises them into every search/
@@ -34,7 +34,7 @@
            value="{{ data.q }}"
            placeholder="Filter by title…"
            autocomplete="off"
-           hx-get="{{ ('/api/internal/work-items?workflow=' ~ contract.name ~ '&sort=' ~ data.sort ~ '&direction=' ~ data.direction ~ '&page=1') | keep_filters }}"
+           hx-get="{{ ('/api/internal/work-items?workflow=' ~ workflow.name ~ '&sort=' ~ data.sort ~ '&direction=' ~ data.direction ~ '&page=1') | keep_filters }}"
            hx-target="#work-items-body"
            hx-swap="innerHTML"
            hx-include="#work-items-completed-on, #work-items-in-flight-at, #ptile-min, #ptile-max"

@@ -5,7 +5,7 @@
 #}
 {%- set chart_container_id = "aging-chart" -%}
 {%- set chart_height = 360 if mode == 'detail' else 320 -%}
-{%- set _aging_reset = '/api/internal/aging?workflow=' ~ contract.name -%}
+{%- set _aging_reset = '/api/internal/aging?workflow=' ~ workflow.name -%}
 
 <section id="aging-tile" class="metric">
   <header class="metric-header">
@@ -18,7 +18,7 @@
               title="Re-load this chart">↻ Reset</button>
       {% if mode == 'tile' %}
         <a class="details-link"
-           href="{{ ("/workflows/" ~ contract.name ~ "/metrics/aging") | keep_filters }}">Details →</a>
+           href="{{ ("/workflows/" ~ workflow.name ~ "/metrics/aging") | keep_filters }}">Details →</a>
       {% endif %}
     </div>
   </header>

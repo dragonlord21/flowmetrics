@@ -1,4 +1,4 @@
-"""UX-pass guarantees for the contract builder form.
+"""UX-pass guarantees for the workflow builder form.
 
 The builder must not leave the user guessing:
   - Required fields carry the `required` attribute AND a visible
@@ -145,7 +145,7 @@ class TestConsistentFieldStyling:
 
 class TestWarehouseEmptyStateCopy:
     def test_new_mode_hides_warehouse_suggestions(self, workspace):
-        """A brand-new contract has never materialized, so the
+        """A brand-new workflow has never materialized, so the
         'in your warehouse' suggestions group is meaningless — it's
         only rendered in edit mode."""
         contracts, data = workspace
@@ -163,7 +163,7 @@ class TestWarehouseEmptyStateCopy:
             client.put(
                 "/api/internal/workflows/alpha",
                 json={"yaml":
-                    "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"
+                    "workflow:\n  name: alpha\n  source: github\n  repo: a/b\n"
                 },
                 headers={"X-Requested-With": "fetch"},
             )

@@ -35,11 +35,11 @@ def workspace(tmp_path):
 
 
 def _seed(client, contract_id: str, label: str = "demo") -> None:
-    """Insert a contract via the public API (the canonical path)."""
+    """Insert a workflow via the public API (the canonical path)."""
     r = client.put(
         f"/api/internal/workflows/{contract_id}",
         json={"yaml":
-            f"contract:\n  name: {contract_id}\n  label: {label}\n"
+            f"workflow:\n  name: {contract_id}\n  label: {label}\n"
             "  source: github\n  repo: a/b\n"
         },
         headers={"X-Requested-With": "fetch"},
@@ -116,7 +116,7 @@ class TestArchiveEndpoint:
             ).json()
             # Reason rolls forward; archive timestamp stayed put
             # (we can't easily compare floor timestamps in this
-            # test, but the contract carries the latest reason).
+            # test, but the workflow carries the latest reason).
             assert detail["archived_reason"] == "second"
 
 

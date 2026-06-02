@@ -7,13 +7,13 @@ The slice 1 click-path the user described:
   > later, Parquet files exist under data/work_items/contract_id=…/
   > and DuckDB can SELECT count(*) and get real numbers.
 
-This test enforces that contract. It uses the existing pinned
+This test enforces that workflow. It uses the existing pinned
 GitHub fixture cache (tests/fixtures/cache/, recorded against
 astral-sh/uv for 2026-05-04..2026-05-10) so the test stays offline
-and reproducible. The contract name in the test is astral-uv-week
+and reproducible. The workflow name in the test is astral-uv-week
 because that's what the fixture covers; the user-facing example will
 be CalcMark (or whatever the operator points it at), but the
-acceptance contract — "given a valid contract, materialize writes
+acceptance workflow — "given a valid workflow, materialize writes
 queryable Parquet" — doesn't care which repo.
 
 Per SPEC.md §6 (test credibility rule) this is an e2e test: it
@@ -37,10 +37,10 @@ FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
 
 def _write_test_contract(contracts_dir: Path) -> str:
-    """Write a minimal contract YAML matching the pinned fixture cache."""
+    """Write a minimal workflow YAML matching the pinned fixture cache."""
     name = "astral-uv-week"
-    contract = {
-        "contract": {
+    workflow = {
+        "workflow": {
             "name": name,
             "source": "github",
             "repo": "astral-sh/uv",
@@ -48,7 +48,7 @@ def _write_test_contract(contracts_dir: Path) -> str:
             "stop": "2026-05-10",
         }
     }
-    (contracts_dir / f"{name}.yaml").write_text(yaml.safe_dump(contract))
+    (contracts_dir / f"{name}.yaml").write_text(yaml.safe_dump(workflow))
     return name
 
 
@@ -224,11 +224,11 @@ class TestSlice1Acceptance:
             assert key in manifest, f"missing manifest key {key!r}; have {sorted(manifest)}"
 
     def test_materialize_reads_db_stored_contract(self, tmp_path):
-        """A contract created in the web builder lives in the SQLite
+        """A workflow created in the web builder lives in the SQLite
         store, not as a YAML file on disk. `flow materialize NAME` must
         read it from the store — the Data Source page's browser-driven
         backfill spawns exactly this command, and it was failing with
-        'contract not found ... looked for NAME.yaml' for DB-only
+        'workflow not found ... looked for NAME.yaml' for DB-only
         contracts."""
         from flowmetrics.workflow import parse_workflow_text
         from flowmetrics.workflows_db import WorkflowsDB, ensure_initialized
@@ -242,7 +242,7 @@ class TestSlice1Acceptance:
         db = WorkflowsDB(contracts_dir / "workflows.db")
         db.put(
             parse_workflow_text(
-                "contract:\n"
+                "workflow:\n"
                 f"  name: {name}\n"
                 "  source: github\n"
                 "  repo: astral-sh/uv\n"
@@ -251,7 +251,7 @@ class TestSlice1Acceptance:
                 name,
             )
         )
-        # The contract exists ONLY in the DB — no YAML on disk.
+        # The workflow exists ONLY in the DB — no YAML on disk.
         assert not (contracts_dir / f"{name}.yaml").exists()
 
         result = CliRunner().invoke(
@@ -270,7 +270,7 @@ class TestSlice1Acceptance:
             catch_exceptions=False,
         )
         assert result.exit_code == 0, (
-            "materialize should read the DB-stored contract "
+            "materialize should read the DB-stored workflow "
             f"(exit={result.exit_code}):\n{result.output}"
         )
         work_items_dir = data_dir / "work_items" / f"contract_id={name}"
@@ -302,14 +302,14 @@ class TestSlice1Acceptance:
         )
         assert result.exit_code != 0
         assert "does-not-exist" in result.output, (
-            "error message should name the missing contract"
+            "error message should name the missing workflow"
         )
 
     def test_invalid_contract_yaml_exits_nonzero_with_clear_message(self, tmp_path):
         contracts_dir = tmp_path / "contracts"
         contracts_dir.mkdir()
         # Malformed YAML — unbalanced brackets
-        (contracts_dir / "broken.yaml").write_text("contract: {name: broken\n")
+        (contracts_dir / "broken.yaml").write_text("workflow: {name: broken\n")
         data_dir = tmp_path / "data"
 
         result = CliRunner().invoke(

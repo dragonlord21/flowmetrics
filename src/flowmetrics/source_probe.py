@@ -1,4 +1,4 @@
-"""Source-probe model layer for the contract builder.
+"""Source-probe model layer for the workflow builder.
 
 Everything that talks to GitHub / Jira on behalf of the builder UI
 lives here — NOT in the web layer (app.py). Keeping it in a model
@@ -128,7 +128,7 @@ def probe_source_vocab(source: str, target: dict) -> dict:
       - Jira `labels`: `/rest/api/2/project/{key}/statuses`.
       - `lifecycle_events`: curated per source (constants above).
       - `warehouse_stages`: the route fills this from the warehouse
-        when editing a materialized contract; empty here.
+        when editing a materialized workflow; empty here.
 
     Source-API failures return empty `labels` so the lifecycle +
     warehouse subsections still render.

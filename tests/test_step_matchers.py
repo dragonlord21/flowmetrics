@@ -22,7 +22,7 @@ from flowmetrics.matching import matcher_matches
 
 def _parse(steps_yaml: str, source: str = "github", target: str = "  repo: o/r\n"):
     return parse_workflow_text(
-        f"contract:\n  name: c\n  source: {source}\n{target}{steps_yaml}", "c"
+        f"workflow:\n  name: c\n  source: {source}\n{target}{steps_yaml}", "c"
     )
 
 

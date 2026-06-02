@@ -1,7 +1,7 @@
-"""E2E: the contract builder's Steps editor (Alpine component).
+"""E2E: the workflow builder's Steps editor (Alpine component).
 
 Drives the real Alpine component in Chromium with the source probes
-stubbed via `app.state` — no network. Pins the chip-binding contract:
+stubbed via `app.state` — no network. Pins the chip-binding workflow:
 
   - Suggestion chips live *inside* the step they bind to. Only the
     selected (green) row renders them, so a chip can only ever land on
@@ -175,7 +175,7 @@ class TestSaveProposesFetchData:
     def test_save_shows_a_fetch_data_panel_not_an_empty_dashboard(
         self, server_url: str, page: Page
     ):
-        """Saving a new contract only writes the definition — the
+        """Saving a new workflow only writes the definition — the
         warehouse is still empty. Instead of dropping the user on an
         empty dashboard, the builder confirms the save and offers to
         fetch data via the Data Source page (whose backfill picks the
@@ -204,9 +204,9 @@ class TestNoStepsContract:
     def test_save_a_no_steps_contract_uses_native_stages(
         self, server_url: str, page: Page
     ):
-        """Steps are optional. A contract with zero steps uses the
+        """Steps are optional. A workflow with zero steps uses the
         source's native stages (the exact intent of a plain YAML
-        contract like astral-uv-week). The builder must let you save it
+        workflow like astral-uv-week). The builder must let you save it
         without forcing a step."""
         page.goto(server_url + "/admin/workflows/new")
         page.fill("#f-name", "native-demo")

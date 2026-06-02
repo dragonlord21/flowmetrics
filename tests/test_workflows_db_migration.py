@@ -28,7 +28,7 @@ def _make_db(path: Path) -> None:
     can read it without crashing."""
     path.parent.mkdir(parents=True, exist_ok=True)
     yaml_text = (
-        "contract:\n"
+        "workflow:\n"
         "  name: astral-uv\n"
         "  source: github\n"
         "  repo: astral-sh/uv\n"

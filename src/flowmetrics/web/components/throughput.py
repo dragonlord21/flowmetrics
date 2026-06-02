@@ -72,7 +72,7 @@ def _throughput_to_vega(model: ThroughputModel) -> dict[str, Any]:
         "title": "Completion date (UTC)",
         "labelAngle": 0,
         # `utcFormat` (not `timeFormat`) renders the date ignoring
-        # browser TZ — same TZ-safety contract the tooltip
+        # browser TZ — same TZ-safety workflow the tooltip
         # nominal-pre-format idiom enforces.
         "labelExpr": "utcFormat(datetime(datum.value), '%b %d')",
     }

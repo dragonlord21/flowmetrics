@@ -1,24 +1,24 @@
 """`flow materialize --since/--until` for targeted backfills.
 
-The contract YAML defines a default fetch window (start / stop).
+The workflow YAML defines a default fetch window (start / stop).
 Operators sometimes need to backfill a specific range without
 editing the YAML — e.g., the aging page's empty-state message
 suggests `flow materialize <name> --since X --until Y` to fill a
 coverage gap. These tests pin the CLI surface and the override
 semantics:
 
-  - `--since` and `--until` are optional. Omitted → contract
+  - `--since` and `--until` are optional. Omitted → workflow
     window applies (existing behavior).
   - Either may be set independently. Setting just one overrides
-    that endpoint; the other keeps the contract default.
+    that endpoint; the other keeps the workflow default.
   - Both expect ISO `YYYY-MM-DD` (UTC). Invalid → exit non-zero
     with a clear message.
   - When set, the materialize step calls
     `source.fetch_completed_in_window(since, until)` with the
-    overrides, NOT the contract's start/stop.
+    overrides, NOT the workflow's start/stop.
 
 The override doesn't mutate the YAML; it's a per-invocation
-window applied to the same Contract config.
+window applied to the same Workflow config.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ def _make_contracts_dir(tmp: Path) -> Path:
     (contracts_dir / "demo.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "demo",
                     "source": "github",
                     "repo": "astral-sh/uv",
@@ -58,9 +58,9 @@ def _make_contracts_dir(tmp: Path) -> Path:
 
 def _capture(captured: dict):
     """Replacement for `materialize.materialize` that records the
-    Contract it was called with and returns a stub manifest. The
+    Workflow it was called with and returns a stub manifest. The
     CLI's only side effect we care about for these tests is the
-    contract it produced — the fetch + Parquet write is the
+    workflow it produced — the fetch + Parquet write is the
     materialize unit's responsibility, separately tested."""
 
     from datetime import UTC
@@ -68,11 +68,11 @@ def _capture(captured: dict):
 
     from flowmetrics.materialize import RunManifest
 
-    def stub(*, contract, data_dir, cache_dir, offline):
-        captured["contract"] = contract
+    def stub(*, workflow, data_dir, cache_dir, offline):
+        captured["workflow"] = workflow
         return RunManifest(
             run_id="test",
-            contract_id=contract.name,
+            contract_id=workflow.name,
             started_at=_dt.now(UTC),
             completed_at=_dt.now(UTC),
             items_fetched=0,
@@ -104,7 +104,7 @@ class TestSinceUntilFlags:
                 catch_exceptions=False,
             )
         assert res.exit_code == 0, res.output
-        c = captured["contract"]
+        c = captured["workflow"]
         assert c.start == date(2026, 5, 4)
         assert c.stop == date(2026, 5, 10)
 
@@ -130,7 +130,7 @@ class TestSinceUntilFlags:
                 catch_exceptions=False,
             )
         assert res.exit_code == 0, res.output
-        c = captured["contract"]
+        c = captured["workflow"]
         assert c.start == date(2026, 5, 6), (
             f"--since should override start; got {c.start}"
         )
@@ -158,7 +158,7 @@ class TestSinceUntilFlags:
                 catch_exceptions=False,
             )
         assert res.exit_code == 0, res.output
-        c = captured["contract"]
+        c = captured["workflow"]
         assert c.start == date(2026, 5, 4)
         assert c.stop == date(2026, 5, 8)
 
@@ -185,7 +185,7 @@ class TestSinceUntilFlags:
                 catch_exceptions=False,
             )
         assert res.exit_code == 0, res.output
-        c = captured["contract"]
+        c = captured["workflow"]
         assert c.start == date(2026, 5, 6)
         assert c.stop == date(2026, 5, 8)
 

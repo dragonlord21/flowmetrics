@@ -21,7 +21,7 @@ def client(tmp_path):
     with TestClient(app) as c:
         c.put(
             "/api/internal/workflows/alpha",
-            json={"yaml": "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"},
+            json={"yaml": "workflow:\n  name: alpha\n  source: github\n  repo: a/b\n"},
             headers={"X-Requested-With": "fetch"},
         )
         yield c

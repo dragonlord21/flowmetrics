@@ -21,7 +21,7 @@
         work-items request returns with HX-Trigger: ptile-changed;
         the chart reads the current bounds out of #work-items-state
         and swaps its own outerHTML with the filtered fragment. #}
-     hx-get="/api/internal/aging?workflow={{ contract.name }}"
+     hx-get="/api/internal/aging?workflow={{ workflow.name }}"
      hx-trigger="flowmetrics:ptile-changed from:body"
      hx-swap="outerHTML"
      hx-vals='js:{
@@ -34,7 +34,7 @@
     {# Empty states. The headline names the gap; the action is
        always the Data Source page — browser-based backfill, no
        CLI. #}
-    {%- set ds_link = "/workflows/" ~ contract.name ~ "/data-source" -%}
+    {%- set ds_link = "/workflows/" ~ workflow.name ~ "/data-source" -%}
     {% if data.empty_state == "asof_after_coverage" %}
       <div class="aging-empty aging-empty--gap">
         <p class="aging-empty-headline">
@@ -123,7 +123,7 @@
         // Carry the current view/reference window into the
         // item page so the filter persists across navigation.
         window.location.href =
-          "/workflows/{{ contract.name }}/items/" +
+          "/workflows/{{ workflow.name }}/items/" +
           encodeURIComponent(cleanId) + window.location.search;
       });
     }).catch(function (err) {

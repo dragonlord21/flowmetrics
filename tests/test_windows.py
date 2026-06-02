@@ -13,7 +13,7 @@ bar emits a `period` choice, `parse_windows` resolves it into a
     strands the percentile sample.
 
 This suite uses raw query dicts on purpose: it IS the test of
-the `?period=` / `?anchor=` / `?ref_days=` param contract.
+the `?period=` / `?anchor=` / `?ref_days=` param workflow.
 Both windows are inclusive on both endpoints.
 """
 

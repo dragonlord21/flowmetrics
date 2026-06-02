@@ -9,7 +9,7 @@ returns three categories of suggestions for the Steps editor:
   - `lifecycle_events`: curated source-native lifecycle chips
     ("PR opened", "Marked ready for review", "Issue resolved", …).
   - `warehouse_stages`: distinct stage names already observed in
-    the materialized transitions for this contract.
+    the materialized transitions for this workflow.
 
 Each chip carries a sensible WIP default so a one-click add
 lands a step row that's likely close to right.

@@ -1,7 +1,7 @@
 """C5 — Dry-run preview against the live source.
 
 `POST /api/internal/workflows/_dry-run` takes the in-progress
-contract payload + `{since, items_cap}` and returns items bucketed
+workflow payload + `{since, items_cap}` and returns items bucketed
 per the user's steps — without persisting anything to the
 warehouse.
 
@@ -33,14 +33,14 @@ def workspace(tmp_path):
 
 
 def _payload(steps, source="github", repo="owner/repo"):
-    contract = {"name": "tmp", "source": source}
+    workflow = {"name": "tmp", "source": source}
     if source == "github":
-        contract["repo"] = repo
+        workflow["repo"] = repo
     else:
-        contract["jira_url"] = "https://j.example.com"
-        contract["jira_project"] = "X"
-    contract["steps"] = steps
-    return {"contract": contract, "since": "2026-04-01", "items_cap": 200}
+        workflow["jira_url"] = "https://j.example.com"
+        workflow["jira_project"] = "X"
+    workflow["steps"] = steps
+    return {"workflow": workflow, "since": "2026-04-01", "items_cap": 200}
 
 
 def _post(client, payload, mock_fetch=None):

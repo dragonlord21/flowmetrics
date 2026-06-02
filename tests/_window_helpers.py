@@ -3,7 +3,7 @@ so higher-level tests don't hardcode URL param names. A param
 rename then touches this one place, not every test.
 
 (The low-level `test_windows` suite deliberately uses raw dicts
-— it IS the test of the param contract.)
+— it IS the test of the param workflow.)
 """
 
 from __future__ import annotations

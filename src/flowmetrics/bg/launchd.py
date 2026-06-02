@@ -8,7 +8,7 @@ Hides launchctl mechanics behind two verbs:
   - `stop_and_uninstall(…)` → bootout + remove the plist. Idempotent.
 
 `render_serve_plist(…)` is a pure function returning the plist XML —
-extracted so we can unit-test the contract with launchd without
+extracted so we can unit-test the workflow with launchd without
 needing launchd to run.
 
 Why not just shell out to the templated `com.flowmetrics.serve.plist`

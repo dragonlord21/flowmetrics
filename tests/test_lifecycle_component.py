@@ -6,7 +6,7 @@ written by `flow materialize`) plus the item's `work_items` row
 (for title + URL), and returns a typed payload the Jinja partial
 renders as a Vega-Lite timeline.
 
-The contract:
+The workflow:
 
   - Identity: (contract_id, source, item_id) selects exactly one item.
     Missing identity → ItemNotFound (component layer; route maps to 404).
@@ -45,7 +45,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     (contracts_dir / "astral-uv-week.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "astral-uv-week",
                     "source": "github",
                     "repo": "astral-sh/uv",

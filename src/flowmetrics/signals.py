@@ -63,7 +63,7 @@ SIGNAL_JIRA_RESOLVED = "jira-resolved"
 # ----------------------------------------------------------------------
 # Step-matcher event codes.
 #
-# A contract step can match on a lifecycle `event`. Users (and
+# A workflow step can match on a lifecycle `event`. Users (and
 # hand-edited YAML) reference the event by a short, source-scoped code
 # rather than the verbose signal string — `pr-ready`, not
 # `github-pr-ready-for-review`. These maps are the single source of

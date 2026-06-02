@@ -1,6 +1,6 @@
 """Behavioural spec for the CLI --format flag.
 
-Contract:
+Workflow:
 1. Default format is `text` (human-readable).
 2. `--format json` emits structured JSON on stdout. Exit code 0.
 3. `--format html` writes a single .html file and prints "Wrote PATH".

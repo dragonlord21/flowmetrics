@@ -334,7 +334,7 @@
         Steps are <strong>optional</strong>. With none, this workflow
         uses the source's <strong>native stages</strong> (e.g. GitHub's
         PR lifecycle, or Jira statuses) — leave them blank to mirror a
-        plain contract. Add steps only to define your own workflow: a
+        plain workflow. Add steps only to define your own workflow: a
         step captures items whose source stage matches its name; add
         chips to map other labels / statuses / events. Toggle WIP per
         step.
@@ -516,7 +516,7 @@
     <p class="wizard-errors" x-text="errors"></p>
   </form>
 
-  {# Post-save: the contract is defined but the warehouse is empty. Send
+  {# Post-save: the workflow is defined but the warehouse is empty. Send
      the user to the Data Source page to fetch data (its backfill picks
      the date range), rather than dropping them on an empty dashboard. #}
   <div class="saved-panel" x-show="saved" x-cloak>
@@ -597,7 +597,7 @@
         return this.steps[this.steps.length - 1].name.trim() !== '';
       },
       get canDryRun() { return this.sourceVerified && this.steps.length > 0; },
-      // Steps are optional: a contract with no steps uses the source's
+      // Steps are optional: a workflow with no steps uses the source's
       // native stages. Save needs only a valid routing id + a reachable
       // source.
       get canSave() { return this.nameOk && this.sourceVerified; },
@@ -755,7 +755,7 @@
       },
       buildYaml() {
         const q = (s) => JSON.stringify(s);
-        const lines = ['contract:', `  name: ${this.name}`];
+        const lines = ['workflow:', `  name: ${this.name}`];
         if (this.label) lines.push(`  label: ${q(this.label)}`);
         lines.push(`  source: ${this.source}`);
         if (this.source === 'github' && this.repo) lines.push(`  repo: ${this.repo}`);
@@ -791,7 +791,7 @@
         this.dryStatus = 'Running…'; this.dryClass = 'probe-status';
         const r = await fetch('/api/internal/workflows/_dry-run', {
           method: 'POST', headers: HEADERS,
-          body: JSON.stringify({ contract: this._contractBody(), since: this.drySince, items_cap: 200 }),
+          body: JSON.stringify({ workflow: this._contractBody(), since: this.drySince, items_cap: 200 }),
         });
         const body = await r.json();
         this.dryResults = body.per_step || [];
@@ -853,7 +853,7 @@
           add(p.states.wip, true);
           add(p.states.done, false);
         }
-        // The contract was saved with a working source; trust it so the
+        // The workflow was saved with a working source; trust it so the
         // steps stay editable even if the network probe is flaky right now.
         this.sourceVerified = this.sourceComplete;
         if (this.steps.length) this.activeIdx = 0;

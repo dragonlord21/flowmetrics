@@ -1,4 +1,4 @@
-"""End-to-end (offline): a typed-matcher contract materializes so the
+"""End-to-end (offline): a typed-matcher workflow materializes so the
 warehouse transitions carry the user's STEP names, not the adapter's raw
 stages (#2 slice E).
 
@@ -20,7 +20,7 @@ from flowmetrics.workflow import parse_workflow_text
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
-_YAML = """contract:
+_YAML = """workflow:
   name: uv-typed
   source: github
   repo: astral-sh/uv

@@ -6,7 +6,7 @@
      data           — CfdModel (rendered to a spec via the
                       `vega_spec` Jinja global)
      chart_height   — int pixels (~320 for tile, ~440 for detail)
-     contract.name  — for any back-links
+     workflow.name  — for any back-links
 #}
 {%- set chart_container_id = "cfd-chart" -%}
 {%- set _h = chart_height|default(320) -%}

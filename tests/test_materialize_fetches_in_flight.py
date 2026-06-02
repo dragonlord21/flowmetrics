@@ -20,7 +20,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from flowmetrics.compute import WorkItem
-from flowmetrics.workflow import Contract
+from flowmetrics.workflow import Workflow
 from flowmetrics.materialize import materialize
 
 
@@ -41,7 +41,7 @@ class TestMaterializeFetchesInFlight:
     def test_both_fetch_methods_are_called(self, tmp_path: Path):
         """Pin the call shape: materialize hits BOTH fetch_completed
         and fetch_in_flight on every run."""
-        contract = Contract(
+        workflow = Workflow(
             name="demo",
             source="github",
             repo="x/y",
@@ -58,21 +58,21 @@ class TestMaterializeFetchesInFlight:
             return_value=mock_source,
         ):
             materialize(
-                contract=contract,
+                workflow=workflow,
                 data_dir=tmp_path / "data",
                 cache_dir=tmp_path / "cache",
                 offline=False,
             )
 
         mock_source.fetch_completed_in_window.assert_called_once_with(
-            contract.start, contract.stop
+            workflow.start, workflow.stop
         )
         mock_source.fetch_in_flight.assert_called_once()
 
     def test_in_flight_items_appear_in_warehouse(self, tmp_path: Path):
         """End-to-end: after materialize, the work_items Parquet
         contains rows where `completed_at IS NULL` (in-flight)."""
-        contract = Contract(
+        workflow = Workflow(
             name="demo",
             source="github",
             repo="x/y",
@@ -100,7 +100,7 @@ class TestMaterializeFetchesInFlight:
             return_value=mock_source,
         ):
             materialize(
-                contract=contract,
+                workflow=workflow,
                 data_dir=tmp_path / "data",
                 cache_dir=tmp_path / "cache",
                 offline=False,
@@ -132,7 +132,7 @@ class TestMaterializeFetchesInFlight:
         time. The `cycle_time_days` column must be NULL for them
         (matters for downstream percentile filters that look for
         IS NOT NULL)."""
-        contract = Contract(
+        workflow = Workflow(
             name="demo",
             source="github",
             repo="x/y",
@@ -152,7 +152,7 @@ class TestMaterializeFetchesInFlight:
             return_value=mock_source,
         ):
             materialize(
-                contract=contract,
+                workflow=workflow,
                 data_dir=tmp_path / "data",
                 cache_dir=tmp_path / "cache",
                 offline=False,

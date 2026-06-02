@@ -11,7 +11,7 @@
      data           — ThroughputModel (rendered to a spec via the
                       `vega_spec` Jinja global)
      chart_height   — int pixels (~280 for tile, ~440 for detail)
-     contract.name  — used to build the work-items endpoint URL
+     workflow.name  — used to build the work-items endpoint URL
 #}
 {%- set chart_container_id = "throughput-chart" -%}
 {%- set _h = chart_height|default(280) -%}
@@ -23,7 +23,7 @@
       <strong class="aging-empty-headline">No completed items in this window.</strong>
       <span class="aging-empty-sub">
         Widen the view window using the controls above, or
-        <a href="/workflows/{{ contract.name }}/data-source">backfill more data</a>.
+        <a href="/workflows/{{ workflow.name }}/data-source">backfill more data</a>.
       </span>
     </p>
   {% endif %}
@@ -67,10 +67,10 @@
         const wrap = document.getElementById("work-items");
         if (!filterInput || !body || !wrap) return;
         filterInput.value = item.datum.date_iso;
-        const contract = wrap.dataset.contract || "{{ contract.name }}";
+        const workflow = wrap.dataset.workflow || "{{ workflow.name }}";
         let url = (
           "/api/internal/work-items?workflow=" +
-          encodeURIComponent(contract) +
+          encodeURIComponent(workflow) +
           "&completed_on=" + encodeURIComponent(item.datum.date_iso)
         );
         // Preserve the table's current sort + direction AND the

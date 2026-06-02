@@ -7,7 +7,7 @@
 #   flow materialize <your-name> --workflows-dir contracts --data-dir data
 #   flow serve --workflows-dir contracts --data-dir data
 
-contract:
+workflow:
   name: astral-uv-week
   label: Astral uv (PRs)
   source: github

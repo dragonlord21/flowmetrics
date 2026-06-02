@@ -1,7 +1,7 @@
 """Behavioural spec for the interpretation layer.
 
 interpret_* functions turn raw results into agent-actionable narrative.
-Contract:
+Workflow:
 
 - A non-empty `headline` that names the repo and the headline metric.
 - A `key_insight` that explains the result.

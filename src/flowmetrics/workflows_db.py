@@ -1,10 +1,10 @@
-"""SQLite-backed contract store.
+"""SQLite-backed workflow store.
 
 The DB at `<workflows-dir>/contracts.db` is server-managed: a single
 `contracts` table with columns `(id, yaml, archived_at,
-archived_reason, created_at, updated_at)`. The body of the contract
+archived_reason, created_at, updated_at)`. The body of the workflow
 lives in the `yaml` column as canonical YAML text — adding a future
-field to the Contract Pydantic model needs zero DB migration.
+field to the Workflow Pydantic model needs zero DB migration.
 
 `ensure_initialized(workflows_dir)` is the first-boot hook: it
 creates the DB, scans the workflows dir for legacy `*.yaml` /
@@ -24,14 +24,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .workflow import (
-    Contract,
+    Workflow,
     WorkflowError,
     emit_canonical_yaml,
     parse_workflow_text,
 )
 
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS contracts (
+CREATE TABLE IF NOT EXISTS workflows (
   id TEXT PRIMARY KEY,
   yaml TEXT NOT NULL,
   archived_at TEXT,
@@ -39,9 +39,48 @@ CREATE TABLE IF NOT EXISTS contracts (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS contracts_archived_at_idx
-  ON contracts(archived_at);
+CREATE INDEX IF NOT EXISTS workflows_archived_at_idx
+  ON workflows(archived_at);
 """
+
+
+def _migrate_legacy_table(con: sqlite3.Connection) -> None:
+    """One-time rename of the legacy `contracts` table → `workflows`.
+
+    Existing installs predating the SQL rename have a workflows.db
+    file (the filename rename shipped earlier) that still contains
+    a `contracts` table inside. Detect that shape on open and ALTER
+    TABLE in place so a live install survives the upgrade with no
+    operator action.
+
+    Idempotent: a fresh DB has only `workflows` and this is a no-op.
+    Defensive: BOTH tables present is operator-induced ambiguity
+    (typically: someone copied an old DB onto a new one); raise so
+    we never silently pick one.
+    """
+    rows = con.execute(
+        "SELECT name FROM sqlite_master "
+        "WHERE type='table' AND name IN ('contracts', 'workflows')"
+    ).fetchall()
+    names = {r[0] for r in rows}
+    if "contracts" in names and "workflows" in names:
+        raise WorkflowsDBError(
+            "ambiguous DB state: both `contracts` and `workflows` "
+            "tables exist in this file. Resolve manually (typically: "
+            "keep the one with the rows you want, drop the other)."
+        )
+    if "contracts" in names and "workflows" not in names:
+        con.execute("ALTER TABLE contracts RENAME TO workflows")
+        # Rename the index to follow the table; older DBs might not
+        # have one (IF NOT EXISTS in the schema) — the subsequent
+        # CREATE INDEX in _SCHEMA will create one with the new name.
+        try:
+            con.execute(
+                "ALTER INDEX contracts_archived_at_idx "
+                "RENAME TO workflows_archived_at_idx"
+            )
+        except sqlite3.OperationalError:
+            pass
 
 
 class WorkflowsDBError(Exception):
@@ -52,9 +91,9 @@ class WorkflowsDBError(Exception):
 @dataclass(frozen=True)
 class WorkflowMeta:
     """A row's wrapper carrying lifecycle metadata alongside the
-    parsed Contract object."""
+    parsed Workflow object."""
 
-    contract: Contract
+    workflow: Workflow
     yaml: str                # canonical YAML text as stored
     created_at: str
     updated_at: str
@@ -64,8 +103,8 @@ class WorkflowMeta:
     @property
     def name(self) -> str:
         """Routing-id shortcut so callers that just want the id can
-        write `meta.name` instead of `meta.contract.name`."""
-        return self.contract.name
+        write `meta.name` instead of `meta.workflow.name`."""
+        return self.workflow.name
 
 
 class WorkflowsDB:
@@ -80,6 +119,7 @@ class WorkflowsDB:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as con:
+            _migrate_legacy_table(con)
             con.executescript(_SCHEMA)
 
     # ------------------------------------------------------------ helpers
@@ -94,9 +134,9 @@ class WorkflowsDB:
         return datetime.now(UTC).isoformat()
 
     def _row_to_meta(self, row: sqlite3.Row) -> WorkflowMeta:
-        contract = parse_workflow_text(row["yaml"], row["id"])
+        workflow = parse_workflow_text(row["yaml"], row["id"])
         return WorkflowMeta(
-            contract=contract,
+            workflow=workflow,
             yaml=row["yaml"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -106,55 +146,55 @@ class WorkflowsDB:
 
     # ------------------------------------------------------------ CRUD
 
-    def put(self, contract: Contract) -> None:
-        """Upsert the contract.
+    def put(self, workflow: Workflow) -> None:
+        """Upsert the workflow.
 
           - New id → INSERT live row (created_at = updated_at = now).
           - Existing LIVE id → UPDATE (keep created_at, bump
             updated_at).
           - Existing ARCHIVED id → REFUSE with a clear error.
-            The user wants a fresh contract with that name;
+            The user wants a fresh workflow with that name;
             archive + new-with-same-id collision needs an explicit
             decision (restore the old or hard-delete it first), not
             silent resurrection.
         """
-        yaml_text = emit_canonical_yaml(contract)
+        yaml_text = emit_canonical_yaml(workflow)
         now = self._now()
         with self._connect() as con:
             existing = con.execute(
-                "SELECT created_at, archived_at FROM contracts "
+                "SELECT created_at, archived_at FROM workflows "
                 "WHERE id = ?",
-                (contract.name,),
+                (workflow.name,),
             ).fetchone()
             if existing is None:
                 con.execute(
-                    "INSERT INTO contracts "
+                    "INSERT INTO workflows "
                     "(id, yaml, created_at, updated_at) "
                     "VALUES (?, ?, ?, ?)",
-                    (contract.name, yaml_text, now, now),
+                    (workflow.name, yaml_text, now, now),
                 )
             elif existing["archived_at"] is not None:
                 raise WorkflowsDBError(
-                    f"a contract with id {contract.name!r} is "
+                    f"a workflow with id {workflow.name!r} is "
                     "archived. Restore it (or hard-delete it) "
-                    "before creating a new contract with the "
+                    "before creating a new workflow with the "
                     "same id."
                 )
             else:
                 con.execute(
-                    "UPDATE contracts SET yaml = ?, updated_at = ? "
+                    "UPDATE workflows SET yaml = ?, updated_at = ? "
                     "WHERE id = ?",
-                    (yaml_text, now, contract.name),
+                    (yaml_text, now, workflow.name),
                 )
 
-    def get(self, contract_id: str) -> Contract | None:
+    def get(self, contract_id: str) -> Workflow | None:
         meta = self.get_meta(contract_id)
-        return meta.contract if meta else None
+        return meta.workflow if meta else None
 
     def get_meta(self, contract_id: str) -> WorkflowMeta | None:
         with self._connect() as con:
             row = con.execute(
-                "SELECT * FROM contracts WHERE id = ?", (contract_id,)
+                "SELECT * FROM workflows WHERE id = ?", (contract_id,)
             ).fetchone()
             return self._row_to_meta(row) if row else None
 
@@ -162,11 +202,11 @@ class WorkflowsDB:
         with self._connect() as con:
             if include_archived:
                 rows = con.execute(
-                    "SELECT * FROM contracts ORDER BY id"
+                    "SELECT * FROM workflows ORDER BY id"
                 ).fetchall()
             else:
                 rows = con.execute(
-                    "SELECT * FROM contracts "
+                    "SELECT * FROM workflows "
                     "WHERE archived_at IS NULL ORDER BY id"
                 ).fetchall()
         return [self._row_to_meta(r) for r in rows]
@@ -179,82 +219,82 @@ class WorkflowsDB:
         captures the latest call)."""
         with self._connect() as con:
             row = con.execute(
-                "SELECT archived_at FROM contracts WHERE id = ?",
+                "SELECT archived_at FROM workflows WHERE id = ?",
                 (contract_id,),
             ).fetchone()
             if row is None:
                 raise WorkflowsDBError(
-                    f"contract {contract_id!r} not found"
+                    f"workflow {contract_id!r} not found"
                 )
             if row["archived_at"] is None:
                 con.execute(
-                    "UPDATE contracts SET archived_at = ?, "
+                    "UPDATE workflows SET archived_at = ?, "
                     "archived_reason = ?, updated_at = ? WHERE id = ?",
                     (self._now(), reason, self._now(), contract_id),
                 )
             else:
                 # Idempotent: only the reason rolls forward.
                 con.execute(
-                    "UPDATE contracts SET archived_reason = ? "
+                    "UPDATE workflows SET archived_reason = ? "
                     "WHERE id = ?",
                     (reason, contract_id),
                 )
 
     def restore(self, contract_id: str) -> None:
-        """Clears `archived_at`. Refuses if a LIVE contract with the
+        """Clears `archived_at`. Refuses if a LIVE workflow with the
         same id exists — that'd shadow the row and confuse listings."""
         with self._connect() as con:
             row = con.execute(
-                "SELECT archived_at FROM contracts WHERE id = ?",
+                "SELECT archived_at FROM workflows WHERE id = ?",
                 (contract_id,),
             ).fetchone()
             if row is None:
                 raise WorkflowsDBError(
-                    f"contract {contract_id!r} not found"
+                    f"workflow {contract_id!r} not found"
                 )
             if row["archived_at"] is None:
                 return  # already live; nothing to do
-            # Is there another live contract with the same id? In
+            # Is there another live workflow with the same id? In
             # current schema id is PRIMARY KEY so no — but a future
             # schema (e.g. versioned ids) might allow it. The
             # invariant is documented here: refuse if any LIVE
-            # contract with this id exists, ignoring the archived
+            # workflow with this id exists, ignoring the archived
             # row we're about to restore.
             collide = con.execute(
-                "SELECT 1 FROM contracts "
+                "SELECT 1 FROM workflows "
                 "WHERE id = ? AND archived_at IS NULL",
                 (contract_id,),
             ).fetchone()
             if collide is not None:
                 raise WorkflowsDBError(
-                    f"a live contract with id {contract_id!r} "
+                    f"a live workflow with id {contract_id!r} "
                     "already exists; rename it before restoring."
                 )
             con.execute(
-                "UPDATE contracts SET archived_at = NULL, "
+                "UPDATE workflows SET archived_at = NULL, "
                 "archived_reason = NULL, updated_at = ? WHERE id = ?",
                 (self._now(), contract_id),
             )
 
     def hard_delete(self, contract_id: str) -> None:
-        """Permanently delete a row. Refuses unless the contract is
+        """Permanently delete a row. Refuses unless the workflow is
         already archived (the two-step delete invariant)."""
         with self._connect() as con:
             row = con.execute(
-                "SELECT archived_at FROM contracts WHERE id = ?",
+                "SELECT archived_at FROM workflows WHERE id = ?",
                 (contract_id,),
             ).fetchone()
             if row is None:
                 raise WorkflowsDBError(
-                    f"contract {contract_id!r} not found"
+                    f"workflow {contract_id!r} not found"
                 )
             if row["archived_at"] is None:
                 raise WorkflowsDBError(
-                    f"contract {contract_id!r} is live; archive it "
+                    f"workflow {contract_id!r} is live; archive it "
                     "first before hard-deleting."
                 )
             con.execute(
-                "DELETE FROM contracts WHERE id = ?", (contract_id,)
+                "DELETE FROM workflows WHERE id = ?", (contract_id,)
             )
 
 
@@ -323,13 +363,13 @@ def ensure_initialized(workflows_dir: Path) -> None:
             continue
         name = path.stem
         try:
-            contract = parse_workflow_text(path.read_text(), name)
+            workflow = parse_workflow_text(path.read_text(), name)
         except WorkflowError:
             # Leave the bad YAML where it is so the user sees it.
             continue
         # DB wins — if the row already exists, don't clobber it.
         if db.get(name) is None:
-            db.put(contract)
+            db.put(workflow)
         migrated_dir.mkdir(exist_ok=True)
         shutil.move(str(path), str(migrated_dir / path.name))
 
@@ -340,7 +380,7 @@ def ensure_initialized(workflows_dir: Path) -> None:
 
 
 class WorkflowStore:
-    """The one contract-persistence adapter for both the web app and
+    """The one workflow-persistence adapter for both the web app and
     the CLI, so the "YAML vs DB read/write" decision lives in exactly
     one place.
 
@@ -349,7 +389,7 @@ class WorkflowStore:
 
       - **writes** (put / archive / restore / hard_delete) go to the DB;
       - **reads** (get / get_meta) resolve DB-first, then fall back to a
-        YAML file on disk — a contract dropped in but not yet migrated —
+        YAML file on disk — a workflow dropped in but not yet migrated —
         *without moving it* (a read has no side effects);
       - `ensure_initialized()` is the explicit, idempotent migration that
         imports leftover YAMLs into the DB. It is the only operation that
@@ -378,17 +418,17 @@ class WorkflowStore:
         meta = self.db.get_meta(contract_id)
         return meta if meta is not None else self._yaml_meta(contract_id)
 
-    def get(self, contract_id: str) -> Contract | None:
+    def get(self, contract_id: str) -> Workflow | None:
         meta = self.get_meta(contract_id)
-        return meta.contract if meta is not None else None
+        return meta.workflow if meta is not None else None
 
     def list(self, *, include_archived: bool = False) -> list[WorkflowMeta]:
         return self.db.list(include_archived=include_archived)
 
     # ----------------------------------------------------------- writes
 
-    def put(self, contract: Contract) -> None:
-        self.db.put(contract)
+    def put(self, workflow: Workflow) -> None:
+        self.db.put(workflow)
 
     def archive(self, contract_id: str, *, reason: str | None = None) -> None:
         self.db.archive(contract_id, reason=reason)
@@ -402,7 +442,7 @@ class WorkflowStore:
     # --------------------------------------------------------- internal
 
     def _yaml_meta(self, contract_id: str) -> WorkflowMeta | None:
-        """Resolve a contract from a YAML file on disk (read-only). The
+        """Resolve a workflow from a YAML file on disk (read-only). The
         file is never moved — that's `ensure_initialized`'s job."""
         for ext in (".yaml", ".yml"):
             path = self.workflows_dir / f"{contract_id}{ext}"
@@ -410,12 +450,12 @@ class WorkflowStore:
                 continue
             text = path.read_text()
             try:
-                contract = parse_workflow_text(text, contract_id)
+                workflow = parse_workflow_text(text, contract_id)
             except WorkflowError:
                 return None
             stamp = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
             return WorkflowMeta(
-                contract=contract,
+                workflow=workflow,
                 yaml=text,
                 created_at=stamp,
                 updated_at=stamp,

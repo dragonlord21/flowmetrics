@@ -119,7 +119,7 @@
             hx-post="/api/internal/backfill"
             hx-target="#backfill-progress"
             hx-swap="innerHTML">
-        <input type="hidden" name="workflow" value="{{ contract.name }}">
+        <input type="hidden" name="workflow" value="{{ workflow.name }}">
         {# since / until are derived (read-only) from window + anchor. #}
         <input type="hidden" name="since" id="ds-since">
         <input type="hidden" name="until" id="ds-until">
@@ -152,7 +152,7 @@
   </section>
 
   <a class="back-link"
-     href="{{ ('/workflows/' ~ contract.name ~ '/') | keep_filters }}">← Back to dashboard</a>
+     href="{{ ('/workflows/' ~ workflow.name ~ '/') | keep_filters }}">← Back to dashboard</a>
 
   <script>
     // The window length + anchor date resolve to an explicit

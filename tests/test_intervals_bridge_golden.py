@@ -6,7 +6,7 @@ is a verbatim slice of `.cache/jira/*` for one issue with five
 status changes — exactly the kind of multi-stage workflow Vacanti
 talks about.
 
-This test asserts the *contract* between the existing Jira
+This test asserts the *workflow* between the existing Jira
 adapter (untouched) and the bridge: every status interval surfaces
 as a StageTransition, in order, with the right signal mapping. If
 the adapter changes shape or the bridge stops carrying authentic

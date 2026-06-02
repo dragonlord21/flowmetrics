@@ -1,7 +1,7 @@
 """Work-items table component — column-config-driven.
 
 Renders a sortable, filterable, paginated table of work items for
-the current contract. Routes pass a column list (or accept the
+the current workflow. Routes pass a column list (or accept the
 default); the template iterates without metric-specific branching.
 Server-side sort + filter + pagination via HTMX.
 
@@ -247,7 +247,7 @@ def render(
     # PERCENT_RANK.
     metric_thresholds: tuple[float, float, float] | None = None,
 ) -> WorkItemsTableData:
-    """Read a page of rows for the contract.
+    """Read a page of rows for the workflow.
 
     `q` does a case-insensitive substring filter on `title`.
     `completed_on` is a UTC ISO date — only items completed on
@@ -301,7 +301,7 @@ def render(
     )
 
     # When the table is scoped to in-flight items AND the
-    # contract declares WIP states, mirror the aging-chart
+    # workflow declares WIP states, mirror the aging-chart
     # filter: only items whose CURRENT state (latest transition
     # at or before asof) is in `wip_states`. Without this, the
     # table over-collects — Cassandra's chart shows 322 WIP

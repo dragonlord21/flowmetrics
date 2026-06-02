@@ -129,7 +129,7 @@ class TestAsciiSafeOutput:
 
 
 class TestEfficiencyText:
-    """Verbose efficiency mirrors the Aging text contract: headline +
+    """Verbose efficiency mirrors the Aging text workflow: headline +
     actionable numbers + slowest-PR table + reproduce. No more Key
     insight panel, no numbered Next actions list, no Vocabulary."""
 

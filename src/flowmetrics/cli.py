@@ -596,7 +596,7 @@ def forecast_how_many(
 # ---------------------------------------------------------------------------
 
 
-@cli.command(short_help="Materialize a contract — fetch + write Parquet")
+@cli.command(short_help="Materialize a workflow — fetch + write Parquet")
 @click.argument("name", type=str)
 @click.option(
     "--data-dir",
@@ -633,7 +633,7 @@ def forecast_how_many(
     type=click.DateTime(formats=["%Y-%m-%d"]),
     default=None,
     help=(
-        "Override the contract's `start` for this run only. "
+        "Override the workflow's `start` for this run only. "
         "ISO YYYY-MM-DD (UTC). Used for targeted backfills, e.g. "
         "the aging page's coverage-gap action."
     ),
@@ -644,7 +644,7 @@ def forecast_how_many(
     type=click.DateTime(formats=["%Y-%m-%d"]),
     default=None,
     help=(
-        "Override the contract's `stop` for this run only. "
+        "Override the workflow's `stop` for this run only. "
         "ISO YYYY-MM-DD (UTC)."
     ),
 )
@@ -669,7 +669,7 @@ def materialize(
     until,
     status_file: Path | None,
 ) -> None:
-    """Fetch + canonicalise + write Parquet for one contract.
+    """Fetch + canonicalise + write Parquet for one workflow.
 
     NAME is looked up DB-first in `<workflows-dir>/workflows.db`
     (where the wizard writes), then falls back to a `NAME.yaml` file
@@ -680,11 +680,11 @@ def materialize(
     on success, non-zero on any failure. Operators see the error in
     cron mail or systemd journal.
 
-    `--since` and `--until` override the contract's stored
+    `--since` and `--until` override the workflow's stored
     start/stop for this invocation only — they don't mutate the
     DB row or YAML. Useful for targeted backfills when the
     warehouse needs to be brought forward without changing the
-    contract's canonical window.
+    workflow's canonical window.
 
     `--status-file` (opt-in) writes a JSON running → done/failed
     record so the web Data Source page can poll a browser-triggered
@@ -723,10 +723,10 @@ def materialize(
     # The store resolves DB-first then falls back to a YAML on disk
     # (cron / not-yet-migrated). Reads don't trigger the YAML→DB
     # migration — that's serve-time's job.
-    contract = WorkflowStore(contracts_dir).get(name)
-    if contract is None:
+    workflow = WorkflowStore(contracts_dir).get(name)
+    if workflow is None:
         msg = (
-            f"contract {name!r} not found under {contracts_dir} "
+            f"workflow {name!r} not found under {contracts_dir} "
             "(no DB row and no matching YAML)"
         )
         _status("failed", msg)
@@ -741,12 +741,12 @@ def materialize(
         overrides["stop"] = until.date()
     if overrides:
         # Pydantic's `model_copy` is the equivalent of
-        # `dataclasses.replace` for the new Contract model.
-        contract = contract.model_copy(update=overrides)
+        # `dataclasses.replace` for the new Workflow model.
+        workflow = workflow.model_copy(update=overrides)
 
     try:
         manifest = run_materialize(
-            contract=contract,
+            workflow=workflow,
             data_dir=data_dir,
             cache_dir=cache_dir,
             offline=offline,
@@ -770,7 +770,7 @@ def materialize(
 
 # ---------------------------------------------------------------------------
 # `flow materialize-all` — daily-ingest wrapper for cron / launchd / Task
-# Scheduler. Iterates every YAML in --workflows-dir; one bad contract
+# Scheduler. Iterates every YAML in --workflows-dir; one bad workflow
 # doesn't block the others. Writes a JSON manifest the user's monitoring
 # tool can grep for failures.
 # ---------------------------------------------------------------------------
@@ -829,7 +829,7 @@ def materialize_all(
     un-migrated YAML files in --workflows-dir. `flow workflows list`
     shows what would run.
 
-    Scheduler-friendly: a single failing contract doesn't block the
+    Scheduler-friendly: a single failing workflow doesn't block the
     rest. Exit code is 0 when at least one workflow succeeded (so
     monitoring only pages when EVERYTHING is broken); the manifest
     holds per-workflow detail for finer-grained alerting.
@@ -852,11 +852,11 @@ def materialize_all(
 
     results: list[dict] = []
     for meta in live:
-        name = meta.contract.name
+        name = meta.workflow.name
         entry: dict = {"workflow": name, "status": "failed", "error": ""}
         try:
             manifest = run_materialize(
-                contract=meta.contract,
+                workflow=meta.workflow,
                 data_dir=data_dir,
                 cache_dir=cache_dir,
                 offline=offline,
@@ -963,7 +963,7 @@ def contracts_list(contracts_dir: Path, include_archived: bool) -> None:
                 # Malformed YAML — skip silently; the materialize
                 # command will surface a clear error if invoked.
                 continue
-            yaml_rows.append((stem, _contract_target(meta.contract)))
+            yaml_rows.append((stem, _contract_target(meta.workflow)))
 
     if not db_rows and not yaml_rows:
         click.echo(
@@ -985,7 +985,7 @@ def contracts_list(contracts_dir: Path, include_archived: bool) -> None:
         rows.append((
             meta.name,
             "db",
-            _contract_target(meta.contract),
+            _contract_target(meta.workflow),
             meta.archived_at is not None,
         ))
     for name, target in yaml_rows:
@@ -1001,15 +1001,15 @@ def contracts_list(contracts_dir: Path, include_archived: bool) -> None:
         click.echo(f"{name:<{name_w}}  {src:<{src_w}}  {target}{suffix}")
 
 
-def _contract_target(contract) -> str:
-    """One-line summary of what the contract is fetching — GitHub
+def _contract_target(workflow) -> str:
+    """One-line summary of what the workflow is fetching — GitHub
     `repo` or Jira `jira_project @ jira_url`. Carried in the listing
     so an operator can match name → source without opening the YAML."""
-    if contract.source == "github":
-        return contract.repo or "(no repo set)"
-    if contract.source == "jira":
-        return f"{contract.jira_project} @ {contract.jira_url}"
-    return contract.source
+    if workflow.source == "github":
+        return workflow.repo or "(no repo set)"
+    if workflow.source == "jira":
+        return f"{workflow.jira_project} @ {workflow.jira_url}"
+    return workflow.source
 
 
 # ---------------------------------------------------------------------------

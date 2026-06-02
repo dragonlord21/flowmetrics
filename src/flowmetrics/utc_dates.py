@@ -82,7 +82,7 @@ def attach_utc(d: datetime | None) -> datetime | None:
     that warehouse-read boundary; every component renderer used to
     inline its own private `_aware()` doing exactly this.
 
-    Contract:
+    Workflow:
       - `None`          → `None`   (passthrough)
       - naive datetime  → aware UTC (re-attach the dropped marker)
       - aware datetime  → returned unchanged (do not convert; if

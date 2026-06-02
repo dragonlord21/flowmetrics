@@ -38,8 +38,8 @@ def two_snapshot_warehouse(tmp_path: Path) -> Path:
     (completed_at NULL). The second snapshot (May 06) captures
     the same item as completed.
     """
-    contract = "demo"
-    base = tmp_path / "work_items" / f"contract_id={contract}"
+    workflow = "demo"
+    base = tmp_path / "work_items" / f"contract_id={workflow}"
     snap1 = base / "year=2026" / "month=05" / "day=04" / "items.parquet"
     snap2 = base / "year=2026" / "month=05" / "day=06" / "items.parquet"
     snap1.parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +65,7 @@ def two_snapshot_warehouse(tmp_path: Path) -> Path:
                 datetime(2026, 5, 4, 9, 0),
                 completed_at,
                 cycle,
-                contract,
+                workflow,
                 mat_at,
                 "rid",
             ],

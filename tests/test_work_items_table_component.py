@@ -5,9 +5,9 @@ pattern as cycle_time: a pure render function reads from DuckDB and
 returns a typed payload that a Jinja partial renders.
 
 Interaction (filter by title, sort by column) is client-side JS for
-v1 — data volumes are small (≤ a few hundred rows per contract per
+v1 — data volumes are small (≤ a few hundred rows per workflow per
 window) and snappy local sort beats round-tripping through HTMX.
-The tests assert the contract at the data and the spec level; the
+The tests assert the workflow at the data and the spec level; the
 e2e file tests the in-browser interactivity.
 """
 
@@ -37,7 +37,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     (contracts_dir / "astral-uv-week.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "astral-uv-week",
                     "source": "github",
                     "repo": "astral-sh/uv",
@@ -106,7 +106,7 @@ class TestWorkItemsTableShape:
         assert first.url is None or first.url.startswith("http")
 
     def test_created_at_display_is_utc_anchored(self, warehouse):
-        """Same TZ-safety contract as completed_at: the Started
+        """Same TZ-safety workflow as completed_at: the Started
         column must show the same UTC date regardless of viewer
         timezone."""
         data = render(warehouse, "astral-uv-week")
@@ -255,7 +255,7 @@ class TestWorkItemsTableShape:
         )
 
     def test_completed_at_display_is_utc_anchored(self, warehouse):
-        """Same TZ-safety contract as the cycle-time chart: the
+        """Same TZ-safety workflow as the cycle-time chart: the
         date the table shows must not shift by browser TZ. Display
         string comes from `flowmetrics.utc_dates`."""
         data = render(warehouse, "astral-uv-week")

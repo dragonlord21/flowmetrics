@@ -18,7 +18,7 @@ from flowmetrics.warehouse.connection import open_warehouse
 
 FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
-_YAML = """contract:
+_YAML = """workflow:
   name: uv
   source: github
   repo: astral-sh/uv

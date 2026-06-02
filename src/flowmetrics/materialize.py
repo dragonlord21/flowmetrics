@@ -1,21 +1,21 @@
-"""ETL: contract → source fetch → canonical → Parquet.
+"""ETL: workflow → source fetch → canonical → Parquet.
 
 Invoked by `flow materialize NAME`. One-shot:
 
-  1. Load contract YAML.
+  1. Load workflow YAML.
   2. Build source adapter (GitHub or Jira) using existing factories.
-  3. Fetch completed items in the contract's window.
+  3. Fetch completed items in the workflow's window.
   4. Convert each WorkItem → fact-table row (work_items.parquet).
   5. Convert each WorkItem.status_intervals → StageTransition rows
      (transitions.parquet).
   6. Write Parquet atomically (write `.tmp`, rename).
-  7. Append a run manifest under `data/runs/<contract>/run_id=…/`.
+  7. Append a run manifest under `data/runs/<workflow>/run_id=…/`.
 
 Hive partitioning is `contract_id=<name>/year=<YYYY>/month=<MM>/`
 per `docs/SPEC-warehouse-app.md` §4.1.
 
 Slice 1 scope: identity + lifecycle + provenance columns. Stage
-durations and phase durations land in later slices when the contract
+durations and phase durations land in later slices when the workflow
 defines stages (Slice 4+).
 """
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 import duckdb
 
-from .workflow import Contract
+from .workflow import Workflow
 from .matching import remap_transitions
 from .service import make_github_source, make_jira_source
 from .sources.intervals import (
@@ -46,7 +46,7 @@ from .sources.intervals import (
 # write in flight is always younger and is never touched.
 _STALE_TMP_AFTER = timedelta(minutes=30)
 
-# A contract may omit start/stop (the web builder no longer asks for a
+# A workflow may omit start/stop (the web builder no longer asks for a
 # window — data is fetched via the Data Source page's backfill, which
 # passes its own range). When neither is set, fetch the most recent
 # window of this many days up to today so the scheduled import still has
@@ -54,12 +54,12 @@ _STALE_TMP_AFTER = timedelta(minutes=30)
 DEFAULT_FETCH_WINDOW_DAYS = 90
 
 
-def _resolve_window(contract: Contract, *, today: date) -> tuple[date, date]:
-    """The fetch window for this run: the contract's explicit start/stop
+def _resolve_window(workflow: Workflow, *, today: date) -> tuple[date, date]:
+    """The fetch window for this run: the workflow's explicit start/stop
     when present, otherwise a rolling `DEFAULT_FETCH_WINDOW_DAYS` window
     ending today. Each bound defaults independently."""
-    stop = contract.stop or today
-    start = contract.start or (stop - timedelta(days=DEFAULT_FETCH_WINDOW_DAYS))
+    stop = workflow.stop or today
+    start = workflow.start or (stop - timedelta(days=DEFAULT_FETCH_WINDOW_DAYS))
     return start, stop
 
 
@@ -105,7 +105,7 @@ class RunManifest:
 def _compact_one(
     *, contract_dir: Path, stem: str, dedup_sql: str, now: datetime,
 ) -> None:
-    """Collapse one table's snapshot files for a contract into a
+    """Collapse one table's snapshot files for a workflow into a
     single file. `dedup_sql` runs against a `src` view of all the
     originals and must reproduce the read view's dedup exactly.
 
@@ -156,7 +156,7 @@ def _compact_one(
 def compact_contract(
     data_dir: Path, contract_name: str, *, now: datetime,
 ) -> None:
-    """Collapse a contract's accumulated snapshot files into one
+    """Collapse a workflow's accumulated snapshot files into one
     file per table. Reads every snapshot, applies the read view's
     dedup (latest run per work item AND per transition), writes a
     single file, then deletes the originals — never dropping a work
@@ -198,12 +198,12 @@ def compact_contract(
 
 def materialize(
     *,
-    contract: Contract,
+    workflow: Workflow,
     data_dir: Path,
     cache_dir: Path,
     offline: bool,
 ) -> RunManifest:
-    """Run one ETL pass for `contract`. Returns the manifest written
+    """Run one ETL pass for `workflow`. Returns the manifest written
     to disk so the caller (CLI) can echo summary stats.
     """
     started_at = datetime.now(UTC)
@@ -216,31 +216,31 @@ def materialize(
     # Collapse accumulated snapshots into one file per table
     # before this run adds its own — keeps the warehouse to ~2
     # files per table without ever dropping a work item.
-    compact_contract(data_dir, contract.name, now=started_at)
+    compact_contract(data_dir, workflow.name, now=started_at)
 
-    if contract.source == "github":
-        assert contract.repo  # validated at load_contract
+    if workflow.source == "github":
+        assert workflow.repo  # validated at load_contract
         # Slice 1 sources are read-only when --offline is set; live fetch
         # is the cron path. Item-id prefix conventions handled by
         # `service.make_github_source`.
         source = make_github_source(
-            contract.repo,
+            workflow.repo,
             cache_dir=cache_dir,
             read_only=offline,
         )
     else:
-        assert contract.jira_url and contract.jira_project
+        assert workflow.jira_url and workflow.jira_project
         source = make_jira_source(
-            contract.jira_url,
-            contract.jira_project,
+            workflow.jira_url,
+            workflow.jira_project,
             cache_dir=cache_dir,
             read_only=offline,
         )
 
-    # The contract window is optional; fall back to a rolling default
-    # so a UI-built (windowless) contract still materializes.
+    # The workflow window is optional; fall back to a rolling default
+    # so a UI-built (windowless) workflow still materializes.
     window_start, window_stop = _resolve_window(
-        contract, today=started_at.date()
+        workflow, today=started_at.date()
     )
     completed = list(
         source.fetch_completed_in_window(window_start, window_stop)
@@ -288,7 +288,7 @@ def materialize(
     work_items_path = (
         data_dir
         / "work_items"
-        / f"contract_id={contract.name}"
+        / f"contract_id={workflow.name}"
         / f"year={year}"
         / f"month={month:02d}"
         / f"day={day:02d}"
@@ -297,7 +297,7 @@ def materialize(
     transitions_path = (
         data_dir
         / "transitions"
-        / f"contract_id={contract.name}"
+        / f"contract_id={workflow.name}"
         / f"year={year}"
         / f"month={month:02d}"
         / f"day={day:02d}"
@@ -308,33 +308,33 @@ def materialize(
 
     _write_work_items_parquet(
         items=items,
-        contract=contract,
+        workflow=workflow,
         run_id=run_id,
         materialized_at=completed_at,
         out_path=work_items_path,
     )
 
-    # Dispatch on contract.source — we know what produced these items
+    # Dispatch on workflow.source — we know what produced these items
     # and don't need to sniff item_id prefixes (the bridge's prefix-
     # based dispatch isn't accurate against real GitHub item ids like
     # `#19342`).
     to_txs = (
         github_workitem_to_transitions
-        if contract.source == "github"
+        if workflow.source == "github"
         else jira_workitem_to_transitions
     )
     transitions = []
     for item in items:
         transitions.extend(to_txs(item))
-    # Relabel adapter-native stages to the contract's step names (the
-    # user's workflow). No-op when the contract defines no steps.
+    # Relabel adapter-native stages to the workflow's step names (the
+    # user's workflow). No-op when the workflow defines no steps.
     transitions = remap_transitions(
-        transitions, contract.steps, source=contract.source
+        transitions, workflow.steps, source=workflow.source
     )
     _write_transitions_parquet(
         transitions=transitions,
-        contract_source=contract.source,
-        contract_id=contract.name,
+        contract_source=workflow.source,
+        contract_id=workflow.name,
         out_path=transitions_path,
         materialized_at=completed_at,
         run_id=run_id,
@@ -342,7 +342,7 @@ def materialize(
 
     manifest = RunManifest(
         run_id=run_id,
-        contract_id=contract.name,
+        contract_id=workflow.name,
         started_at=started_at,
         completed_at=completed_at,
         items_fetched=len(items),
@@ -412,7 +412,7 @@ def cycle_time_days(
     that's the "bad data" zone (valid minimum is 1.0d). Surfaced
     rather than clamped so source-data corruption is visible.
 
-    See tests/test_calendar_cycle_time.py for the contract.
+    See tests/test_calendar_cycle_time.py for the workflow.
     """
     if completed_at is None:
         return None
@@ -421,11 +421,11 @@ def cycle_time_days(
     return float((fd - sd).days + 1)
 
 
-def _work_item_row(item, contract: Contract, run_id: str, materialized_at: datetime):
+def _work_item_row(item, workflow: Workflow, run_id: str, materialized_at: datetime):
     cycle_days = cycle_time_days(item.created_at, item.completed_at)
     return (
-        contract.source,
-        contract.repo,
+        workflow.source,
+        workflow.repo,
         item.item_id,
         item.title,
         item.url,
@@ -434,7 +434,7 @@ def _work_item_row(item, contract: Contract, run_id: str, materialized_at: datet
         item.created_at,
         item.completed_at,
         cycle_days,
-        contract.name,
+        workflow.name,
         materialized_at,
         run_id,
     )
@@ -443,7 +443,7 @@ def _work_item_row(item, contract: Contract, run_id: str, materialized_at: datet
 def _write_work_items_parquet(
     *,
     items,
-    contract: Contract,
+    workflow: Workflow,
     run_id: str,
     materialized_at: datetime,
     out_path: Path,
@@ -453,7 +453,7 @@ def _write_work_items_parquet(
     Atomic rename means concurrent readers either see the previous
     snapshot or the new one — never a torn half-written file.
     """
-    rows = [_work_item_row(i, contract, run_id, materialized_at) for i in items]
+    rows = [_work_item_row(i, workflow, run_id, materialized_at) for i in items]
     tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
     con = duckdb.connect()
     try:
@@ -485,7 +485,7 @@ def _write_transitions_parquet(
     materialized_at: datetime,
     run_id: str,
 ) -> None:
-    # `source` comes from the contract — we already dispatched on it
+    # `source` comes from the workflow — we already dispatched on it
     # to build the transitions, so the column is constant per call.
     # `materialized_at` + `run_id` stamp the run so the read view can
     # keep only the latest run per item (remap rewrites `stage`, so

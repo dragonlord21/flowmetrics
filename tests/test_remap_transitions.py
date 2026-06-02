@@ -3,7 +3,7 @@ materialize time (#2 Slice B).
 
 Each transition's `stage` is rewritten to the first step it matches (OR
 within a step, first step wins across steps). Unmatched transitions go
-to `_unmatched`. A contract with no steps passes through unchanged
+to `_unmatched`. A workflow with no steps passes through unchanged
 (adapter-native stages).
 """
 

@@ -2,7 +2,7 @@
 # Small/medium project; the default workflow shows up nicely on the
 # dashboard.
 
-contract:
+workflow:
   name: apache-bigtop-week
   label: Apache BIGTOP
   source: jira

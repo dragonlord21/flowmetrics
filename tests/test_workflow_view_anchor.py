@@ -45,7 +45,7 @@ def view_factory():
     (contracts_dir / "astral-uv-week.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "astral-uv-week",
                     "source": "github",
                     "repo": "astral-sh/uv",

@@ -3,7 +3,7 @@
    Required context:
      data           — HowManyModel (rendered via the vega_spec Jinja global)
      chart_height   — int pixels
-     contract.name  — for any back-links
+     workflow.name  — for any back-links
 #}
 {%- set chart_container_id = "forecast-how-many-chart" -%}
 {%- set _h = chart_height|default(280) -%}
@@ -39,7 +39,7 @@
         <span class="aging-empty-sub">
           Monte Carlo needs daily completion counts inside the
           reference period. Widen the reference window above, or
-          <a href="/workflows/{{ contract.name }}/data-source">backfill more data</a>.
+          <a href="/workflows/{{ workflow.name }}/data-source">backfill more data</a>.
         </span>
       </p>
     {% endif %}

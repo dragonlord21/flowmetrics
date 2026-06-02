@@ -9,7 +9,7 @@ These tests pin three things:
 
   1. The plist we generate has the load-bearing keys (`Label`,
      `ProgramArguments`, `RunAtLoad`, `KeepAlive`, working dir,
-     log paths). The plist file IS the contract with launchd —
+     log paths). The plist file IS the workflow with launchd —
      a typo here means the service silently doesn't behave like
      a persistent service.
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 class TestRenderServePlist:
     """Pure function: dict-in, plist-XML-bytes-out. Authoritative
-    contract with launchd lives in this dict."""
+    workflow with launchd lives in this dict."""
 
     def test_renders_a_valid_plist_with_load_bearing_keys(self, tmp_path):
         from flowmetrics.bg.launchd import render_serve_plist

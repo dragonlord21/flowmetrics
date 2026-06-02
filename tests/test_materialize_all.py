@@ -1,17 +1,17 @@
 """`flow materialize-all` — iterate every YAML in `--workflows-dir`,
-run materialize per contract, write a daily JSON manifest with
-per-contract outcomes.
+run materialize per workflow, write a daily JSON manifest with
+per-workflow outcomes.
 
 The scheduler templates (cron / launchd / Task Scheduler) point at
 this one command so the user only schedules one invocation. The
 manifest is what monitoring reads; exit code is what schedulers read.
 
-Contract:
-  - Success per contract → record in manifest with status=ok.
-  - Failure per contract → record with status=failed + error message;
-    the next contract still runs.
-  - Exit 0 if at least one contract succeeded; non-zero only if
-    every contract failed (so a single-bad-YAML doesn't page on-call).
+Workflow:
+  - Success per workflow → record in manifest with status=ok.
+  - Failure per workflow → record with status=failed + error message;
+    the next workflow still runs.
+  - Exit 0 if at least one workflow succeeded; non-zero only if
+    every workflow failed (so a single-bad-YAML doesn't page on-call).
   - Manifest path: `<data-dir>/_status/daily-<UTC-date>.json` by default,
     overridable with --manifest.
 """
@@ -33,7 +33,7 @@ FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 
 def _write_contract(contracts_dir: Path, name: str, repo: str) -> None:
     (contracts_dir / f"{name}.yaml").write_text(yaml.safe_dump({
-        "contract": {
+        "workflow": {
             "name": name, "source": "github", "repo": repo,
             "start": "2026-05-04", "stop": "2026-05-10",
         }
@@ -97,12 +97,12 @@ class TestMixedOutcomes:
     def test_unparseable_yaml_is_skipped_at_import_time(self, workspace):
         """A YAML that fails parse never enters the DB (per the C1
         migration semantics); materialize-all therefore doesn't
-        attempt to run it. The good contract still processes; the
+        attempt to run it. The good workflow still processes; the
         bad YAML is left in the dir for the user to fix."""
         contracts, data = workspace
         _write_contract(contracts, "astral-uv-week", "astral-sh/uv")
         # Intentionally broken — no `source:`.
-        (contracts / "broken.yaml").write_text("contract: {name: broken}\n")
+        (contracts / "broken.yaml").write_text("workflow: {name: broken}\n")
         res = CliRunner().invoke(cli, [
             "materialize-all",
             "--workflows-dir", str(contracts),
@@ -121,7 +121,7 @@ class TestMixedOutcomes:
         assert "broken" not in statuses
         # The broken YAML is still on disk for the user to fix.
         assert (contracts / "broken.yaml").exists()
-        # The good contract still wrote Parquet despite the bad one.
+        # The good workflow still wrote Parquet despite the bad one.
         assert (data / "work_items").exists()
 
     def test_all_materialize_failures_exit_non_zero(self, workspace):

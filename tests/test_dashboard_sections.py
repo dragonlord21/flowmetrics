@@ -1,4 +1,4 @@
-"""Dashboard scope-by-section structural contract.
+"""Dashboard scope-by-section structural workflow.
 
 The dashboard groups tiles by what scope drives them:
 
@@ -36,7 +36,7 @@ def app(tmp_path_factory):
     (contracts / "astral-uv-week.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "astral-uv-week",
                     "source": "github",
                     "repo": "astral-sh/uv",

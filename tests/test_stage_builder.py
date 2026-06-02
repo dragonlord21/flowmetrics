@@ -1,4 +1,4 @@
-"""Stage builder — the "Stages" fieldset of the new-contract wizard.
+"""Stage builder — the "Stages" fieldset of the new-workflow wizard.
 
 The user clicks "Discover stages", which POSTs to
 `/api/internal/workflows/_probe-stages`. The server runs a bounded

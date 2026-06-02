@@ -48,14 +48,14 @@ class TestStatusFileHelpers:
 
 
 def _contracts_dir() -> tuple[Path, Path]:
-    """A temp dir with one `astral-uv-week` GitHub contract."""
+    """A temp dir with one `astral-uv-week` GitHub workflow."""
     tmp = Path(tempfile.mkdtemp())
     contracts = tmp / "contracts"
     contracts.mkdir()
     (contracts / "astral-uv-week.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "astral-uv-week",
                     "source": "github",
                     "repo": "astral-sh/uv",

@@ -1,6 +1,6 @@
 """Behavioural spec for the JSON renderer.
 
-Contract:
+Workflow:
 1. `render(report)` returns valid JSON with trailing newline.
 2. Top-level keys: schema, command, generated_at, input, result/training/
    simulation/etc., chart_data, interpretation, logs, docs.

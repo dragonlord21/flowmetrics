@@ -21,7 +21,7 @@
            hx-preserve="true">
     <h2 class="scope-section-h2">Current state</h2>
     <section class="metric metric-loading"
-             hx-get="/api/internal/dashboard-tile/aging?workflow={{ contract.name }}{{ qs }}"
+             hx-get="/api/internal/dashboard-tile/aging?workflow={{ workflow.name }}{{ qs }}"
              hx-trigger="load"
              hx-swap="outerHTML swap:180ms">
       <p class="metric-loading-text">Loading Aging WIP…</p>
@@ -43,7 +43,7 @@
       ('forecast', 'Forecast'),
     ] %}
       <section class="metric metric-loading"
-               hx-get="/api/internal/dashboard-tile/{{ slug }}?workflow={{ contract.name }}{{ qs }}"
+               hx-get="/api/internal/dashboard-tile/{{ slug }}?workflow={{ workflow.name }}{{ qs }}"
                hx-trigger="load"
                hx-swap="outerHTML swap:180ms">
         <p class="metric-loading-text">Loading {{ label }}…</p>

@@ -7,7 +7,7 @@ SHA-256 of every file. Restore verifies the header + checksums
 before touching disk; refuses to clobber a non-empty target unless
 --force.
 
-The contract is: backup → restore → DuckDB read returns identical
+The workflow is: backup → restore → DuckDB read returns identical
 rows. That's what the round-trip test pins; nothing else matters.
 """
 
@@ -56,7 +56,7 @@ def _make_tiny_workflows_db(contracts_dir: Path) -> None:
               updated_at TEXT NOT NULL
             );
             INSERT INTO contracts(id, yaml, created_at, updated_at)
-            VALUES ('demo', 'contract:\\n  name: demo\\n',
+            VALUES ('demo', 'workflow:\\n  name: demo\\n',
                     '2026-05-31T00:00:00Z',
                     '2026-05-31T00:00:00Z');
         """)
@@ -228,7 +228,7 @@ class TestRestoreSafety:
             "restore", "--input", str(out), "--data-dir", str(target),
         ], catch_exceptions=False)
         assert res.exit_code != 0
-        # Same fail-before-write contract as the corrupted-tar case.
+        # Same fail-before-write workflow as the corrupted-tar case.
         assert not target.exists() or not list(target.iterdir())
 
 

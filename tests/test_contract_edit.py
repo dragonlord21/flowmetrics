@@ -1,4 +1,4 @@
-"""Edit-existing-contract page — `/admin/workflows/{id}/edit`.
+"""Edit-existing-workflow page — `/admin/workflows/{id}/edit`.
 
 Reuses the wizard template with `mode: edit`. Pre-fills every field
 from the existing YAML; save routes through PUT (idempotent
@@ -29,7 +29,7 @@ def _write(contracts: Path, name: str, **fields) -> None:
     payload = {"name": name, "source": "github", "repo": "owner/repo"}
     payload.update(fields)
     (contracts / f"{name}.yaml").write_text(
-        yaml.safe_dump({"contract": payload})
+        yaml.safe_dump({"workflow": payload})
     )
 
 
@@ -42,7 +42,7 @@ class TestEditPage:
             r = client.get("/admin/workflows/alpha/edit")
         assert r.status_code == 200
         html = r.text
-        # Edit mode bakes the contract id into the page so the JS
+        # Edit mode bakes the workflow id into the page so the JS
         # knows to PUT this id and to skip the wizard's id field.
         assert "alpha" in html
         # The page hosts the same fieldsets as the new wizard.
@@ -65,7 +65,7 @@ class TestEditPage:
         with TestClient(app) as client:
             html = client.get("/workflows/alpha").text
         # The data-source strip (or somewhere visible on the
-        # dashboard) carries an Edit link to this contract.
+        # dashboard) carries an Edit link to this workflow.
         assert "/admin/workflows/alpha/edit" in html
 
 
@@ -92,7 +92,7 @@ class TestEditRoundTrip:
     def test_get_payload_carries_states_when_present(self, workspace):
         contracts, data = workspace
         (contracts / "alpha.yaml").write_text(yaml.safe_dump({
-            "contract": {
+            "workflow": {
                 "name": "alpha", "source": "github", "repo": "a/b",
                 "states": {
                     "wip": ["Draft", "Awaiting Review"],

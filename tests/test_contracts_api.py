@@ -1,4 +1,4 @@
-"""Contract read API for the future web-UI builder.
+"""Workflow read API for the future web-UI builder.
 
 Two endpoints, both intentionally simple:
 
@@ -10,7 +10,7 @@ Two endpoints, both intentionally simple:
          materialize: {last_run_at, status, items}}
 
 These are the read foundation that the write API (B2) and the
-contract-builder UI (B3..B5) layer on. Auth posture matches the rest
+workflow-builder UI (B3..B5) layer on. Auth posture matches the rest
 of the dashboard: open on 127.0.0.1, HTTP Basic when bound off-host.
 """
 
@@ -37,7 +37,7 @@ def _write(contracts: Path, name: str, **fields) -> None:
     payload = {"name": name, "source": "github", "repo": "owner/repo"}
     payload.update(fields)
     (contracts / f"{name}.yaml").write_text(
-        yaml.safe_dump({"contract": payload})
+        yaml.safe_dump({"workflow": payload})
     )
 
 
@@ -73,7 +73,7 @@ class TestListContracts:
         _write(contracts, "alpha")
         # A .yml twin should also appear — load_contract accepts both.
         (contracts / "gamma.yml").write_text(
-            yaml.safe_dump({"contract": {
+            yaml.safe_dump({"workflow": {
                 "name": "gamma", "source": "github", "repo": "a/b",
             }})
         )
@@ -98,7 +98,7 @@ class TestGetContractDetail:
         assert body["parsed"]["source"] == "github"
         assert body["parsed"]["repo"] == "owner/repo"
         # The original YAML text — for the textarea fallback / diffing.
-        assert "contract:" in body["yaml"]
+        assert "workflow:" in body["yaml"]
         assert "alpha" in body["yaml"]
 
     def test_includes_materialize_status_block(self, workspace):
@@ -127,7 +127,7 @@ class TestGetContractDetail:
         # leaves the bad YAML in place (so the user can see + fix
         # it) and does NOT create a DB row. The detail endpoint
         # therefore returns 404 rather than 422.
-        (contracts / "broken.yaml").write_text("contract: {name: broken}\n")
+        (contracts / "broken.yaml").write_text("workflow: {name: broken}\n")
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = client.get("/api/internal/workflows/broken")
@@ -153,7 +153,7 @@ class TestValidateEndpoint:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = self._post(client, json={"yaml":
-                "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"
+                "workflow:\n  name: alpha\n  source: github\n  repo: a/b\n"
             })
         assert r.status_code == 200
         body = r.json()
@@ -165,7 +165,7 @@ class TestValidateEndpoint:
         # Missing source: → WorkflowError.
         with TestClient(app) as client:
             r = self._post(client, json={"yaml":
-                "contract:\n  name: alpha\n"
+                "workflow:\n  name: alpha\n"
             })
         assert r.status_code == 200  # validate ALWAYS returns 200
         body = r.json()
@@ -182,7 +182,7 @@ class TestValidateEndpoint:
         # Bad indentation → PyYAML raises with a problem_mark.
         with TestClient(app) as client:
             r = self._post(client, json={"yaml":
-                "contract:\n  name: alpha\n source: github\n"
+                "workflow:\n  name: alpha\n source: github\n"
             })
         body = r.json()
         assert body["valid"] is False
@@ -205,7 +205,7 @@ class TestWriteContract:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = self._put(client, "alpha",
-                "contract:\n  name: alpha\n  source: github\n  repo: a/b\n")
+                "workflow:\n  name: alpha\n  source: github\n  repo: a/b\n")
             assert r.status_code == 200, r.text
             body = r.json()
             assert body["id"] == "alpha"
@@ -218,7 +218,7 @@ class TestWriteContract:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             r = self._put(client, "alpha",
-                "contract:\n  name: alpha\n  label: new\n  source: github\n  repo: a/b\n")
+                "workflow:\n  name: alpha\n  label: new\n  source: github\n  repo: a/b\n")
             assert r.status_code == 200, r.text
             # New label visible through the API (DB-backed).
             body = client.get("/api/internal/workflows/alpha").json()
@@ -228,7 +228,7 @@ class TestWriteContract:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
-            r = self._put(client, "broken", "contract: {name: broken}\n")
+            r = self._put(client, "broken", "workflow: {name: broken}\n")
             assert r.status_code == 422
             body = r.json()
             assert "errors" in body or "detail" in body
@@ -241,7 +241,7 @@ class TestWriteContract:
         with TestClient(app) as client:
             # URL says "alpha" but YAML says "beta" → reject.
             r = self._put(client, "alpha",
-                "contract:\n  name: beta\n  source: github\n  repo: a/b\n")
+                "workflow:\n  name: beta\n  source: github\n  repo: a/b\n")
             assert r.status_code == 422
             assert client.get("/api/internal/workflows/alpha").status_code == 404
             assert client.get("/api/internal/workflows/beta").status_code == 404
@@ -261,7 +261,7 @@ class TestDeleteContract:
         )
 
     def test_delete_on_live_row_refuses(self, workspace):
-        """C2 invariant: DELETE requires the contract to already be
+        """C2 invariant: DELETE requires the workflow to already be
         archived. A live DELETE returns 409."""
         contracts, data = workspace
         _write(contracts, "alpha")
@@ -289,7 +289,7 @@ class TestDeleteContract:
             ).status_code == 404
 
     def test_delete_leaves_warehouse_data_alone_without_purge(self, workspace):
-        """DELETE removes the contract row; the warehouse partitions
+        """DELETE removes the workflow row; the warehouse partitions
         stay on disk unless purge_data=true."""
         contracts, data = workspace
         _write(contracts, "alpha")
@@ -346,7 +346,7 @@ class TestCSRFOnWrites:
             r = client.put(
                 "/api/internal/workflows/alpha",
                 json={"yaml":
-                    "contract:\n  name: alpha\n  source: github\n  repo: a/b\n"
+                    "workflow:\n  name: alpha\n  source: github\n  repo: a/b\n"
                 },
             )
             assert r.status_code == 403

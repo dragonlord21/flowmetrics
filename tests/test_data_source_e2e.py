@@ -59,7 +59,7 @@ def server_url(tmp_path_factory):
     name = "astral-uv-week"
     (contracts_dir / f"{name}.yaml").write_text(
         yaml.safe_dump({
-            "contract": {
+            "workflow": {
                 "name": name, "source": "github",
                 "repo": "astral-sh/uv",
                 "start": "2026-05-04", "stop": "2026-05-10",

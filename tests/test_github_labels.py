@@ -1,7 +1,7 @@
 """Unit tests for the label-driven materializer in github_labels.py.
 
 Each case maps to one row of the resolution table in
-``docs/SPEC-github-labels.md`` §8b. The table is the contract; these
+``docs/SPEC-github-labels.md`` §8b. The table is the workflow; these
 tests pin it.
 """
 

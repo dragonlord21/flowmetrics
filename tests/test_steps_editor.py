@@ -12,7 +12,7 @@ Tests pin:
   - The "Discover from data source" button still wires to the
     `_probe-stages` endpoint (C4 will replace it with a richer
     source-vocab probe; for now the existing endpoint is fine).
-  - Save round-trips a contract whose YAML carries the new
+  - Save round-trips a workflow whose YAML carries the new
     `steps: [{name, wip}]` shape.
   - The edit page's Delete button calls /archive (the C2
     soft-delete path), not the hard DELETE.
@@ -41,7 +41,7 @@ def _seed(client, contract_id: str, steps: list[dict] | None = None) -> None:
     }
     if steps is not None:
         body["steps"] = steps
-    text = yaml.safe_dump({"contract": body})
+    text = yaml.safe_dump({"workflow": body})
     r = client.put(
         f"/api/internal/workflows/{contract_id}",
         json={"yaml": text},

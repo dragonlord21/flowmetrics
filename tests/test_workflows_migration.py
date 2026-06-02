@@ -17,7 +17,7 @@ import yaml
 def _write_yaml(dirpath: Path, name: str, **fields) -> None:
     payload = {"name": name, "source": "github", "repo": "owner/repo"}
     payload.update(fields)
-    (dirpath / f"{name}.yaml").write_text(yaml.safe_dump({"contract": payload}))
+    (dirpath / f"{name}.yaml").write_text(yaml.safe_dump({"workflow": payload}))
 
 
 class TestEnsureInitialized:
@@ -89,9 +89,9 @@ class TestEnsureInitialized:
         ensure_initialized(workflows)
         db = WorkflowsDB(workflows / "workflows.db")
         # User edits the DB row through the API (simulated here).
-        from flowmetrics.workflow import Contract
+        from flowmetrics.workflow import Workflow
         c = db.get("alpha")
-        db.put(Contract(**{**c.model_dump(), "label": "from-api"}))
+        db.put(Workflow(**{**c.model_dump(), "label": "from-api"}))
         # User restores the original YAML.
         _write_yaml(workflows, "alpha", label="from-yaml")
         ensure_initialized(workflows)
@@ -107,8 +107,8 @@ class TestEnsureInitialized:
         workflows = tmp_path / "workflows"
         workflows.mkdir()
         _write_yaml(workflows, "good")
-        # Missing source: → contract parse fails.
-        (workflows / "bad.yaml").write_text("contract: {name: bad}\n")
+        # Missing source: → workflow parse fails.
+        (workflows / "bad.yaml").write_text("workflow: {name: bad}\n")
         ensure_initialized(workflows)
         db = WorkflowsDB(workflows / "workflows.db")
         assert [c.name for c in db.list()] == ["good"]

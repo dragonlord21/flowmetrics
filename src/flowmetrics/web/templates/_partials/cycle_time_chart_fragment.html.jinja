@@ -16,7 +16,7 @@
         work-items request returns with HX-Trigger: ptile-changed;
         the chart reads the current bounds out of #work-items-state
         and swaps its own outerHTML with the filtered fragment. #}
-     hx-get="/api/internal/cycle-time?workflow={{ contract.name }}"
+     hx-get="/api/internal/cycle-time?workflow={{ workflow.name }}"
      hx-trigger="flowmetrics:ptile-changed from:body"
      hx-swap="outerHTML"
      hx-vals='js:{
@@ -66,7 +66,7 @@
         // Carry the current view/reference window into the
         // item page so the filter persists across navigation.
         window.location.href =
-          "/workflows/{{ contract.name }}/items/" +
+          "/workflows/{{ workflow.name }}/items/" +
           encodeURIComponent(cleanId) + window.location.search;
       });
     }).catch(function (err) {

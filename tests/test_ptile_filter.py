@@ -2,7 +2,7 @@
 shared percentile-rank filter used by the cycle-time and aging
 chart renders.
 
-The single contract this module pins: rank assignment matches
+The single workflow this module pins: rank assignment matches
 DuckDB's `PERCENT_RANK()` semantics, so the chart's filter
 result lines up with the SQL filter the table runs. Without
 this, chart-vs-table counts drift whenever the underlying

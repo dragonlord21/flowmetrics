@@ -7,7 +7,7 @@ x-axis becomes an unreadable smear of ~700 daily tick labels and
 the metric is "scoped" by nothing.
 
 Acceptance:
-  - When a contract sets `start`/`stop`, the chart shows EXACTLY
+  - When a workflow sets `start`/`stop`, the chart shows EXACTLY
     that window — every visible date label falls within
     [start, stop].
   - When neither bound is set, the chart caps at the default 90
@@ -73,8 +73,8 @@ class _ServerThread(threading.Thread):
 
 @pytest.fixture(scope="module")
 def server_url(tmp_path_factory):
-    """Materialize the fixture against a 7-day contract window and
-    serve via uvicorn. The contract has `start: 2026-05-04` and
+    """Materialize the fixture against a 7-day workflow window and
+    serve via uvicorn. The workflow has `start: 2026-05-04` and
     `stop: 2026-05-10` so the CFD must show exactly that range.
     """
     from flowmetrics.app import create_app
@@ -86,7 +86,7 @@ def server_url(tmp_path_factory):
     name = "astral-uv-week"
 
     contract_yaml = {
-        "contract": {
+        "workflow": {
             "name": name,
             "source": "github",
             "repo": "astral-sh/uv",

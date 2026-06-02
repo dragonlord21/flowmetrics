@@ -1,7 +1,7 @@
 """Behavioural spec for LogCapture.
 
 LogCapture exists so JSON-mode output never silently drops stderr,
-logging, or warnings. The contract:
+logging, or warnings. The workflow:
 
 1. Inside the `with` block, writes to sys.stderr are redirected to an
    internal buffer (not the real terminal).

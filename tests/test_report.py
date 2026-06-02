@@ -1,6 +1,6 @@
 """Behavioural spec for the typed Report dataclasses.
 
-Reports are the contract between commands and renderers. The spec is
+Reports are the workflow between commands and renderers. The spec is
 deliberately thin — we test the surface that renderers actually use:
 schema string, command label, generated_at timestamp, fields are present
 and immutable.

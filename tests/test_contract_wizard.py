@@ -1,4 +1,4 @@
-"""New-contract wizard — UI + probe-source endpoint.
+"""New-workflow wizard — UI + probe-source endpoint.
 
 The wizard lives at `/admin/workflows/new`. A single form: name +
 label, source picker, and the steps editor (there is no date-window
@@ -49,7 +49,7 @@ class TestWizardPage:
         app = create_app(data_dir=data, contracts_dir=contracts)
         with TestClient(app) as client:
             home = client.get("/").text
-        # "+ New contract" affordance lands users in the wizard.
+        # "+ New workflow" affordance lands users in the wizard.
         assert "/admin/workflows/new" in home
 
 

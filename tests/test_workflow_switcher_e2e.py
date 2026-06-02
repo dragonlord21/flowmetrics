@@ -5,7 +5,7 @@ on (dashboard, metric detail).
 Was decorative until this slice — the dropdown carried the
 correct options but was `disabled`. This test pins:
 
-  1. The dropdown is enabled and lists every contract under
+  1. The dropdown is enabled and lists every workflow under
      `contracts_dir`.
   2. Changing the selection navigates to the chosen workflow.
   3. Sub-route is preserved across the switch — picking a new
@@ -77,7 +77,7 @@ def server_url(tmp_path_factory):
         (contracts_dir / f"{name}.yaml").write_text(
             yaml.safe_dump(
                 {
-                    "contract": {
+                    "workflow": {
                         "name": name,
                         "source": "github",
                         "repo": "astral-sh/uv",
@@ -130,7 +130,7 @@ class TestWorkflowSwitcher:
         self, server_url: str, page: Page
     ):
         """The home page is the workflow picker — lists every
-        contract under contracts_dir as a link to its dashboard.
+        workflow under contracts_dir as a link to its dashboard.
         The picker dropdown was replaced by this list.
 
         Guards two failure modes seen in the wild:

@@ -1,6 +1,6 @@
-"""C1 — Pydantic Contract + Step + new `steps:` YAML shape.
+"""C1 — Pydantic Workflow + Step + new `steps:` YAML shape.
 
-Tests the new canonical contract model:
+Tests the new canonical workflow model:
 
   - Each workflow stage is a `Step(name, wip)` row in an ordered
     `steps` list.
@@ -8,7 +8,7 @@ Tests the new canonical contract model:
   - The legacy `states: {backlog, wip, done}` YAML shape is still
     accepted on import; it's normalised to `steps` internally and
     re-emitted in the new shape.
-  - A `Contract.states` compatibility shim synthesises the old
+  - A `Workflow.states` compatibility shim synthesises the old
     `WorkflowStates(backlog, wip, done)` object so every CFD /
     Aging / charts caller keeps working without modification.
 
@@ -81,8 +81,8 @@ class TestStepModel:
 
 class TestContractModel:
     def test_minimal_github_contract(self):
-        from flowmetrics.workflow import Contract
-        c = Contract(name="foo", source="github", repo="owner/repo")
+        from flowmetrics.workflow import Workflow
+        c = Workflow(name="foo", source="github", repo="owner/repo")
         assert c.name == "foo"
         assert c.source == "github"
         assert c.repo == "owner/repo"
@@ -90,8 +90,8 @@ class TestContractModel:
         assert c.label is None
 
     def test_minimal_jira_contract(self):
-        from flowmetrics.workflow import Contract
-        c = Contract(
+        from flowmetrics.workflow import Workflow
+        c = Workflow(
             name="bar", source="jira",
             jira_url="https://j.example.com",
             jira_project="X",
@@ -99,8 +99,8 @@ class TestContractModel:
         assert c.source == "jira"
 
     def test_steps_preserve_insertion_order(self):
-        from flowmetrics.workflow import Contract, Step
-        c = Contract(
+        from flowmetrics.workflow import Workflow, Step
+        c = Workflow(
             name="x", source="github", repo="a/b",
             steps=[
                 Step(name="Triage", wip=False),
@@ -115,7 +115,7 @@ class TestContractModel:
 
 
 class TestStatesCompatibilityShim:
-    """`Contract.states` must look like the old WorkflowStates so
+    """`Workflow.states` must look like the old WorkflowStates so
     every existing caller (CFD, Aging, charts/cfd, app.py) keeps
     working. Synthesis rule:
       - leading non-WIP steps → backlog
@@ -124,8 +124,8 @@ class TestStatesCompatibilityShim:
     """
 
     def _c(self, *steps):
-        from flowmetrics.workflow import Contract, Step
-        return Contract(
+        from flowmetrics.workflow import Workflow, Step
+        return Workflow(
             name="x", source="github", repo="a/b",
             steps=[Step(name=n, wip=w) for n, w in steps],
         )
@@ -181,7 +181,7 @@ class TestParseNewShape:
     def test_minimal_steps_yaml_roundtrips(self):
         from flowmetrics.workflow import parse_workflow_text
         c = parse_workflow_text(
-            "contract:\n"
+            "workflow:\n"
             "  name: x\n"
             "  source: github\n"
             "  repo: a/b\n"
@@ -205,7 +205,7 @@ class TestParseNewShape:
             parse_workflow_text,
         )
         c = parse_workflow_text(
-            "contract:\n"
+            "workflow:\n"
             "  name: x\n"
             "  source: github\n"
             "  repo: a/b\n"
@@ -233,7 +233,7 @@ class TestParseNewShape:
     def test_steps_wip_defaults_to_false(self):
         from flowmetrics.workflow import parse_workflow_text
         c = parse_workflow_text(
-            "contract:\n"
+            "workflow:\n"
             "  name: x\n"
             "  source: github\n"
             "  repo: a/b\n"
@@ -252,7 +252,7 @@ class TestParseLegacyShape:
     def test_old_shape_yaml_imports_as_ordered_steps(self):
         from flowmetrics.workflow import parse_workflow_text
         c = parse_workflow_text(
-            "contract:\n"
+            "workflow:\n"
             "  name: x\n"
             "  source: github\n"
             "  repo: a/b\n"
@@ -269,7 +269,7 @@ class TestParseLegacyShape:
             ("Review", True),
             ("Merged", False),
         ]
-        # The shim still works on a contract created from the old shape.
+        # The shim still works on a workflow created from the old shape.
         assert c.states.backlog == ("Triage",)
         assert c.states.wip == ("In Progress", "Review")
         assert c.states.done == ("Merged",)
@@ -278,12 +278,12 @@ class TestParseLegacyShape:
 class TestEmitCanonical:
     def test_emit_writes_steps_shape(self):
         from flowmetrics.workflow import (
-            Contract,
+            Workflow,
             Step,
             emit_canonical_yaml,
             parse_workflow_text,
         )
-        c = Contract(
+        c = Workflow(
             name="x", source="github", repo="a/b",
             label="Demo",
             start=date(2026, 5, 1), stop=date(2026, 5, 31),
@@ -307,7 +307,7 @@ class TestEmitCanonical:
             parse_workflow_text,
         )
         original_yaml = (
-            "contract:\n"
+            "workflow:\n"
             "  name: x\n"
             "  source: github\n"
             "  repo: a/b\n"
@@ -323,7 +323,7 @@ class TestEmitCanonical:
 
 class TestLegacyWorkflowStatesStillImportable:
     """A lot of existing tests construct WorkflowStates directly.
-    The name has to stay importable from flowmetrics.contract."""
+    The name has to stay importable from flowmetrics.workflow."""
 
     def test_workflowstates_name_is_importable(self):
         from flowmetrics.workflow import WorkflowStates

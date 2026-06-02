@@ -178,7 +178,7 @@ def observed_stages(
     con: duckdb.DuckDBPyConnection, contract_name: str
 ) -> list[str]:
     """Every distinct stage that has appeared in `transitions` for
-    the contract, sorted alphabetically."""
+    the workflow, sorted alphabetically."""
     rows = con.execute(
         "SELECT DISTINCT stage FROM transitions WHERE contract_id = ?",
         [contract_name],
@@ -192,7 +192,7 @@ def pairwise_stage_precedence(
     """For every ordered pair `(A, B)` of stages, the count of
     items whose first entry into A preceded their first entry
     into B. The CFD's stage-order inference is built on these
-    counts when no contract YAML pins the workflow."""
+    counts when no workflow YAML pins the workflow."""
     rows = con.execute(
         """
         WITH item_stages AS (

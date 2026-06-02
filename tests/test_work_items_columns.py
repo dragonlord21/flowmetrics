@@ -43,7 +43,7 @@ def warehouse() -> duckdb.DuckDBPyConnection:
     (contracts_dir / "demo.yaml").write_text(
         yaml.safe_dump(
             {
-                "contract": {
+                "workflow": {
                     "name": "demo",
                     "source": "github",
                     "repo": "astral-sh/uv",

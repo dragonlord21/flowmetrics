@@ -15,7 +15,7 @@
 
    Required context:
      data           — WorkItemsTableData (carries ptile_ranges).
-     contract.name  — for the HTMX URL.
+     workflow.name  — for the HTMX URL.
 #}
 {%- set active_ranges = data.ptile_ranges -%}
 {%- set is_full = (active_ranges | length == 1 and active_ranges[0][0] == 0 and active_ranges[0][1] == 100) -%}
@@ -52,7 +52,7 @@
   (function () {
     const chips = document.getElementById('ptile-chips');
     if (!chips) return;
-    const contract = {{ contract.name | tojson }};
+    const workflow = {{ workflow.name | tojson }};
 
     function activeRanges() {
       const out = [];
@@ -90,7 +90,7 @@
       const completedOn = document.getElementById('work-items-completed-on');
       const inFlightAt = document.getElementById('work-items-in-flight-at');
       const qs = new URLSearchParams({
-        workflow: contract,
+        workflow: workflow,
         from: 'slider',
         ptile_ranges: param,
         ptile_thresholds: ptileThresholds,

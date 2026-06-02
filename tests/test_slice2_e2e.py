@@ -56,25 +56,25 @@ FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 def _materialize_aging_demo(
     contracts_dir: Path, data_dir: Path, cache_dir: Path
 ) -> None:
-    """Materialize a synthetic `aging-demo` contract whose warehouse
+    """Materialize a synthetic `aging-demo` workflow whose warehouse
     holds genuine in-flight items.
 
     Aging WIP is pinned to the in-flight snapshot date. The
     `astral-uv-week` fixture is all completed work, so its aging
     chart is legitimately empty — it can't give browser evidence
-    that a *populated* aging chart renders. This contract can:
+    that a *populated* aging chart renders. This workflow can:
     four open items (staggered ages) for the dot cloud, plus six
     completed items as the cycle-time sample the P50/P85/P95
     reference lines are drawn from.
     """
     from flowmetrics.compute import WorkItem
-    from flowmetrics.workflow import Contract
+    from flowmetrics.workflow import Workflow
     from flowmetrics.materialize import materialize
 
     name = "aging-demo"
     (contracts_dir / f"{name}.yaml").write_text(
         yaml.safe_dump({
-            "contract": {
+            "workflow": {
                 "name": name, "source": "github", "repo": "x/y",
                 "start": "2026-01-01", "stop": "2026-12-31",
             }
@@ -116,7 +116,7 @@ def _materialize_aging_demo(
         return_value=source,
     ):
         materialize(
-            contract=Contract(
+            workflow=Workflow(
                 name=name, source="github", repo="x/y",
                 start=date(2026, 1, 1), stop=date(2026, 12, 31),
             ),
@@ -177,7 +177,7 @@ def server_url(tmp_path_factory):
     # Materialize once via the public CLI so this also exercises the
     # Slice 1 path end-to-end.
     contract_yaml = {
-        "contract": {
+        "workflow": {
             "name": name,
             "source": "github",
             "repo": "astral-sh/uv",
@@ -203,7 +203,7 @@ def server_url(tmp_path_factory):
     )
     assert res.exit_code == 0, f"fixture materialize failed: {res.output}"
 
-    # A second contract with genuine in-flight items, so the aging
+    # A second workflow with genuine in-flight items, so the aging
     # chart has something to draw (see `_materialize_aging_demo`).
     _materialize_aging_demo(contracts_dir, data_dir, tmp_path / "cache")
 
@@ -409,7 +409,7 @@ class TestDetailPageCycleTime:
 
 class TestContractScopedUrls:
     """User-reported feature gap: the dashboard URL must encode the
-    contract id so the system is multi-contract-ready by URL shape.
+    workflow id so the system is multi-workflow-ready by URL shape.
     `/metrics/cycle-time` (the singular form) is no longer the
     canonical URL; the canonical form is
     `/workflows/{contract_id}/metrics/cycle-time`.
@@ -436,7 +436,7 @@ class TestContractScopedUrls:
         self, server_url: str, page: Page
     ):
         """The Details → link on the dashboard tile must point at
-        the contract-scoped URL, not the singular legacy form."""
+        the workflow-scoped URL, not the singular legacy form."""
         page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
         link = page.locator("#cycle-time-tile a:has-text('Details')")
@@ -451,7 +451,7 @@ class TestContractScopedUrls:
     def test_unknown_contract_returns_404(self, server_url: str, page: Page):
         response = page.request.get(server_url + "/workflows/does-not-exist/")
         assert response.status == 404, (
-            f"expected 404 for unknown contract; got {response.status}"
+            f"expected 404 for unknown workflow; got {response.status}"
         )
 
 
@@ -697,7 +697,7 @@ class TestDetailPageNoSubtitleNoise:
 
 class TestDetailPageHeader:
     """The metric name lives in the site header on detail pages —
-    `flowmetrics · <contract> · <metric>` — so the page identifies
+    `flowmetrics · <workflow> · <metric>` — so the page identifies
     itself at the top of the viewport, not buried in the metric
     summary section halfway down. Dashboard pages don't show a
     metric name in the header (they're multi-metric).
@@ -713,9 +713,9 @@ class TestDetailPageHeader:
             f"detail page site header must include the metric name; "
             f"got {header_text!r}"
         )
-        # Contract name still present.
+        # Workflow name still present.
         assert "astral-uv-week" in header_text, (
-            f"detail page site header must still include the contract "
+            f"detail page site header must still include the workflow "
             f"name; got {header_text!r}"
         )
 
@@ -723,7 +723,7 @@ class TestDetailPageHeader:
         self, server_url: str, page: Page
     ):
         """The dashboard shows multiple metrics; pinning one name to
-        the header would be wrong. The contract name is what
+        the header would be wrong. The workflow name is what
         identifies the page."""
         page.goto(server_url + "/workflows/astral-uv-week/")
         page.wait_for_selector("#cycle-time-tile svg", timeout=10000)
@@ -821,7 +821,7 @@ class TestThroughputOnDashboard:
         assert href and href.startswith(
             "/workflows/astral-uv-week/metrics/throughput"
         ), (
-            f"throughput Details → must link to the contract-scoped "
+            f"throughput Details → must link to the workflow-scoped "
             f"URL; got {href!r}"
         )
 
@@ -994,7 +994,7 @@ class TestAgingOnDashboard:
     materialize) — it does not follow the Period picker. The
     `astral-uv-week` fixture is all completed work, so its aging
     chart is legitimately empty; tests that need a populated chart
-    point at the `aging-demo` contract (real in-flight items).
+    point at the `aging-demo` workflow (real in-flight items).
     """
 
     def test_dashboard_renders_aging_tile_with_zero_items_by_default(
@@ -1023,7 +1023,7 @@ class TestAgingOnDashboard:
     def test_aging_detail_renders_in_flight_dots(
         self, server_url: str, page: Page
     ):
-        """The `aging-demo` contract has four genuine in-flight
+        """The `aging-demo` workflow has four genuine in-flight
         items at the snapshot date. The chart must draw a point
         mark for each.
 
@@ -1099,7 +1099,7 @@ class TestAgingOnDashboard:
         href = link.get_attribute("href")
         assert href and href.startswith(
             "/workflows/astral-uv-week/metrics/aging"
-        ), f"aging Details → must link to contract-scoped URL; got {href!r}"
+        ), f"aging Details → must link to workflow-scoped URL; got {href!r}"
 
     def test_default_asof_shows_actionable_coverage_gap_message(
         self, server_url: str, page: Page
@@ -1141,7 +1141,7 @@ class TestAgingOnDashboard:
 
         This e2e test just confirms the empty-state machinery
         EXISTS on the rendered page (one of the messages), not
-        which branch lit up — the component contract is pinned
+        which branch lit up — the component workflow is pinned
         directly by the unit tests (TestAgingShape)."""
         page.goto(
             server_url + "/workflows/astral-uv-week/metrics/aging"
@@ -1186,11 +1186,11 @@ class TestAgingOnDashboard:
 
 class TestWorkflowUrls:
     """URL & terminology rename: `/workflows/{id}` →
-    `/workflows/{id}[/{slug}]` and `?contract=` → `?workflow=`.
+    `/workflows/{id}[/{slug}]` and `?workflow=` → `?workflow=`.
 
-    "Contract" was internal jargon ("no engineer would use that
+    "Workflow" was internal jargon ("no engineer would use that
     word"). External surfaces (URLs, query params, UI labels) now
-    use "workflow"; the YAML format keeps the `contract:` key for
+    use "workflow"; the YAML format keeps the `workflow:` key for
     now since renaming the on-disk schema is a separate change.
 
     The slug is decorative — derived from the workflow's source
@@ -1257,11 +1257,11 @@ class TestWorkflowUrls:
         re-introduction of `/contracts/...` routes."""
         r = page.request.get(server_url + "/contracts/astral-uv-week")
         assert r.status == 404
-        # Hitting the endpoint with `?contract=` (instead of
+        # Hitting the endpoint with `?workflow=` (instead of
         # `?workflow=`) should fail param validation — `workflow`
         # is now the required name.
         r2 = page.request.get(
-            server_url + "/api/internal/cycle-time?contract=astral-uv-week"
+            server_url + "/api/internal/cycle-time?workflow=astral-uv-week"
         )
         assert r2.status in (400, 404, 422), r2.status
 
@@ -1283,7 +1283,7 @@ class TestWorkflowUrls:
     def test_filter_bar_does_not_say_contract(
         self, server_url: str, page: Page
     ):
-        """Internal `contract` naming stays out of the filter
+        """Internal `workflow` naming stays out of the filter
         controls' user-facing copy. (The page-top filter bar was
         removed in the scope-by-section dashboard; the Period /
         Reference picker now lives in the windowed section's scope
@@ -1291,8 +1291,8 @@ class TestWorkflowUrls:
         page.goto(server_url + "/workflows/astral-uv-week")
         page.wait_for_selector(".scope-section-header--filter", timeout=10000)
         bar = page.locator(".scope-section-header--filter").inner_text()
-        assert "Contract" not in bar, (
-            f"filter controls must not say 'Contract'; got {bar!r}"
+        assert "Workflow" not in bar, (
+            f"filter controls must not say 'Workflow'; got {bar!r}"
         )
 
     def test_header_workflow_chip_links_to_dashboard_on_detail_pages(
@@ -1329,7 +1329,7 @@ class TestWorkflowUrls:
 class TestSiteBrandLink:
     """The "flowmetrics" brand text in the site header is a link to
     the home page (`/`). Standard web convention; lets the user
-    bounce back to the contract selector / dashboard from any
+    bounce back to the workflow selector / dashboard from any
     detail or lifecycle page without using the browser back button.
     """
 
@@ -1347,7 +1347,7 @@ class TestSiteBrandLink:
         )
         href = brand.get_attribute("href")
         assert href == "/", (
-            f"brand link must href='/' so it routes to the contract "
+            f"brand link must href='/' so it routes to the workflow "
             f"redirect; got {href!r}"
         )
         # Text content unchanged.
@@ -1629,7 +1629,7 @@ class TestWorkItemsTableOnDetailPages:
 
 
 class TestWorkItemsFragmentEndpoint:
-    """`/api/internal/work-items?contract=X&sort=…&direction=…&q=…`
+    """`/api/internal/work-items?workflow=X&sort=…&direction=…&q=…`
     returns the work-items partial only (no page chrome). It's the
     HTMX swap target for sort/filter interactions.
     """
@@ -1770,7 +1770,7 @@ class TestLifecyclePage:
     def _url(item_id: str) -> str:
         """URL builder for the lifecycle page.
 
-        The data-source (github / jira) is implicit in the contract,
+        The data-source (github / jira) is implicit in the workflow,
         not in the URL. The GitHub `#` is stripped from the URL path
         since `%23` reads as junk to humans; the route accepts both
         forms and resolves to the canonical `#…` id internally.
@@ -1831,7 +1831,7 @@ class TestLifecyclePage:
     def test_lifecycle_header_shows_item_identity(
         self, server_url: str, page: Page
     ):
-        """Site header carries item id + contract for either mode."""
+        """Site header carries item id + workflow for either mode."""
         page.goto(server_url + self._url(self._CHARTABLE))
         page.wait_for_selector("#lifecycle-chart svg", timeout=10000)
         header_text = page.locator(".site-header").inner_text()
@@ -1922,7 +1922,7 @@ class TestLifecyclePage:
     ):
         """The URL path strips the GitHub `#` so the URL doesn't
         contain `%23`. The route resolves `/items/19342` to the
-        warehouse id `#19342` for a GitHub-source contract."""
+        warehouse id `#19342` for a GitHub-source workflow."""
         # The bare numeric form (no `#`, no `%23`) must work.
         response = page.request.get(
             server_url
@@ -1930,7 +1930,7 @@ class TestLifecyclePage:
         )
         assert response.status == 200, (
             f"bare numeric id should route to the canonical `#19342` "
-            f"for a github-source contract; got {response.status}"
+            f"for a github-source workflow; got {response.status}"
         )
 
 

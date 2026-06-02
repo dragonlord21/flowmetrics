@@ -1,9 +1,9 @@
-"""Tests for the contract YAML's `states:` block — the 3-category
+"""Tests for the workflow YAML's `states:` block — the 3-category
 classification of workflow states.
 
 Schema:
 
-    contract:
+    workflow:
       ...
       states:
         backlog: [Triage Needed, Open]        # excluded from CFD
@@ -33,7 +33,7 @@ def _write(tmp: Path, name: str, body: dict) -> Path:
     p = tmp / f"{name}.yaml"
     p.write_text(
         yaml.safe_dump(
-            {"contract": {"name": name, **body}}, sort_keys=False
+            {"workflow": {"name": name, **body}}, sort_keys=False
         )
     )
     return tmp

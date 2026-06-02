@@ -38,19 +38,19 @@ def _warehouse() -> duckdb.DuckDBPyConnection:
         )"""
     )
     rows = [
-        # contract "c" — three completed, completion-ascending
+        # workflow "c" — three completed, completion-ascending
         ("c", "github", "#1", "first", "http://x/1",
          datetime(2026, 1, 1), datetime(2026, 1, 4), 3.0),
         ("c", "github", "#2", "second", None,
          datetime(2026, 1, 2), datetime(2026, 1, 9), 7.0),
         ("c", "github", "#3", "third", "http://x/3",
          datetime(2026, 1, 1), datetime(2026, 2, 1), 31.0),
-        # contract "c" — two in flight (completed_at NULL)
+        # workflow "c" — two in flight (completed_at NULL)
         ("c", "github", "#4", "open", None,
          datetime(2026, 1, 5), None, None),
         ("c", "github", "#5", "open2", None,
          datetime(2026, 1, 6), None, None),
-        # a different contract — must be excluded
+        # a different workflow — must be excluded
         ("other", "github", "#9", "elsewhere", None,
          datetime(2026, 1, 1), datetime(2026, 1, 2), 1.0),
     ]
@@ -256,7 +256,7 @@ def _warehouse_with_materialized() -> duckdb.DuckDBPyConnection:
              datetime(2026, 5, 3, 9, 0)),
             ("other", "github", "#9", "x", None,
              datetime(2026, 1, 1), datetime(2026, 1, 2), 1.0,
-             datetime(2099, 1, 1)),  # other contract — must be excluded
+             datetime(2099, 1, 1)),  # other workflow — must be excluded
         ],
     )
     return con
@@ -273,7 +273,7 @@ class TestCompletionDateRange:
         assert completion_date_range(_warehouse_with_materialized(), "nope") == (None, None)
 
     def test_no_completions_yields_none_none(self):
-        # only in-flight items for the contract.
+        # only in-flight items for the workflow.
         con = duckdb.connect(":memory:")
         con.execute(
             """CREATE TABLE work_items (

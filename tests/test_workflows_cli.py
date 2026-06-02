@@ -32,7 +32,7 @@ def _make_yaml(workflows_dir: Path, name: str, *, repo: str = "owner/repo") -> N
     workflows_dir.mkdir(parents=True, exist_ok=True)
     (workflows_dir / f"{name}.yaml").write_text(
         f"""
-contract:
+workflow:
   name: {name}
   source: github
   repo: {repo}
@@ -55,7 +55,7 @@ def _write_db_row(
     workflows_dir.mkdir(parents=True, exist_ok=True)
     db = workflows_dir / "contracts.db"
     yaml = (
-        f"contract:\n"
+        f"workflow:\n"
         f"  name: {name}\n"
         f"  source: github\n"
         f"  repo: {repo}\n"
@@ -134,7 +134,7 @@ class TestListsYamlFallback:
         """A user can drop a YAML into the workflows-dir without
         having run `flow serve` (which is what migrates YAMLs into
         the DB). `flow workflows list` must still see them so
-        `flow materialize NAME` against a YAML-only contract is
+        `flow materialize NAME` against a YAML-only workflow is
         discoverable."""
         wf = tmp_path / "contracts"
         _make_yaml(wf, "scripted-workflow")

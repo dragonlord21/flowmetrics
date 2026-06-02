@@ -41,7 +41,7 @@ FIXTURE_CACHE = Path(__file__).parent / "fixtures" / "cache"
 def _materialize_wide(
     contracts_dir: Path, data_dir: Path, cache_dir: Path
 ) -> None:
-    """Materialize a `wide-demo` contract whose completions span
+    """Materialize a `wide-demo` workflow whose completions span
     ~130 days, plus a few in-flight items.
 
     The `astral-uv-week` fixture only holds one week of data, so a
@@ -51,13 +51,13 @@ def _materialize_wide(
     windows visibly diverge.
     """
     from flowmetrics.compute import WorkItem
-    from flowmetrics.workflow import Contract
+    from flowmetrics.workflow import Workflow
     from flowmetrics.materialize import materialize
 
     name = "wide-demo"
     (contracts_dir / f"{name}.yaml").write_text(
         yaml.safe_dump({
-            "contract": {
+            "workflow": {
                 "name": name, "source": "github", "repo": "x/y",
                 "start": "2025-01-01", "stop": "2027-12-31",
             }
@@ -100,7 +100,7 @@ def _materialize_wide(
         return_value=source,
     ):
         materialize(
-            contract=Contract(
+            workflow=Workflow(
                 name=name, source="github", repo="x/y",
                 start=date(2025, 1, 1), stop=date(2027, 12, 31),
             ),
@@ -143,7 +143,7 @@ def server_url(tmp_path_factory):
     name = "astral-uv-week"
     (contracts_dir / f"{name}.yaml").write_text(
         yaml.safe_dump({
-            "contract": {
+            "workflow": {
                 "name": name, "source": "github",
                 "repo": "astral-sh/uv",
                 "start": "2026-05-04", "stop": "2026-05-10",
@@ -163,7 +163,7 @@ def server_url(tmp_path_factory):
     )
     assert res.exit_code == 0, res.output
 
-    # A second contract whose data spans ~130 days — the filter-
+    # A second workflow whose data spans ~130 days — the filter-
     # propagation tests need that spread (see `_materialize_wide`).
     _materialize_wide(contracts_dir, data_dir, tmp_path / "cache")
 

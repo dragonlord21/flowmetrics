@@ -8,8 +8,8 @@ Slice 2 ships two routes:
   GET /                     dashboard with the cycle-time tile
   GET /metrics/cycle-time   detail page reusing the same partial
 
-Both routes resolve `contract` from a query string (or, for now,
-the first contract found under contracts_dir).
+Both routes resolve `workflow` from a query string (or, for now,
+the first workflow found under contracts_dir).
 
 The factory takes data_dir + contracts_dir explicitly so we can
 stand up multiple isolated instances per the multi-instance design.
@@ -147,10 +147,10 @@ open_warehouse_for_test = open_warehouse
 
 
 class WorkflowView:
-    """Per-request workflow handle. Loads the contract once,
+    """Per-request workflow handle. Loads the workflow once,
     exposes the warehouse, and orchestrates renders. Replaces
     the older `_workflow_context` + `_workflow_slug` + `_workflow_system_label`
-    + `load_contract` chain that loaded the contract three times
+    + `load_contract` chain that loaded the workflow three times
     per dashboard request.
 
     Routes pattern:
@@ -159,7 +159,7 @@ class WorkflowView:
             cfd = view.render_cfd(con)
         return templates.TemplateResponse(
             request, "cfd_detail.html.jinja",
-            {"contract": view.template_context(), "cfd": cfd, ...},
+            {"workflow": view.template_context(), "cfd": cfd, ...},
         )
     """
 
@@ -174,7 +174,7 @@ class WorkflowView:
     ) -> None:
         self.id = workflow_id
         self._data_dir = data_dir
-        # Load the contract via the DB when one is supplied (the
+        # Load the workflow via the DB when one is supplied (the
         # runtime path); fall back to the legacy filesystem path
         # for any code path that hasn't been wired through yet.
         if contracts_db is not None:
@@ -182,12 +182,12 @@ class WorkflowView:
             if meta is None or meta.archived_at is not None:
                 from .workflow import WorkflowError
                 raise WorkflowError(
-                    f"contract {workflow_id!r} not in the live "
+                    f"workflow {workflow_id!r} not in the live "
                     f"store at {contracts_dir / 'contracts.db'}"
                 )
-            self.contract = meta.contract
+            self.workflow = meta.workflow
         else:
-            self.contract = load_contract(workflow_id, contracts_dir)
+            self.workflow = load_contract(workflow_id, contracts_dir)
         today_utc = datetime.now(UTC).date()
         # The completion-data coverage. `data_max_date` anchors
         # the reference period; both bound the filter-bar date
@@ -283,9 +283,9 @@ class WorkflowView:
         return {
             "name": self.id,
             # Human-friendly display name. Templates render
-            # `contract.label` in breadcrumbs / home-page lists;
-            # `contract.name` stays the URL-safe routing ID.
-            "label": self.contract.label or self.id,
+            # `workflow.label` in breadcrumbs / home-page lists;
+            # `workflow.name` stays the URL-safe routing ID.
+            "label": self.workflow.label or self.id,
             "slug": self._slug(),
             # The one filter model — see flowmetrics.windows.
             "window": self.selection,
@@ -313,7 +313,7 @@ class WorkflowView:
             # Source display name for the snapshot-section aside
             # ("most recent GitHub import" / "Jira import").
             "source_display": _SOURCE_DISPLAY.get(
-                self.contract.source, self.contract.source.title()
+                self.workflow.source, self.workflow.source.title()
             ),
         }
 
@@ -326,7 +326,7 @@ class WorkflowView:
         )
 
     def _slug(self) -> str:
-        c = self.contract
+        c = self.workflow
         if c.source == "github" and c.repo:
             return c.repo.lower().replace("/", "-").replace(".", "-")
         if c.source == "jira" and c.jira_project:
@@ -342,7 +342,7 @@ class WorkflowView:
         # y-axis floor slider crops that inert base.
         return render_cfd(
             con, self.id,
-            states=self.contract.states,
+            states=self.workflow.states,
             view=self.view_window,
         )
 
@@ -361,7 +361,7 @@ class WorkflowView:
         return render_aging(
             con, self.id,
             asof=asof,
-            states=self.contract.states,
+            states=self.workflow.states,
             reference=self.selection.reference,
             ptile_min=ptile_min, ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
@@ -425,7 +425,7 @@ def create_app(
     """Build a FastAPI app reading from this data dir.
 
     Each call returns an isolated app — multiple instances (one per
-    contract scope / data directory) share zero state. Mounted as a
+    workflow scope / data directory) share zero state. Mounted as a
     subprocess of uvicorn, started by `flow serve`.
 
     `cache_dir` is the source-API response cache (used by the
@@ -437,7 +437,7 @@ def create_app(
     auth (user='operator', password matches). Used for off-localhost
     binds where Tailscale or Caddy fronts the app.
     """
-    # The contract store is the single YAML/DB persistence adapter
+    # The workflow store is the single YAML/DB persistence adapter
     # (see flowmetrics.contracts_db.WorkflowStore). `ensure_initialized`
     # is the first-boot migration: import any legacy YAMLs in the
     # workflows dir into the SQLite store, then move them to `migrated/`.
@@ -577,7 +577,7 @@ def create_app(
     def _open_view(
         workflow_id: str, request: Request | None = None,
     ) -> WorkflowView:
-        """Factory: 404 if the contract YAML is missing, else
+        """Factory: 404 if the workflow YAML is missing, else
         return a WorkflowView. Centralizes the (exists-check +
         construct + bind to factory data/contracts dirs) shape
         that every route used to inline. When `request` is
@@ -608,13 +608,13 @@ def create_app(
             return None
 
     def _ensure_contract_exists(name: str) -> None:
-        """Confirm a contract exists in the live store; otherwise
+        """Confirm a workflow exists in the live store; otherwise
         404 with a clear message."""
         if contracts_db.get_meta(name) is None or _is_archived(name):
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"contract {name!r} not found in the workflows "
+                    f"workflow {name!r} not found in the workflows "
                     f"store at {contracts_dir / 'contracts.db'}. "
                     "Create one through /admin/workflows/new, or "
                     "drop a YAML in this directory and restart."
@@ -626,7 +626,7 @@ def create_app(
         return meta is not None and meta.archived_at is not None
 
     def _first_contract_or_404() -> str:
-        """Pick the first live contract, or 404 with a clear
+        """Pick the first live workflow, or 404 with a clear
         message if there are none."""
         rows = contracts_db.list()
         if not rows:
@@ -642,11 +642,11 @@ def create_app(
         return rows[0].name
 
     def _available_contracts() -> list[str]:
-        """Live contract ids, alphabetical."""
+        """Live workflow ids, alphabetical."""
         return [m.name for m in contracts_db.list()]
 
     def _raw_yaml_text(name: str) -> str | None:
-        """The contract's canonical YAML body — returned to the UI
+        """The workflow's canonical YAML body — returned to the UI
         for the textarea-fallback / diff view. None when the row
         is missing."""
         meta = contracts_db.get_meta(name)
@@ -679,7 +679,7 @@ def create_app(
         }
 
     def _load_contract_for_request(name: str):
-        """Load a Contract from the DB by id. Raises HTTPException on
+        """Load a Workflow from the DB by id. Raises HTTPException on
         404 (missing) or 500 (parser failure, which shouldn't happen
         since the DB only stores YAMLs that passed validation on
         write, but be defensive)."""
@@ -688,15 +688,15 @@ def create_app(
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"contract {name!r} not found in "
+                    f"workflow {name!r} not found in "
                     f"{contracts_dir / 'contracts.db'}."
                 ),
             )
-        return meta.contract
+        return meta.workflow
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def home(request: Request) -> HTMLResponse:
-        """Landing page — lists every contract under contracts_dir
+        """Landing page — lists every workflow under contracts_dir
         as a link to its dashboard. The brand link in the header
         always lands here so the operator can pivot between
         workflows without dropping into a specific one first."""
@@ -724,15 +724,15 @@ def create_app(
                 # where the default `./contracts` is empty/missing
                 # and need to see the resolved path to debug.
                 "contracts_dir_display": str(contracts_dir.resolve()),
-                # Empty contract keeps `_base.html.jinja` header
+                # Empty workflow keeps `_base.html.jinja` header
                 # / filter-bar guards happy without implying a
                 # current workflow.
-                "contract": None,
+                "workflow": None,
             },
         )
 
     # ------------------------------------------------------------------
-    # Contract management API (B1+). Read endpoints first; the wizard
+    # Workflow management API (B1+). Read endpoints first; the wizard
     # UI (B3..B5) layers on top.
     # ------------------------------------------------------------------
 
@@ -764,9 +764,9 @@ def create_app(
         out = []
         for meta in contracts_db.list(include_archived=include_archived):
             entry = {
-                "id": meta.contract.name,
-                "label": meta.contract.label or meta.contract.name,
-                "source": meta.contract.source,
+                "id": meta.workflow.name,
+                "label": meta.workflow.label or meta.workflow.name,
+                "source": meta.workflow.source,
             }
             if include_archived:
                 entry["archived"] = meta.archived_at is not None
@@ -779,7 +779,7 @@ def create_app(
     def get_contract(
         contract_id: str, include_archived: bool = False,
     ) -> dict:
-        """Full detail for one contract.
+        """Full detail for one workflow.
 
         Default: archived rows return 404. Pass
         `?include_archived=true` to fetch an archived row; the
@@ -789,17 +789,17 @@ def create_app(
         if meta is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"contract {contract_id!r} not found",
+                detail=f"workflow {contract_id!r} not found",
             )
         if meta.archived_at is not None and not include_archived:
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"contract {contract_id!r} is archived. "
+                    f"workflow {contract_id!r} is archived. "
                     "Pass ?include_archived=true to fetch."
                 ),
             )
-        c = meta.contract
+        c = meta.workflow
         parsed: dict = {
             "name": c.name,
             "source": c.source,
@@ -847,14 +847,14 @@ def create_app(
         dependencies=auth_dep,
     )
     def new_contract_wizard(request: Request) -> HTMLResponse:
-        """The new-contract wizard. Pure form + JS — the actual
+        """The new-workflow wizard. Pure form + JS — the actual
         write goes through PUT /api/internal/workflows/{id}."""
         return templates.TemplateResponse(
             request,
             "contracts_new.html.jinja",
             {
                 "title": "New workflow · flowmetrics",
-                "contract": None,
+                "workflow": None,
                 "contracts_dir_display": str(contracts_dir.resolve()),
                 "wizard_mode": "new",
                 "edit_id": None,
@@ -869,7 +869,7 @@ def create_app(
     def edit_contract_page(
         request: Request, contract_id: str,
     ) -> HTMLResponse:
-        """Edit-existing-contract page. Reuses the wizard template;
+        """Edit-existing-workflow page. Reuses the wizard template;
         the JS detects `mode=edit` and hydrates fields from
         GET /api/internal/workflows/{id} on load."""
         _ensure_contract_exists(contract_id)
@@ -878,7 +878,7 @@ def create_app(
             "contracts_new.html.jinja",
             {
                 "title": f"Edit {contract_id} · flowmetrics",
-                "contract": None,
+                "workflow": None,
                 "contracts_dir_display": str(contracts_dir.resolve()),
                 "wizard_mode": "edit",
                 "edit_id": contract_id,
@@ -892,7 +892,7 @@ def create_app(
     def export_contract_yaml(
         contract_id: str, include_archived: bool = False,
     ):
-        """Return the contract's canonical YAML as a downloadable
+        """Return the workflow's canonical YAML as a downloadable
         attachment. 404 on archived rows unless
         ?include_archived=true."""
         from fastapi.responses import Response
@@ -901,13 +901,13 @@ def create_app(
         if meta is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"contract {contract_id!r} not found",
+                detail=f"workflow {contract_id!r} not found",
             )
         if meta.archived_at is not None and not include_archived:
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"contract {contract_id!r} is archived. Pass "
+                    f"workflow {contract_id!r} is archived. Pass "
                     "?include_archived=true to export."
                 ),
             )
@@ -935,9 +935,9 @@ def create_app(
         ]
         archived = [
             {
-                "id": m.contract.name,
-                "label": m.contract.label or m.contract.name,
-                "source": m.contract.source,
+                "id": m.workflow.name,
+                "label": m.workflow.label or m.workflow.name,
+                "source": m.workflow.source,
                 "archived_at": m.archived_at,
                 "archived_reason": m.archived_reason,
             }
@@ -948,7 +948,7 @@ def create_app(
             "contracts_archive.html.jinja",
             {
                 "title": "Archived workflows · flowmetrics",
-                "contract": None,
+                "workflow": None,
                 "archived": archived,
             },
         )
@@ -958,9 +958,9 @@ def create_app(
         dependencies=write_dep,
     )
     def dry_run(payload: dict, request: Request) -> dict:
-        """Preview a contract definition against live source data.
+        """Preview a workflow definition against live source data.
 
-        Takes the in-progress contract payload + `{since, items_cap}`,
+        Takes the in-progress workflow payload + `{since, items_cap}`,
         calls a bounded fetch (≤200 items OR ≤30 days from `since`),
         and buckets items per the user's steps using
         `Step.effective_matches`. Items whose current stage doesn't
@@ -971,7 +971,7 @@ def create_app(
 
         Items NEVER enter the warehouse — the dry-run is ephemeral.
         """
-        c_payload = payload.get("contract") or {}
+        c_payload = payload.get("workflow") or {}
         source = c_payload.get("source")
         if source not in ("github", "jira"):
             raise HTTPException(
@@ -1191,7 +1191,7 @@ def create_app(
         "/api/internal/workflows/{contract_id}", dependencies=write_dep,
     )
     def put_contract(contract_id: str, payload: dict) -> dict:
-        """Create or overwrite a contract. Body must carry a `yaml`
+        """Create or overwrite a workflow. Body must carry a `yaml`
         STRING that parses against `parse_workflow_text` with
         `name == contract_id`. The DB owns the storage — no
         filesystem write."""
@@ -1199,7 +1199,7 @@ def create_app(
 
         text = payload.get("yaml") or ""
         try:
-            contract = parse_workflow_text(text, contract_id)
+            workflow = parse_workflow_text(text, contract_id)
         except WorkflowError as exc:
             errors = validate_yaml_text_structured(text, contract_id)
             raise HTTPException(
@@ -1207,7 +1207,7 @@ def create_app(
                 detail={"message": str(exc), "errors": errors},
             ) from exc
         try:
-            contracts_db.put(contract)
+            contracts_db.put(workflow)
         except WorkflowsDBError as exc:
             # e.g. id collides with an archived row.
             raise HTTPException(
@@ -1229,7 +1229,7 @@ def create_app(
         if meta is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"contract {contract_id!r} not found",
+                detail=f"workflow {contract_id!r} not found",
             )
         reason = (payload or {}).get("reason")
         try:
@@ -1250,7 +1250,7 @@ def create_app(
         if meta is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"contract {contract_id!r} not found",
+                detail=f"workflow {contract_id!r} not found",
             )
         try:
             contracts_db.restore(contract_id)
@@ -1264,7 +1264,7 @@ def create_app(
     async def delete_contract(
         contract_id: str, request: Request,
     ) -> dict:
-        """**Hard delete.** Refuses unless the contract is already
+        """**Hard delete.** Refuses unless the workflow is already
         archived (the two-step delete invariant — POST to /archive
         first). Independent of `purge_data`, which controls whether
         the warehouse partitions get wiped alongside the row."""
@@ -1274,13 +1274,13 @@ def create_app(
         if meta is None:
             raise HTTPException(
                 status_code=404,
-                detail=f"contract {contract_id!r} not found",
+                detail=f"workflow {contract_id!r} not found",
             )
         if meta.archived_at is None:
             raise HTTPException(
                 status_code=409,
                 detail=(
-                    f"contract {contract_id!r} is live; archive it "
+                    f"workflow {contract_id!r} is live; archive it "
                     "first (POST /api/internal/workflows/"
                     f"{contract_id}/archive) before hard-deleting."
                 ),
@@ -1332,7 +1332,7 @@ def create_app(
             {
                 "title": f"Cumulative Flow — {workflow_id}",
                 "metric_name": "Cumulative Flow",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "cfd": cfd,
@@ -1354,7 +1354,7 @@ def create_app(
             {
                 "data": cfd,
                 "chart_height": 320,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
             },
         )
 
@@ -1380,7 +1380,7 @@ def create_app(
             {
                 "title": f"Data Source — {workflow_id}",
                 "metric_name": "Data Source",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "workflow": workflow_id,
@@ -1499,7 +1499,7 @@ def create_app(
             "dashboard.html.jinja",
             {
                 "title": f"flowmetrics — {workflow_id}",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
             },
@@ -1519,7 +1519,7 @@ def create_app(
         anchor / view_days / ref_days) so the selected window
         propagates to the tile's renders."""
         view = _open_view(workflow, request)
-        ctx: dict = {"contract": view.template_context()}
+        ctx: dict = {"workflow": view.template_context()}
         with view.warehouse() as con:
             if metric == "cycle-time":
                 ctx["data"] = view.render_cycle_time(con)
@@ -1605,7 +1605,7 @@ def create_app(
                 # the viewport. Dashboard routes pass no
                 # `metric_name` — the header stays multi-metric-neutral.
                 "metric_name": "Cycle time",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "cycle_time": cycle_time,
@@ -1644,8 +1644,8 @@ def create_app(
                 "data": cycle_time,
                 "chart_height": 320,
                 # Templates that the fragment includes (the chart
-                # partial reads `contract.name` for href/hx-get URLs).
-                "contract": view.template_context(),
+                # partial reads `workflow.name` for href/hx-get URLs).
+                "workflow": view.template_context(),
             },
         )
 
@@ -1667,7 +1667,7 @@ def create_app(
             {
                 "title": f"Throughput — {workflow_id}",
                 "metric_name": "Throughput",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "throughput": throughput,
@@ -1692,7 +1692,7 @@ def create_app(
             {
                 "data": throughput,
                 "chart_height": 280,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
             },
         )
 
@@ -1728,8 +1728,8 @@ def create_app(
                 sort="created_at",
                 direction="asc",
                 wip_states=(
-                    view.contract.states.wip
-                    if view.contract.states else None
+                    view.workflow.states.wip
+                    if view.workflow.states else None
                 ),
                 ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
@@ -1749,7 +1749,7 @@ def create_app(
             {
                 "title": f"Aging WIP — {workflow_id}",
                 "metric_name": "Aging WIP",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "aging": aging,
@@ -1796,7 +1796,7 @@ def create_app(
             {
                 "title": f"Forecast — {workflow_id}",
                 "metric_name": "Forecast",
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "when_done": when_done,
@@ -1833,7 +1833,7 @@ def create_app(
             "_partials/forecast_when_done_chart_fragment.html.jinja",
             {
                 "data": data,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "chart_height": 280,
             },
         )
@@ -1867,7 +1867,7 @@ def create_app(
             "_partials/forecast_how_many_chart_fragment.html.jinja",
             {
                 "data": data,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "chart_height": 280,
             },
         )
@@ -1899,7 +1899,7 @@ def create_app(
             {
                 "data": aging,
                 "chart_height": 320,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
             },
         )
 
@@ -1916,7 +1916,7 @@ def create_app(
         """Per-item lifecycle: timeline of stage transitions for one
         work item, plus a tabular event list below.
 
-        The contract specifies the source (github / jira) — we don't
+        The workflow specifies the source (github / jira) — we don't
         repeat it in the URL since it's an implementation detail of
         where the data came from, not part of the resource identity.
 
@@ -1933,13 +1933,13 @@ def create_app(
         # PR numbers — both `12345` and `#12345` route to the
         # canonical warehouse id (`#12345`).
         resolved_id = item_id
-        if view.contract.source == "github" and not item_id.startswith("#"):
+        if view.workflow.source == "github" and not item_id.startswith("#"):
             resolved_id = "#" + item_id
         try:
             with view.warehouse() as con:
                 data = view.render_lifecycle(
                     con,
-                    source=view.contract.source,
+                    source=view.workflow.source,
                     item_id=resolved_id,
                 )
         except ItemNotFound as exc:
@@ -1952,7 +1952,7 @@ def create_app(
                 # The item id goes in the site header so the page
                 # identifies itself at the top of the viewport.
                 "metric_name": data.item_id,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
                 "data": data,
@@ -2009,7 +2009,7 @@ def create_app(
         # On the aging page, the route sorts in-flight items by
         # created_at ASC (oldest open first). HTMX-driven pagination
         # without an explicit sort override should keep that
-        # contract.
+        # workflow.
         if in_flight_at and sort == "completed_at":
             sort_key = "created_at"
             direction_key = "asc"
@@ -2024,8 +2024,8 @@ def create_app(
                 direction=direction_key,
                 page=page_int,
                 wip_states=(
-                    view.contract.states.wip
-                    if view.contract.states else None
+                    view.workflow.states.wip
+                    if view.workflow.states else None
                 ),
                 # View window applies in completed-items mode
                 # (cycle-time / throughput pages); the component
@@ -2046,7 +2046,7 @@ def create_app(
             "_partials/work_items_table_body.html.jinja",
             {
                 "data": data,
-                "contract": view.template_context(),
+                "workflow": view.template_context(),
             },
         )
         # Tell the chart above the table to refetch itself with the

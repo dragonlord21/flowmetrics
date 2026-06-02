@@ -29,7 +29,7 @@ def _seed(client, contract_id, label="demo"):
     r = client.put(
         f"/api/internal/workflows/{contract_id}",
         json={"yaml":
-            f"contract:\n  name: {contract_id}\n  label: {label}\n"
+            f"workflow:\n  name: {contract_id}\n  label: {label}\n"
             "  source: github\n  repo: a/b\n"
         },
         headers={"X-Requested-With": "fetch"},
@@ -57,7 +57,7 @@ class TestExportYaml:
         assert "application/x-yaml" in r.headers["content-type"]
         assert "alpha.yaml" in r.headers.get("content-disposition", "")
         # Body is the canonical YAML.
-        assert "contract:" in r.text
+        assert "workflow:" in r.text
         assert "name: alpha" in r.text
 
     def test_yaml_round_trips_through_materialize_from_yaml(self, workspace, tmp_path):
@@ -112,7 +112,7 @@ class TestArchivePage:
         # Archived one shows; live one doesn't.
         assert "beta" in html
         assert "rotated out" in html
-        # The live contract "alpha" should not be listed on the
+        # The live workflow "alpha" should not be listed on the
         # archive page.
         assert "Alpha" not in html
 

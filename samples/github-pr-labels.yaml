@@ -9,7 +9,7 @@
 #
 # See docs/SPEC-github-labels.md for the full resolution rules.
 
-contract:
+workflow:
   name: backend-team-week
   label: Backend team (PRs)
   source: github

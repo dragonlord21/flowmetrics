@@ -1,7 +1,7 @@
 # Apache CASSANDRA — Jira workflow with richer state vocabulary.
 # Public project, anonymous reads.
 
-contract:
+workflow:
   name: apache-cassandra-week
   label: Apache CASSANDRA
   source: jira

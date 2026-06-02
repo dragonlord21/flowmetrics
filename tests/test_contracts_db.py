@@ -6,7 +6,7 @@ archived_reason, created_at, updated_at)`. The DB owns lifecycle
 metadata; the YAML text owns shape (Pydantic validates writes).
 
 Tests pin:
-  - CRUD round-trip via the canonical Contract objects.
+  - CRUD round-trip via the canonical Workflow objects.
   - Listing excludes archived rows by default.
   - Archive sets the timestamp + reason; restore clears it.
   - Hard delete refuses on a live row; succeeds on an archived row.
@@ -29,8 +29,8 @@ def db(tmp_path):
 
 
 def _c(name="x", source="github", repo="a/b", steps=None, **kw):
-    from flowmetrics.workflow import Contract, Step
-    return Contract(
+    from flowmetrics.workflow import Workflow, Step
+    return Workflow(
         name=name, source=source, repo=repo,
         steps=[Step(**s) for s in (steps or [])],
         **kw,
@@ -48,7 +48,7 @@ class TestInitialization:
         try:
             cur = con.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' "
-                "AND name='contracts'"
+                "AND name='workflows'"
             )
             assert cur.fetchone() is not None
         finally:
@@ -77,7 +77,7 @@ class TestCrud:
         db.put(_c(name="b"))
         db.archive("b")
         rows = db.list(include_archived=True)
-        by_id = {r.contract.name: r for r in rows}
+        by_id = {r.workflow.name: r for r in rows}
         assert by_id["a"].archived_at is None
         assert by_id["b"].archived_at is not None
 
@@ -126,10 +126,10 @@ class TestArchiveLifecycle:
         db.hard_delete("x")
         assert db.get("x") is None
         # Even ?include_archived=true can't see it.
-        assert not any(r.contract.name == "x" for r in db.list(include_archived=True))
+        assert not any(r.workflow.name == "x" for r in db.list(include_archived=True))
 
     def test_put_refuses_when_id_is_archived(self, db):
-        # Archive "x", then try to create a NEW contract with id "x".
+        # Archive "x", then try to create a NEW workflow with id "x".
         # The DB refuses with an explicit error so the user has to
         # decide: restore the old, or hard-delete it first. No
         # silent resurrection.

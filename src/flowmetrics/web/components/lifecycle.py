@@ -6,7 +6,7 @@ the `transitions` Parquet (stage entry events written by
 URL), and returns a typed payload the Jinja partial renders as a
 Vega-Lite timeline.
 
-The render function is the contract; the partial is the view. See
+The render function is the workflow; the partial is the view. See
 tests/test_lifecycle_component.py for the pinned shape.
 """
 
@@ -23,7 +23,7 @@ from ...utc_dates import attach_utc, to_utc_display_date
 
 
 class ItemNotFound(Exception):
-    """The (contract, source, item_id) tuple did not match any row in
+    """The (workflow, source, item_id) tuple did not match any row in
     the work_items table. The route layer maps this to a 404."""
 
 
@@ -143,7 +143,7 @@ def render(
     """Read the item's identity + every transition, return a payload
     the timeline partial can render.
 
-    Raises ItemNotFound if the (contract, source, item_id) tuple
+    Raises ItemNotFound if the (workflow, source, item_id) tuple
     doesn't match any work_items row."""
     header_row = con.execute(
         "SELECT title, url, created_at, completed_at, cycle_time_days "
@@ -154,7 +154,7 @@ def render(
     ).fetchone()
     if header_row is None:
         raise ItemNotFound(
-            f"no work item found for contract={contract_name!r} "
+            f"no work item found for workflow={contract_name!r} "
             f"source={source!r} item_id={item_id!r}"
         )
     title, url, _, header_completed_at, cycle_time_days = header_row

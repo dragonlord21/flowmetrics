@@ -1,10 +1,10 @@
-"""`WorkflowStore` — the single contract-persistence adapter.
+"""`WorkflowStore` — the single workflow-persistence adapter.
 
 Both the web app and the CLI go through this so the "YAML vs DB
 read/write" decision lives in one place:
   - writes go to the SQLite store;
   - reads resolve DB-first, then fall back to a YAML file on disk
-    (a contract dropped in but not yet migrated) — without moving it;
+    (a workflow dropped in but not yet migrated) — without moving it;
   - `ensure_initialized()` is the explicit, idempotent migration that
     imports leftover YAMLs into the DB (the only thing that moves files).
 """
@@ -18,7 +18,7 @@ from flowmetrics.workflows_db import WorkflowStore
 
 
 def _yaml(name: str, repo: str = "o/r") -> str:
-    return f"contract:\n  name: {name}\n  source: github\n  repo: {repo}\n"
+    return f"workflow:\n  name: {name}\n  source: github\n  repo: {repo}\n"
 
 
 def _c(name: str, repo: str = "o/r"):
