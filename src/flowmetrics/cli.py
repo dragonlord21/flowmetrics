@@ -18,6 +18,7 @@ import json
 import shutil
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from random import Random
@@ -521,8 +522,123 @@ def _emit_metric(fmt: str, headline: str, payload: dict) -> None:
     click.echo(headline)
 
 
+_WORKFLOW_OPTIONS = [
+    click.option(
+        "--workflow-name", "workflow_name", type=str, default=None,
+        help=(
+            "Look up the workflow in `<workflows-dir>/workflows.db` "
+            "(DB-first, YAML fallback in the same dir). The workflow's "
+            "source + stages drive the query."
+        ),
+    ),
+    click.option(
+        "--workflow-yaml", "workflow_yaml", type=click.Path(path_type=Path),
+        default=None,
+        help=(
+            "Path to a workflow YAML file. Use this for ad-hoc "
+            "queries against a workflow that isn't in the store."
+        ),
+    ),
+    click.option(
+        "--workflows-dir", "workflows_dir",
+        type=click.Path(path_type=Path),
+        default=Path("./contracts"), show_default=True,
+        help="Where --workflow-name looks up the store (DB + un-migrated YAMLs).",
+    ),
+]
+
+
+def _apply_workflow_options(f):
+    """Decorator: add the --workflow-name / --workflow-yaml / --workflows-dir trio to
+    a subcommand. Used by every `flow metric ...` and `flow forecast
+    ...` command — they all share the same 'point at a workflow
+    definition' shape."""
+    for decorator in reversed(_WORKFLOW_OPTIONS):
+        f = decorator(f)
+    return f
+
+
+def _resolve_workflow(
+    *,
+    workflow_name: str | None,
+    workflow_yaml: Path | None,
+    workflows_dir: Path,
+):
+    """Resolve the workflow definition the user pointed at, via
+    either `--workflow-name NAME` (store lookup) or `--workflow-yaml PATH` (direct
+    file). Exactly one MUST be set. Returns a `Workflow` Pydantic
+    model — the caller reads `.source`, `.repo`, `.jira_url`,
+    `.jira_project`, and `.steps` from it.
+
+    Refuses ambiguous combinations (`--workflow-name` + `--workflow-yaml` together,
+    or neither) so the user can't silently end up running the wrong
+    workflow.
+    """
+    if workflow_name and workflow_yaml:
+        raise click.UsageError(
+            "--workflow-name and --workflow-yaml are mutually exclusive."
+        )
+    if not workflow_name and not workflow_yaml:
+        raise click.UsageError(
+            "Pass --workflow-name NAME (stored workflow) or --workflow-yaml PATH "
+            "(YAML file). Run `flow workflows list` to see what's "
+            "in the store."
+        )
+
+    if workflow_name:
+        from .workflows_db import WorkflowStore
+        wf = WorkflowStore(workflows_dir).get(workflow_name)
+        if wf is None:
+            raise click.UsageError(
+                f"workflow {workflow_name!r} not found under "
+                f"{workflows_dir} (no DB row and no matching YAML). "
+                "Run `flow workflows list` to see what's configured."
+            )
+        return wf
+
+    from .workflow import WorkflowError, parse_workflow_text
+    path = Path(workflow_yaml)
+    if not path.exists():
+        raise click.UsageError(f"YAML file {path} does not exist.")
+    try:
+        return parse_workflow_text(path.read_text(), path.stem)
+    except WorkflowError as exc:
+        raise click.UsageError(
+            f"failed to parse {path}: {exc}"
+        ) from exc
+
+
+def _build_source_from_workflow(
+    wf,
+    *,
+    cache_dir: Path,
+    offline: bool,
+    include_issues: bool = False,
+    wip_labels=None,
+):
+    """Build a Source from a `Workflow` model. Centralised so the
+    per-subcommand code stays small (and so any future Source
+    construction tweaks happen in one place)."""
+    return _build_source(
+        repo=wf.repo if wf.source == "github" else None,
+        jira_url=wf.jira_url if wf.source == "jira" else None,
+        jira_project=wf.jira_project if wf.source == "jira" else None,
+        cache_dir=cache_dir, offline=offline,
+        include_issues=include_issues,
+        wip_labels=wip_labels,
+    )
+
+
+def _stages_from_workflow(wf) -> tuple[str, ...]:
+    """The ordered stage tuple — WIP steps if any are marked, else
+    every step in order. Used by aging + cumulative as the band /
+    column order."""
+    wip = tuple(s.name for s in wf.steps if s.wip)
+    return wip or tuple(s.name for s in wf.steps)
+
+
 @metric.command("throughput", short_help="Daily completion counts in a window")
-@_apply_source_options
+@_apply_workflow_options
 @click.option("--start", type=str, required=True, help="Window start (YYYY-MM-DD).")
 @click.option("--stop", type=str, required=True, help="Window stop (YYYY-MM-DD).")
 @click.option(
@@ -530,27 +646,29 @@ def _emit_metric(fmt: str, headline: str, payload: dict) -> None:
     default=DEFAULT_CACHE_DIR, show_default=True,
 )
 @click.option("--offline/--online", default=False)
-@click.option(
-    "--include-issues/--no-include-issues", default=False,
-    help="GitHub-only: also include Issues closed in the window.",
-)
 @_METRIC_FORMAT_OPTION
 def metric_throughput(
-    repo, jira_url, jira_project, start, stop,
-    cache_dir, offline, include_issues, fmt,
+    workflow_name, workflow_yaml, workflows_dir,
+    start, stop, cache_dir, offline, fmt,
 ) -> None:
     """Daily completion counts — items completed each day in the
-    window. Schema: `flowmetrics.metric.throughput.v1`."""
-    from datetime import date, timedelta
+    window. The workflow (`--workflow-name` or `--workflow-yaml`) supplies the source.
+
+    Schema: `flowmetrics.metric.throughput.v1`."""
+    from datetime import date
 
     from .throughput import daily_counts
 
+    wf = _resolve_workflow(
+        workflow_name=workflow_name, workflow_yaml=workflow_yaml,
+        workflows_dir=workflows_dir,
+    )
+    src = _build_source_from_workflow(
+        wf, cache_dir=cache_dir, offline=offline,
+    )
+
     start_d = _parse_date(start)
     stop_d = _parse_date(stop)
-    src = _build_source(
-        repo=repo, jira_url=jira_url, jira_project=jira_project,
-        cache_dir=cache_dir, offline=offline, include_issues=include_issues,
-    )
     items = list(src.fetch_completed_in_window(start_d, stop_d))
     completion_dates: list[date] = [
         it.completed_at.date() for it in items if it.completed_at is not None
@@ -561,18 +679,21 @@ def metric_throughput(
     avg = total / days if days else 0.0
 
     headline = (
-        f"{src.label} {start_d} → {stop_d}: "
+        f"{wf.name} ({src.label}) {start_d} → {stop_d}: "
         f"{total} items completed across {days} days "
         f"({avg:.2f}/day)."
     )
     payload = {
         "schema": "flowmetrics.metric.throughput.v1",
         "input": {
-            "repo": src.label,
+            "workflow": wf.name,
+            "source": wf.source,
+            "repo": wf.repo,
+            "jira_url": wf.jira_url,
+            "jira_project": wf.jira_project,
             "start": start_d.isoformat(),
             "stop": stop_d.isoformat(),
             "offline": offline,
-            "jira_url": jira_url,
         },
         "summary": {
             "total_items": total,
@@ -586,13 +707,9 @@ def metric_throughput(
 
 
 @metric.command("cumulative", short_help="Cumulative Flow Diagram — state counts over time")
-@_apply_source_options
+@_apply_workflow_options
 @click.option("--start", type=str, required=True, help="Window start (YYYY-MM-DD).")
 @click.option("--stop", type=str, required=True, help="Window stop (YYYY-MM-DD).")
-@click.option(
-    "--workflow", type=str, required=True,
-    help="Comma-separated workflow states, earliest → latest.",
-)
 @click.option(
     "--interval-days", type=int, default=1, show_default=True,
     help="Sample interval in days.",
@@ -602,34 +719,38 @@ def metric_throughput(
     default=DEFAULT_CACHE_DIR, show_default=True,
 )
 @click.option("--offline/--online", default=False)
-@click.option(
-    "--include-issues/--no-include-issues", default=False,
-    help="GitHub-only: also include Issues alongside PRs.",
-)
 @_METRIC_FORMAT_OPTION
 def metric_cumulative(
-    repo, jira_url, jira_project, start, stop, workflow, interval_days,
-    cache_dir, offline, include_issues, fmt,
+    workflow_name, workflow_yaml, workflows_dir,
+    start, stop, interval_days,
+    cache_dir, offline, fmt,
 ) -> None:
     """Cumulative Flow Diagram data — cumulative state counts at
-    each sample. Schema: `flowmetrics.metric.cumulative.v1`."""
+    each sample. The workflow (`--workflow-name` or `--workflow-yaml`) supplies both
+    the source AND the stage order.
+
+    Schema: `flowmetrics.metric.cumulative.v1`."""
     from datetime import timedelta
 
     from .cfd import build_cfd
     from .service import fetch_items_active_in_window
 
+    wf = _resolve_workflow(
+        workflow_name=workflow_name, workflow_yaml=workflow_yaml,
+        workflows_dir=workflows_dir,
+    )
+    src = _build_source_from_workflow(
+        wf, cache_dir=cache_dir, offline=offline,
+    )
+    workflow_tuple = _stages_from_workflow(wf)
+    if not workflow_tuple:
+        raise click.UsageError(
+            f"workflow {wf.name!r} has no steps — add stages via the "
+            "wizard or in the YAML."
+        )
+
     start_d = _parse_date(start)
     stop_d = _parse_date(stop)
-    workflow_tuple = tuple(
-        s.strip() for s in workflow.split(",") if s.strip()
-    )
-    if not workflow_tuple:
-        raise click.UsageError("--workflow needs at least one state")
-
-    src = _build_source(
-        repo=repo, jira_url=jira_url, jira_project=jira_project,
-        cache_dir=cache_dir, offline=offline, include_issues=include_issues,
-    )
     items = fetch_items_active_in_window(src, start_d, stop_d)
     points = build_cfd(
         items, workflow=workflow_tuple,
@@ -642,20 +763,23 @@ def metric_cumulative(
     departures = end.counts_by_state.get(workflow_tuple[-1], 0) if end else 0
     end_wip = arrivals - departures
     headline = (
-        f"{src.label} {start_d} → {stop_d}: "
+        f"{wf.name} ({src.label}) {start_d} → {stop_d}: "
         f"{arrivals} arrivals, {departures} departures, "
         f"end-of-window WIP {end_wip}."
     )
     payload = {
         "schema": "flowmetrics.metric.cumulative.v1",
         "input": {
-            "repo": src.label,
+            "workflow": wf.name,
+            "source": wf.source,
+            "repo": wf.repo,
+            "jira_url": wf.jira_url,
+            "jira_project": wf.jira_project,
             "start": start_d.isoformat(),
             "stop": stop_d.isoformat(),
-            "workflow": list(workflow_tuple),
+            "stages": list(workflow_tuple),
             "interval_days": interval_days,
             "offline": offline,
-            "jira_url": jira_url,
         },
         "summary": {
             "arrivals_at_end": arrivals,
@@ -676,74 +800,52 @@ def metric_cumulative(
 
 
 @metric.command("aging", short_help="In-flight items × state × age")
-@_apply_source_options
+@_apply_workflow_options
 @click.option(
     "--asof", type=str, default=None,
     help="As-of date (YYYY-MM-DD). Defaults to today (UTC).",
-)
-@click.option(
-    "--workflow", type=str, default=None,
-    help=(
-        "Comma-separated workflow states, earliest → latest. "
-        "Required unless --wip-labels is supplied."
-    ),
-)
-@click.option(
-    "--wip-labels", "wip_labels_raw", type=str, default=None,
-    help="GitHub-only: PR-label-driven WIP, ordered (rightmost = most progress).",
 )
 @click.option(
     "--cache-dir", type=click.Path(path_type=Path),
     default=DEFAULT_CACHE_DIR, show_default=True,
 )
 @click.option("--offline/--online", default=False)
-@click.option(
-    "--include-issues/--no-include-issues", default=False,
-    help="GitHub-only: also include open Issues alongside open PRs.",
-)
 @_METRIC_FORMAT_OPTION
 def metric_aging(
-    repo, jira_url, jira_project, asof, workflow, wip_labels_raw,
-    cache_dir, offline, include_issues, fmt,
+    workflow_name, workflow_yaml, workflows_dir,
+    asof, cache_dir, offline, fmt,
 ) -> None:
     """In-flight items by current state × age, plus completed-item
-    cycle-time percentiles as reference thresholds.
+    cycle-time percentiles as reference thresholds. The workflow
+    (`--workflow-name` or `--workflow-yaml`) supplies both the source AND the stage
+    order.
 
     Schema: `flowmetrics.metric.aging.v1`."""
-    from datetime import date
+    from datetime import date, timedelta as _td
 
     from .aging import compute_aging, cycle_time_percentiles
     from .compute import compute_pr_flow
-    from .sources.github_labels import WipLabels
 
-    asof_d = _parse_date(asof) if asof else date.today()
-    try:
-        wip = WipLabels.parse(wip_labels_raw) if wip_labels_raw else None
-    except ValueError as exc:
-        raise click.UsageError(str(exc)) from exc
-
-    if workflow:
-        workflow_tuple = tuple(s.strip() for s in workflow.split(",") if s.strip())
-    elif wip is not None:
-        workflow_tuple = wip.ordered
-    else:
+    wf = _resolve_workflow(
+        workflow_name=workflow_name, workflow_yaml=workflow_yaml,
+        workflows_dir=workflows_dir,
+    )
+    src = _build_source_from_workflow(
+        wf, cache_dir=cache_dir, offline=offline,
+    )
+    workflow_tuple = _stages_from_workflow(wf)
+    if not workflow_tuple:
         raise click.UsageError(
-            "Pass --workflow (review-cycle / Jira) or --wip-labels "
-            "(GitHub label mode)."
+            f"workflow {wf.name!r} has no steps — add stages via the "
+            "wizard or in the YAML."
         )
 
-    src = _build_source(
-        repo=repo, jira_url=jira_url, jira_project=jira_project,
-        cache_dir=cache_dir, offline=offline,
-        wip_labels=wip, include_issues=include_issues,
-    )
-
+    asof_d = _parse_date(asof) if asof else date.today()
     in_flight = list(src.fetch_in_flight(asof_d))
     aging_items = compute_aging(in_flight, asof=asof_d)
 
-    # Cycle-time percentiles from the prior 30-day window — the same
+    # Cycle-time percentiles from the prior 30-day window — same
     # reference window the Aging chart uses on the web UI.
-    from datetime import timedelta as _td
     hist_end = asof_d - _td(days=1)
     hist_start = hist_end - _td(days=DEFAULT_TRAINING_DAYS - 1)
     completed = list(src.fetch_for_percentile_training(hist_start, hist_end))
@@ -757,19 +859,21 @@ def metric_aging(
     count = len(aging_items)
     oldest = max((it.age_days for it in aging_items), default=0)
     headline = (
-        f"{src.label} as of {asof_d}: {count} in-flight "
+        f"{wf.name} ({src.label}) as of {asof_d}: {count} in-flight "
         f"items; oldest {oldest}d "
         f"(P85={pct.get(85, 0):.1f}d from {len(flows)} completed)."
     )
     payload = {
         "schema": "flowmetrics.metric.aging.v1",
         "input": {
-            "repo": src.label,
+            "workflow": wf.name,
+            "source": wf.source,
+            "repo": wf.repo,
+            "jira_url": wf.jira_url,
+            "jira_project": wf.jira_project,
             "asof": asof_d.isoformat(),
-            "workflow": list(workflow_tuple),
-            "from_wip_labels": wip is not None,
+            "stages": list(workflow_tuple),
             "offline": offline,
-            "jira_url": jira_url,
         },
         "summary": {
             "in_flight_count": count,
@@ -793,7 +897,7 @@ def metric_aging(
 
 
 @metric.command("cycle-time", short_help="Per-item cycle times + P50/P85/P95")
-@_apply_source_options
+@_apply_workflow_options
 @click.option("--start", type=str, default=None, help="Window start (YYYY-MM-DD).")
 @click.option("--stop", type=str, default=None, help="Window stop (YYYY-MM-DD).")
 @click.option(
@@ -801,21 +905,25 @@ def metric_aging(
     default=DEFAULT_CACHE_DIR, show_default=True,
 )
 @click.option("--offline/--online", default=False)
-@click.option(
-    "--include-issues/--no-include-issues", default=False,
-    help="GitHub-only: also include Issues closed in the window.",
-)
 @_METRIC_FORMAT_OPTION
 def metric_cycle_time(
-    repo, jira_url, jira_project, start, stop,
-    cache_dir, offline, include_issues, fmt,
+    workflow_name, workflow_yaml, workflows_dir,
+    start, stop, cache_dir, offline, fmt,
 ) -> None:
-    """Per-item cycle times + percentile thresholds. Replaces the
-    old `flow scatterplot` command — same numbers, no chart.
+    """Per-item cycle times + percentile thresholds. The workflow
+    (`--workflow-name` or `--workflow-yaml`) supplies the source.
 
     Schema: `flowmetrics.metric.cycle_time.v1`."""
     from .charts.primitives import chart_percentiles
     from .service import default_history_end, default_history_start
+
+    wf = _resolve_workflow(
+        workflow_name=workflow_name, workflow_yaml=workflow_yaml,
+        workflows_dir=workflows_dir,
+    )
+    src = _build_source_from_workflow(
+        wf, cache_dir=cache_dir, offline=offline,
+    )
 
     stop_d = _parse_date(stop) if stop else default_history_end()
     start_d = _parse_date(start) if start else default_history_start(stop_d)
@@ -824,10 +932,6 @@ def metric_cycle_time(
             f"--start ({start_d}) must be on or before --stop ({stop_d})"
         )
 
-    src = _build_source(
-        repo=repo, jira_url=jira_url, jira_project=jira_project,
-        cache_dir=cache_dir, offline=offline, include_issues=include_issues,
-    )
     items = list(src.fetch_for_percentile_training(start_d, stop_d))
 
     rows: list[dict] = []
@@ -850,7 +954,7 @@ def metric_cycle_time(
         if cycle_days else {50: 0.0, 70: 0.0, 85: 0.0, 95: 0.0}
     )
     headline = (
-        f"{src.label} {start_d} → {stop_d}: "
+        f"{wf.name} ({src.label}) {start_d} → {stop_d}: "
         f"{len(rows)} completed items; "
         f"P50={pct.get(50, 0):.1f}d, "
         f"P85={pct.get(85, 0):.1f}d, "
@@ -859,11 +963,14 @@ def metric_cycle_time(
     payload = {
         "schema": "flowmetrics.metric.cycle_time.v1",
         "input": {
-            "repo": src.label,
+            "workflow": wf.name,
+            "source": wf.source,
+            "repo": wf.repo,
+            "jira_url": wf.jira_url,
+            "jira_project": wf.jira_project,
             "start": start_d.isoformat(),
             "stop": stop_d.isoformat(),
             "offline": offline,
-            "jira_url": jira_url,
         },
         "summary": {"completed_count": len(rows)},
         "percentiles_days": {str(p): round(v, 4) for p, v in pct.items()},

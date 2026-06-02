@@ -127,39 +127,42 @@ Output columns: `NAME`, `SOURCE` (`db` = wizard-managed in
 
 ### `flow metric ...`
 
-Text + JSON metric extraction for agents / headless humans. Each
-subcommand takes `--repo OWNER/NAME` **or** `--jira-url URL
---jira-project KEY` (mutually exclusive) plus subcommand-specific
-flags. All write to stdout. `--format text` (default) → one-line
-headline; `--format json` → versioned envelope.
+Text + JSON metric extraction for agents / headless humans. Every
+subcommand needs exactly one of:
 
-| Subcommand | Purpose | Required |
+- `--workflow-name NAME` — look up a configured workflow in
+  `<--workflows-dir>/workflows.db` (DB-first, YAML fallback).
+- `--workflow-yaml PATH` — point at a YAML file directly (ad-hoc).
+
+The workflow definition supplies the source (`--repo` equivalent)
+AND the stage order — the CLI doesn't accept those inline.
+
+| Subcommand | Purpose | Window flags |
 |----|----|----|
 | `flow metric throughput` | Daily completion counts in a window | `--start --stop` |
-| `flow metric cumulative` | CFD points — state counts over time | `--start --stop --workflow` |
-| `flow metric aging` | In-flight × state × age + percentiles | `--workflow` *or* `--wip-labels` |
-| `flow metric cycle-time` | Per-item cycle times + P50/P70/P85/P95 | — (defaults to last 30 days) |
+| `flow metric cumulative` | CFD points — state counts over time | `--start --stop` |
+| `flow metric aging` | In-flight × state × age + percentiles | `--asof` (defaults to today) |
+| `flow metric cycle-time` | Per-item cycle times + P50/P70/P85/P95 | `--start --stop` (defaults to last 30 days) |
 
 ### `flow forecast`
 
-Monte Carlo forecasts over the empirical throughput distribution.
+Monte Carlo forecasts. Same workflow-pointing pattern as `metric`.
 
 | Subcommand | Purpose | Required |
 |----|----|----|
 | `flow forecast when-done` | When will N items be done? | `--items` |
 | `flow forecast how-many` | How many items by a target date? | `--target-date` |
 
-Common source-fetching flags (apply to `metric` + `forecast`):
+Common flags (apply to `metric` + `forecast`):
 
 | Flag | Notes |
 |----|----|
-| `--start / --stop YYYY-MM-DD` | Window (UTC). |
+| `--workflow-name NAME` | Stored workflow lookup. |
+| `--workflow-yaml PATH` | YAML file path (for ad-hoc queries). |
+| `--workflows-dir PATH` | Default `contracts`. Where --workflow-name looks. |
 | `--cache-dir PATH` | Default `.cache/github`. |
 | `--offline / --online` | Cache-only vs. hit-API-on-miss. |
-| `--include-issues / --no-include-issues` | GitHub-only: also include Issues. |
 | `--format text\|json` | text=humans (default), json=agents. |
-| `--workflow "A,B,C"` | Comma-separated states, earliest → latest. |
-| `--wip-labels "x,y,z"` | GitHub-only: PR-label-driven WIP, ordered. |
 
 Forecast-only:
 

@@ -409,36 +409,55 @@ Numeric metric data for terminals, pipelines, and agents. No warehouse
 required; these hit the source API directly. **For charts, use the
 web UI (`flow serve`)** — the CLI is intentionally graphics-free.
 
-`flow metric` group — text headline by default, `--format json`
-for a versioned envelope:
+Every metric command takes either `--workflow-name NAME` (look up a
+configured workflow in the store) or `--workflow-yaml PATH` (point at
+a YAML file directly). The workflow definition supplies the source
+(GitHub repo or Jira project) AND the stage order — you never repeat
+those inline.
 
 ```bash
-# Daily completion counts in a window.
-flow metric throughput --repo astral-sh/uv \
+# Daily completion counts.
+flow metric throughput \
+    --workflow-name astral-uv \
+    --workflows-dir ~/flow/contracts \
     --start 2026-05-04 --stop 2026-05-10
 
 # Cumulative Flow Diagram data (state counts over time).
-flow metric cumulative --repo astral-sh/uv \
-    --start 2026-05-04 --stop 2026-05-10 \
-    --workflow "Open,Merged"
+flow metric cumulative \
+    --workflow-name astral-uv \
+    --workflows-dir ~/flow/contracts \
+    --start 2026-05-04 --stop 2026-05-10
 
 # In-flight items × current state × age + percentile thresholds.
-flow metric aging --repo astral-sh/uv \
-    --workflow "Draft,Awaiting Review,Changes Requested,Approved"
+flow metric aging \
+    --workflow-name astral-uv \
+    --workflows-dir ~/flow/contracts
 
 # Per-item cycle times + P50/P70/P85/P95.
-flow metric cycle-time --repo astral-sh/uv \
+flow metric cycle-time \
+    --workflow-name astral-uv \
+    --workflows-dir ~/flow/contracts \
     --start 2026-05-04 --stop 2026-05-10
 ```
 
-Monte Carlo forecasts:
+For an ad-hoc query against a workflow that isn't in your store, use
+`--workflow-yaml` instead:
+
+```bash
+flow metric cycle-time \
+    --workflow-yaml ./my-demo-workflow.yaml \
+    --start 2026-05-04 --stop 2026-05-10
+```
+
+Monte Carlo forecasts (same `--workflow-name` / `--workflow-yaml`
+pattern):
 
 ```bash
 # When will 50 items be done? (percentile dates).
-flow forecast when-done --repo astral-sh/uv --items 50
+flow forecast when-done --workflow-name astral-uv --items 50
 
 # How many items by 2026-06-30? (percentile counts).
-flow forecast how-many --repo astral-sh/uv --target-date 2026-06-30
+flow forecast how-many --workflow-name astral-uv --target-date 2026-06-30
 ```
 
 Every command takes `--format text|json` (default `text`). See

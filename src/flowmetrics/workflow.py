@@ -240,10 +240,15 @@ def parse_workflow_text(text: str, name: str) -> Workflow:
             f"workflow {name!r} is not valid YAML: {exc}"
         ) from exc
 
-    if not isinstance(raw, dict) or "workflow" not in raw:
+    if not isinstance(raw, dict) or (
+        "workflow" not in raw and "contract" not in raw
+    ):
         raise WorkflowError("must have a top-level `workflow:` key")
 
-    body = raw["workflow"]
+    # Accept the legacy `contract:` key for backwards compatibility —
+    # rows written before the YAML-key rename are still parsed without
+    # a destructive DB migration. New writes always use `workflow:`.
+    body = raw.get("workflow") if "workflow" in raw else raw["contract"]
     if not isinstance(body, dict):
         raise WorkflowError(
             f"`workflow:` must be a mapping; got {type(body).__name__}"
