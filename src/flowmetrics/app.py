@@ -1380,10 +1380,16 @@ def create_app(
             {
                 "title": f"Data Source — {workflow_id}",
                 "metric_name": "Data Source",
+                # `workflow` is the rich object — every template
+                # (filter bar, breadcrumb, the backfill form's
+                # hidden field) reads `.name`, `.label`, etc. off
+                # it. Previously a second `"workflow": workflow_id`
+                # entry shadowed this, leaving the backfill form's
+                # `value="{{ workflow.name }}"` empty (strings have
+                # no `.name`) and producing a 422 on submit.
                 "workflow": view.template_context(),
                 "available_contracts": _available_contracts(),
                 "view": {"since": None, "until": None},
-                "workflow": workflow_id,
                 "coverage": coverage,
                 "backfill": display_status(
                     read_status(status_path(data_dir, workflow_id)),
