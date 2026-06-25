@@ -107,6 +107,17 @@ class TestProbeSourceVocab:
         # Lifecycle constants still present so the UI isn't empty.
         assert out["lifecycle_events"]
 
+    def test_jira_vocab_sends_auth_header(self, monkeypatch):
+        monkeypatch.setenv("JIRA_PAT", "env_pat_abc")
+        requests_seen = []
+        def mock_get(url, *args, **kwargs):
+            requests_seen.append((url, kwargs.get("headers")))
+            return _Resp(200, [])
+        monkeypatch.setattr(httpx, "get", mock_get)
+        sp.probe_source_vocab("jira", {"jira_url": "https://j", "jira_project": "X"})
+        assert len(requests_seen) == 1
+        assert requests_seen[0][1]["Authorization"] == "Bearer env_pat_abc"
+
 
 class TestProbeSourceExists:
     def test_github_ok(self, monkeypatch):
@@ -127,6 +138,18 @@ class TestProbeSourceExists:
     def test_github_bad_repo_format(self):
         out = sp.probe_source_exists("github", {"repo": "noslash"})
         assert out["ok"] is False
+
+    def test_jira_ok(self, monkeypatch):
+        monkeypatch.setenv("JIRA_PAT", "env_pat_123")
+        requests_seen = []
+        def mock_get(url, *args, **kwargs):
+            requests_seen.append((url, kwargs.get("headers")))
+            return _Resp(200, {"name": "Cool Project"})
+        monkeypatch.setattr(httpx, "get", mock_get)
+        out = sp.probe_source_exists("jira", {"jira_url": "https://j", "jira_project": "X"})
+        assert out == {"ok": True, "label": "Cool Project"}
+        assert len(requests_seen) == 1
+        assert requests_seen[0][1]["Authorization"] == "Bearer env_pat_123"
 
 
 class TestDryRunFetch:
@@ -155,3 +178,17 @@ class TestDryRunFetch:
             source="github", target={"repo": "o/r"},
             since="not-a-date", items_cap=10)
         assert out["stopped_by"] == "error"
+
+    def test_jira_dry_run_sends_auth_header(self, monkeypatch):
+        monkeypatch.setenv("JIRA_PAT", "env_pat_xyz")
+        requests_seen = []
+        def mock_get(url, *args, **kwargs):
+            requests_seen.append((url, kwargs.get("headers")))
+            return _Resp(200, {"issues": []})
+        monkeypatch.setattr(httpx, "get", mock_get)
+        sp.dry_run_fetch(
+            source="jira", target={"jira_url": "https://j", "jira_project": "X"},
+            since="2026-04-01", items_cap=50
+        )
+        assert len(requests_seen) == 1
+        assert requests_seen[0][1]["Authorization"] == "Bearer env_pat_xyz"

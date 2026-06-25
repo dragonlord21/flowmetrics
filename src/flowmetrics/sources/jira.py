@@ -16,6 +16,7 @@ is captured as a future task.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from dataclasses import dataclass, field
@@ -64,7 +65,14 @@ class JiraSource:
     user_agent: str = "flowmetrics/0.1 (+https://github.com/dvhthomas/flowmetrics)"
     max_retries: int = 3
     retry_initial_seconds: float = 1.0
+    token: str | None = None
     _owns_client: bool = field(default=False, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.token is None:
+            token = os.environ.get("JIRA_PAT")
+            if token:
+                self.token = token.strip()
 
     @property
     def label(self) -> str:
@@ -119,6 +127,8 @@ class JiraSource:
             "Accept": "application/json",
             "User-Agent": self.user_agent,
         }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
 
         response = self._get_with_retries(url, headers, params)
         response.raise_for_status()

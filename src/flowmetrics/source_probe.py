@@ -68,6 +68,17 @@ def github_headers() -> dict[str, str]:
     return headers
 
 
+def jira_headers() -> dict[str, str]:
+    """Auth headers for Jira REST calls. Reads $JIRA_PAT and sends it
+    as a Bearer token. Degrades to anonymous when no token is configured."""
+    headers = {"Accept": "application/json"}
+    import os
+    token = os.environ.get("JIRA_PAT")
+    if token:
+        headers["Authorization"] = f"Bearer {token.strip()}"
+    return headers
+
+
 # ---------------------------------------------------------------------------
 # Existence probe.
 # ---------------------------------------------------------------------------
@@ -101,7 +112,7 @@ def probe_source_exists(source: str, target: dict) -> dict:
         # API v2 — Apache's public Jira is Jira Server.
         url = f"{base.rstrip('/')}/rest/api/2/project/{project}"
         try:
-            r = httpx.get(url, timeout=10.0)
+            r = httpx.get(url, timeout=10.0, headers=jira_headers())
         except httpx.HTTPError as exc:
             return {"ok": False, "error": str(exc)}
         if r.status_code == 404:
@@ -156,7 +167,7 @@ def probe_source_vocab(source: str, target: dict) -> dict:
         if base and project:
             url = f"{base.rstrip('/')}/rest/api/2/project/{project}/statuses"
             try:
-                r = httpx.get(url, timeout=10.0)
+                r = httpx.get(url, timeout=10.0, headers=jira_headers())
                 if r.status_code == 200:
                     seen: set[str] = set()
                     for issue_type in r.json():
@@ -239,7 +250,7 @@ def _jira_dry_run_items(
         f"&maxResults={min(items_cap, 100)}&fields=summary,status"
     )
     try:
-        r = httpx.get(url, timeout=10.0)
+        r = httpx.get(url, timeout=10.0, headers=jira_headers())
     except httpx.HTTPError:
         return []
     if r.status_code != 200:

@@ -25,6 +25,12 @@ from typing import Any
 
 import click
 
+try:
+    import dotenv
+    dotenv.load_dotenv()
+except ImportError:
+    pass
+
 from .forecast import (
     ResultsHistogram,
     backward_percentile,
@@ -94,13 +100,13 @@ _SOURCE_OPTIONS = [
         "Mutually exclusive with --jira-url/--jira-project.",
     ),
     click.option(
-        "--jira-url", default=None,
+        "--jira-url", envvar="JIRA_URL", default=None,
         help="Jira base URL (e.g. https://issues.apache.org/jira). "
-        "Used together with --jira-project.",
+        "Used together with --jira-project. Can also be set via JIRA_URL environment variable.",
     ),
     click.option(
-        "--jira-project", default=None,
-        help="Jira project key (e.g. BIGTOP). Used together with --jira-url.",
+        "--jira-project", envvar="JIRA_PROJECT", default=None,
+        help="Jira project key (e.g. BIGTOP). Used together with --jira-url. Can also be set via JIRA_PROJECT environment variable.",
     ),
 ]
 

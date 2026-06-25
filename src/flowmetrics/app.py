@@ -28,6 +28,12 @@ from pathlib import Path
 import duckdb
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
+
+try:
+    import dotenv
+    dotenv.load_dotenv()
+except ImportError:
+    pass
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
