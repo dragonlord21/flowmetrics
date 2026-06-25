@@ -239,6 +239,7 @@ def materialize(
             workflow.jira_project,
             cache_dir=cache_dir,
             read_only=offline,
+            allowed_issuetypes=workflow.allowed_issuetypes,
         )
 
     # The workflow window is optional; fall back to a rolling default

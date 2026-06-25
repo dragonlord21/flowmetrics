@@ -66,6 +66,7 @@ class JiraSource:
     max_retries: int = 3
     retry_initial_seconds: float = 1.0
     token: str | None = None
+    allowed_issuetypes: list[str] = field(default_factory=list)
     _owns_client: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -120,7 +121,7 @@ class JiraSource:
             "jql": jql,
             "startAt": str(start_at),
             "maxResults": str(max_results),
-            "fields": "summary,created,resolutiondate,status,reporter",
+            "fields": "summary,created,resolutiondate,status,reporter,issuetype",
             "expand": "changelog",
         }
         headers = {
@@ -163,9 +164,12 @@ class JiraSource:
         return last
 
     def fetch_completed_in_window(self, start: date, stop: date) -> list[WorkItem]:
-        jql = (
-            f'project = "{self.project}" '
-            f'AND resolutiondate >= "{start.isoformat()}" '
+        jql = f'project = "{self.project}"'
+        if self.allowed_issuetypes:
+            types_str = ", ".join(f'"{t}"' for t in self.allowed_issuetypes)
+            jql += f" AND issuetype IN ({types_str})"
+        jql += (
+            f' AND resolutiondate >= "{start.isoformat()}" '
             f'AND resolutiondate <= "{stop.isoformat()}" '
             "AND statusCategory = Done "
             "ORDER BY resolutiondate ASC"
@@ -183,9 +187,12 @@ class JiraSource:
     def fetch_in_flight(self, asof: date) -> list[WorkItem]:
         """Unresolved issues for this project, with their current status
         appended as a final synthetic interval ending at `asof`."""
-        jql = (
-            f'project = "{self.project}" '
-            "AND resolution = Unresolved "
+        jql = f'project = "{self.project}"'
+        if self.allowed_issuetypes:
+            types_str = ", ".join(f'"{t}"' for t in self.allowed_issuetypes)
+            jql += f" AND issuetype IN ({types_str})"
+        jql += (
+            " AND resolution = Unresolved "
             "ORDER BY created ASC"
         )
         return self._paginated_fetch(jql, in_flight_asof=asof)
@@ -197,6 +204,11 @@ class JiraSource:
         while True:
             payload = self._search(jql, start_at, max_results)
             for issue in payload.get("issues", []):
+                if self.allowed_issuetypes:
+                    fields = issue.get("fields") or {}
+                    issue_type = fields.get("issuetype", {}).get("name")
+                    if issue_type not in self.allowed_issuetypes:
+                        continue
                 item = _issue_to_work_item(
                     issue,
                     in_flight_asof=in_flight_asof,
@@ -312,3 +324,4 @@ def _issue_to_work_item(
 
 # Re-export for testing convenience
 _ = json  # pragma: no cover — silence unused import warning
+

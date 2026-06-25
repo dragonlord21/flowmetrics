@@ -448,3 +448,88 @@ class TestJiraAuthentication:
             source.fetch_completed_in_window(date(2026, 5, 4), date(2026, 5, 10))
         
         assert exc_info.value.response.status_code == 401
+
+
+class TestJiraSourceFiltering:
+    def test_jql_contains_allowed_issuetypes(self, tmp_path):
+        cache = FileCache(tmp_path)
+        base_url = "https://issues.apache.org/jira"
+        start, stop = date(2026, 5, 4), date(2026, 5, 10)
+        
+        requests_seen = []
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests_seen.append(request)
+            return httpx.Response(200, json={"startAt": 0, "maxResults": 100, "total": 0, "issues": []})
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        source = JiraSource(
+            base_url=base_url,
+            project="BIGTOP",
+            cache=cache,
+            allowed_issuetypes=["Story", "Bug"],
+            http_client=client,
+        )
+        source.fetch_completed_in_window(start, stop)
+
+        assert len(requests_seen) == 1
+        jql_query = requests_seen[0].url.params["jql"]
+        # JQL should have AND issuetype IN ("Story", "Bug") before ORDER BY
+        assert 'project = "BIGTOP"' in jql_query
+        assert 'AND issuetype IN ("Story", "Bug")' in jql_query
+        assert 'resolutiondate >= "2026-05-04"' in jql_query
+        assert 'ORDER BY resolutiondate ASC' in jql_query
+
+    def test_client_side_filtering_ignores_unallowed_types(self, tmp_path):
+        cache = FileCache(tmp_path)
+        base_url = "https://issues.apache.org/jira"
+        start, stop = date(2026, 5, 4), date(2026, 5, 10)
+        
+        # We return two issues, one is 'Story' (allowed), one is 'Epic' (not allowed)
+        issue_story = {
+            "key": "BIGTOP-1",
+            "fields": {
+                "summary": "Allowed Story",
+                "created": "2026-05-01T09:00:00.000+0000",
+                "resolutiondate": "2026-05-05T15:00:00.000+0000",
+                "status": {"name": "Resolved", "statusCategory": {"key": "done"}},
+                "reporter": {"displayName": "Alice", "accountId": "u-1"},
+                "issuetype": {"name": "Story"},
+            },
+            "changelog": {"histories": []},
+        }
+        issue_epic = {
+            "key": "BIGTOP-2",
+            "fields": {
+                "summary": "Unallowed Epic",
+                "created": "2026-05-01T09:00:00.000+0000",
+                "resolutiondate": "2026-05-05T15:00:00.000+0000",
+                "status": {"name": "Resolved", "statusCategory": {"key": "done"}},
+                "reporter": {"displayName": "Alice", "accountId": "u-1"},
+                "issuetype": {"name": "Epic"},
+            },
+            "changelog": {"histories": []},
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={
+                "startAt": 0,
+                "maxResults": 100,
+                "total": 2,
+                "issues": [issue_story, issue_epic]
+            })
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        source = JiraSource(
+            base_url=base_url,
+            project="BIGTOP",
+            cache=cache,
+            allowed_issuetypes=["Story", "Bug"],
+            http_client=client,
+        )
+        items = source.fetch_completed_in_window(start, stop)
+
+        # Only the Story should be loaded, the Epic should be ignored
+        assert len(items) == 1
+        assert items[0].item_id == "BIGTOP-1"
+        assert items[0].title == "Allowed Story"
+

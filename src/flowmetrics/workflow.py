@@ -168,6 +168,7 @@ class Workflow(BaseModel):
     # Jira fields
     jira_url: str | None = None
     jira_project: str | None = None
+    allowed_issuetypes: list[str] = []
     # Window
     start: date | None = None
     stop: date | None = None
@@ -441,6 +442,8 @@ def emit_canonical_yaml(workflow: Workflow) -> str:
         body["jira_url"] = workflow.jira_url
     if workflow.jira_project is not None:
         body["jira_project"] = workflow.jira_project
+    if workflow.allowed_issuetypes:
+        body["allowed_issuetypes"] = workflow.allowed_issuetypes
     if workflow.start is not None:
         body["start"] = workflow.start.isoformat()
     if workflow.stop is not None:

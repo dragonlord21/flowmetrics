@@ -175,12 +175,14 @@ def make_jira_source(
     *,
     cache_dir: Path | str = DEFAULT_CACHE_DIR,
     read_only: bool = False,
+    allowed_issuetypes: list[str] | None = None,
 ) -> Source:
     return JiraSource(
         base_url=base_url,
         project=project,
         cache=FileCache(cache_dir),
         read_only=read_only,
+        allowed_issuetypes=allowed_issuetypes or [],
     )
 
 

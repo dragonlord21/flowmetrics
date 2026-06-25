@@ -208,6 +208,7 @@ def _build_source_from_workflow(
         cache_dir=cache_dir, offline=offline,
         include_issues=include_issues,
         wip_labels=wip_labels,
+        allowed_issuetypes=wf.allowed_issuetypes if wf.source == "jira" else None,
     )
 
 
@@ -228,6 +229,7 @@ def _build_source(
     offline: bool,
     wip_labels: WipLabels | None = None,
     include_issues: bool = False,
+    allowed_issuetypes: list[str] | None = None,
 ) -> Source:
     """Pick the source backend from whichever flag set the user provided.
 
@@ -266,7 +268,8 @@ def _build_source(
                 "Jira needs both --jira-url AND --jira-project."
             )
         return make_jira_source(
-            jira_url, jira_project, cache_dir=cache_dir, read_only=offline
+            jira_url, jira_project, cache_dir=cache_dir, read_only=offline,
+            allowed_issuetypes=allowed_issuetypes,
         )
     raise click.UsageError(
         "No source specified. Pass --repo OWNER/NAME (GitHub) "
@@ -2053,3 +2056,4 @@ def serve(
     click.echo(f"  data_dir:      {data_dir.resolve()}")
     click.echo(f"  workflows_dir: {contracts_dir.resolve()}")
     uvicorn.run(app, host=host, port=port, log_level="info")
+
