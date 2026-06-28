@@ -169,6 +169,7 @@ class Workflow(BaseModel):
     jira_url: str | None = None
     jira_project: str | None = None
     allowed_issuetypes: list[str] = []
+    jira_pat: str | None = None
     # Window
     start: date | None = None
     stop: date | None = None
@@ -306,6 +307,8 @@ def parse_workflow_text(text: str, name: str) -> Workflow:
             repo=repo,
             jira_url=jira_url,
             jira_project=jira_project,
+            allowed_issuetypes=body.get("allowed_issuetypes") or [],
+            jira_pat=body.get("jira_pat"),
             start=_parse_date("start"),
             stop=_parse_date("stop"),
             label=label,
@@ -427,7 +430,7 @@ def load_contract(name: str, contracts_dir: Path) -> Workflow:
     return parse_workflow_text(path.read_text(encoding="utf-8"), name)
 
 
-def emit_canonical_yaml(workflow: Workflow) -> str:
+def emit_canonical_yaml(workflow: Workflow, strip_secrets: bool = False) -> str:
     """Render a Workflow in the canonical `steps:` YAML shape.
 
     The output is what `parse_workflow_text` would round-trip
@@ -444,6 +447,8 @@ def emit_canonical_yaml(workflow: Workflow) -> str:
         body["jira_project"] = workflow.jira_project
     if workflow.allowed_issuetypes:
         body["allowed_issuetypes"] = workflow.allowed_issuetypes
+    if workflow.jira_pat is not None and not strip_secrets:
+        body["jira_pat"] = workflow.jira_pat
     if workflow.start is not None:
         body["start"] = workflow.start.isoformat()
     if workflow.stop is not None:

@@ -855,6 +855,7 @@ def create_app(
             "jira_url": c.jira_url,
             "jira_project": c.jira_project,
             "allowed_issuetypes": c.allowed_issuetypes,
+            "jira_pat_present": bool(c.jira_pat),
             "start": c.start.isoformat() if c.start else None,
             "stop": c.stop.isoformat() if c.stop else None,
             "label": c.label,
@@ -959,8 +960,10 @@ def create_app(
                     f"workflow {contract_id!r} is archived. Pass ?include_archived=true to export."
                 ),
             )
+        from .workflow import emit_canonical_yaml
+        yaml_stripped = emit_canonical_yaml(meta.workflow, strip_secrets=True)
         return Response(
-            content=meta.yaml,
+            content=yaml_stripped,
             media_type="application/x-yaml",
             headers={
                 "Content-Disposition": (f'attachment; filename="{contract_id}.yaml"'),
@@ -1035,6 +1038,7 @@ def create_app(
             "jira_url": c_payload.get("jira_url"),
             "jira_project": c_payload.get("jira_project"),
             "allowed_issuetypes": c_payload.get("allowed_issuetypes") or [],
+            "jira_pat": c_payload.get("jira_pat"),
         }
         import hashlib
         import json as _json
@@ -1047,6 +1051,7 @@ def create_app(
             target.get("jira_url"),
             target.get("jira_project"),
             tuple(target.get("allowed_issuetypes") or []),
+            target.get("jira_pat"),
             since,
             items_cap,
             steps_sig,
@@ -1123,6 +1128,7 @@ def create_app(
             "repo": payload.get("repo"),
             "jira_url": payload.get("jira_url"),
             "jira_project": payload.get("jira_project"),
+            "jira_pat": payload.get("jira_pat"),
         }
         key = (
             "vocab",
@@ -1130,6 +1136,7 @@ def create_app(
             target.get("repo"),
             target.get("jira_url"),
             target.get("jira_project"),
+            target.get("jira_pat"),
         )
         force = (request.query_params.get("force") or "").lower() in (
             "true",
@@ -1191,11 +1198,18 @@ def create_app(
             "repo": payload.get("repo"),
             "jira_url": payload.get("jira_url"),
             "jira_project": payload.get("jira_project"),
+            "jira_pat": payload.get("jira_pat"),
         }
         # Cache key: deterministic tuple of just the identifying
         # bits so a probe of repo "a/b" hits regardless of incidental
         # payload fields.
-        key = (source, target.get("repo"), target.get("jira_url"), target.get("jira_project"))
+        key = (
+            source,
+            target.get("repo"),
+            target.get("jira_url"),
+            target.get("jira_project"),
+            target.get("jira_pat"),
+        )
         force = (request.query_params.get("force") or "").lower() in (
             "true",
             "1",
@@ -1238,6 +1252,7 @@ def create_app(
             "repo": payload.get("repo"),
             "jira_url": payload.get("jira_url"),
             "jira_project": payload.get("jira_project"),
+            "jira_pat": payload.get("jira_pat"),
         }
         probe = getattr(app.state, "probe_source", _default_probe_source)
         try:
@@ -1271,6 +1286,11 @@ def create_app(
         text = payload.get("yaml") or ""
         try:
             workflow = parse_workflow_text(text, contract_id)
+            existing = contracts_db.get(contract_id)
+            if existing and existing.jira_pat and workflow.jira_pat is None:
+                workflow = workflow.model_copy(update={"jira_pat": existing.jira_pat})
+            if workflow.jira_pat == "":
+                workflow = workflow.model_copy(update={"jira_pat": None})
         except WorkflowError as exc:
             errors = validate_yaml_text_structured(text, contract_id)
             raise HTTPException(

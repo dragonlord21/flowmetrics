@@ -44,6 +44,7 @@ class TestWizardPage:
         assert 'name="jira_url"' in html
         assert 'name="jira_project"' in html
         assert 'name="allowed_issuetypes"' in html
+        assert 'name="jira_pat"' in html
 
     def test_links_to_wizard_from_home(self, workspace):
         contracts, data = workspace
@@ -70,7 +71,8 @@ class TestProbeSourceEndpoint:
             client.app.state.probe_source = mock_probe
         return client.post(
             "/api/internal/workflows/_probe-source",
-            json=body, headers=headers,
+            json=body,
+            headers=headers,
         )
 
     def test_github_repo_exists_returns_ok(self, workspace):
@@ -96,7 +98,8 @@ class TestProbeSourceEndpoint:
                 client,
                 {"source": "github", "repo": "does-not/exist"},
                 mock_probe=lambda kind, target: {
-                    "ok": False, "error": "repo not found (404)",
+                    "ok": False,
+                    "error": "repo not found (404)",
                 },
             )
         body = r.json()
@@ -135,3 +138,78 @@ class TestProbeSourceEndpoint:
         with TestClient(app) as client:
             r = self._post(client, {"repo": "a/b"})
         assert r.status_code == 422
+
+
+class TestJiraPatSecretsHandling:
+    def test_jira_pat_lifecycle_via_api(self, workspace):
+        contracts, data = workspace
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        headers = {"X-Requested-With": "fetch"}
+
+        # 1. Create a workflow with jira_pat
+        payload = {
+            "yaml": (
+                "workflow:\n"
+                "  name: jira-auth-test\n"
+                "  source: jira\n"
+                "  jira_url: https://issues.example.com\n"
+                "  jira_project: TEST\n"
+                "  jira_pat: secret_pat_123\n"
+                "  start: 2026-06-01\n"
+                "  stop: 2026-06-10\n"
+            )
+        }
+        with TestClient(app) as client:
+            r_put = client.put("/api/internal/workflows/jira-auth-test", json=payload, headers=headers)
+            assert r_put.status_code == 200
+
+            # 2. GET the workflow: it must mask the secret but flag its presence
+            body = r_put.json()
+            assert "jira_pat" not in body["parsed"]
+            assert body["parsed"].get("jira_pat_present") is True
+
+            r_get = client.get("/api/internal/workflows/jira-auth-test")
+            assert r_get.status_code == 200
+            get_body = r_get.json()
+            assert "jira_pat" not in get_body["parsed"]
+            assert get_body["parsed"].get("jira_pat_present") is True
+
+            # 3. Export YAML: it must NOT contain the secret
+            r_export = client.get("/api/internal/workflows/jira-auth-test/yaml")
+            assert r_export.status_code == 200
+            export_text = r_export.text
+            assert "secret_pat_123" not in export_text
+            assert "jira_pat" not in export_text
+
+            # 4. Update the workflow without specifying jira_pat: existing token must be preserved
+            payload_update = {
+                "yaml": (
+                    "workflow:\n"
+                    "  name: jira-auth-test\n"
+                    "  source: jira\n"
+                    "  jira_url: https://issues.example.com\n"
+                    "  jira_project: TEST\n"
+                    "  start: 2026-06-01\n"
+                    "  stop: 2026-06-12\n"  # stop date changed
+                )
+            }
+            r_put_up = client.put("/api/internal/workflows/jira-auth-test", json=payload_update, headers=headers)
+            assert r_put_up.status_code == 200
+            assert r_put_up.json()["parsed"].get("jira_pat_present") is True
+
+            # 5. Explicitly clear the token by passing an empty string
+            payload_clear = {
+                "yaml": (
+                    "workflow:\n"
+                    "  name: jira-auth-test\n"
+                    "  source: jira\n"
+                    "  jira_url: https://issues.example.com\n"
+                    "  jira_project: TEST\n"
+                    "  jira_pat: ''\n"
+                    "  start: 2026-06-01\n"
+                    "  stop: 2026-06-12\n"
+                )
+            }
+            r_put_clear = client.put("/api/internal/workflows/jira-auth-test", json=payload_clear, headers=headers)
+            assert r_put_clear.status_code == 200
+            assert r_put_clear.json()["parsed"].get("jira_pat_present") is False

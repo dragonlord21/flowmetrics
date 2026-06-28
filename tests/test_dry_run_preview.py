@@ -48,7 +48,8 @@ def _post(client, payload, mock_fetch=None):
         client.app.state.dry_run_fetch = mock_fetch
     return client.post(
         "/api/internal/workflows/_dry-run",
-        json=payload, headers={"X-Requested-With": "fetch"},
+        json=payload,
+        headers={"X-Requested-With": "fetch"},
     )
 
 
@@ -71,20 +72,28 @@ class TestEndpointShape:
         app = create_app(data_dir=data, contracts_dir=contracts)
         steps = [
             {"name": "Ready", "wip": False, "matches": [{"stage": "Open"}]},
-            {"name": "WIP", "wip": True, "matches": [{"stage": "In Progress"}, {"stage": "Review"}]},
+            {
+                "name": "WIP",
+                "wip": True,
+                "matches": [{"stage": "In Progress"}, {"stage": "Review"}],
+            },
             {"name": "Done", "wip": False, "matches": [{"stage": "Closed"}]},
         ]
         items = [
-            _item("Open"), _item("Open"),
+            _item("Open"),
+            _item("Open"),
             _item("In Progress"),
-            _item("Review"), _item("Review"),
+            _item("Review"),
+            _item("Review"),
             _item("Closed"),
         ]
         with TestClient(app) as client:
             r = _post(
-                client, _payload(steps),
+                client,
+                _payload(steps),
                 mock_fetch=lambda **kw: {
-                    "items": items, "stopped_by": "items_cap",
+                    "items": items,
+                    "stopped_by": "items_cap",
                     "window_to": "2026-04-30",
                 },
             )
@@ -130,14 +139,16 @@ class TestUnmatchedBucket:
         ]
         items = [
             _item("In Progress"),
-            _item("Blocked"),       # not in any step's matches
-            _item("Awaiting QA"),   # not in any step's matches
+            _item("Blocked"),  # not in any step's matches
+            _item("Awaiting QA"),  # not in any step's matches
         ]
         with TestClient(app) as client:
             r = _post(
-                client, _payload(steps),
+                client,
+                _payload(steps),
                 mock_fetch=lambda **kw: {
-                    "items": items, "stopped_by": "items_cap",
+                    "items": items,
+                    "stopped_by": "items_cap",
                     "window_to": "2026-04-30",
                 },
             )
@@ -146,7 +157,8 @@ class TestUnmatchedBucket:
         assert by_name["WIP"]["count"] == 1
         assert by_name["_unmatched"]["count"] == 2
         assert {it["current_stage"] for it in by_name["_unmatched"]["items"]} == {
-            "Blocked", "Awaiting QA",
+            "Blocked",
+            "Awaiting QA",
         }
 
 
@@ -165,9 +177,11 @@ class TestLegacyNameMatching:
         items = [_item("Draft"), _item("Draft"), _item("Merged")]
         with TestClient(app) as client:
             r = _post(
-                client, _payload(steps),
+                client,
+                _payload(steps),
                 mock_fetch=lambda **kw: {
-                    "items": items, "stopped_by": "items_cap",
+                    "items": items,
+                    "stopped_by": "items_cap",
                     "window_to": "2026-04-30",
                 },
             )
@@ -187,7 +201,8 @@ class TestCache:
             calls.append(1)
             return {
                 "items": [_item("WIP")],
-                "stopped_by": "items_cap", "window_to": "2026-04-30",
+                "stopped_by": "items_cap",
+                "window_to": "2026-04-30",
             }
 
         payload = _payload([{"name": "WIP", "wip": True, "matches": [{"stage": "WIP"}]}])
@@ -200,18 +215,22 @@ class TestCache:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         calls = []
+
         def fetch(**kw):
             calls.append(1)
             return {
                 "items": [],
-                "stopped_by": "time_window", "window_to": "2026-04-30",
+                "stopped_by": "time_window",
+                "window_to": "2026-04-30",
             }
+
         payload = _payload([{"name": "A", "wip": True, "matches": [{"stage": "A"}]}])
         with TestClient(app) as client:
             _post(client, payload, mock_fetch=fetch)
             r = client.post(
                 "/api/internal/workflows/_dry-run?force=true",
-                json=payload, headers={"X-Requested-With": "fetch"},
+                json=payload,
+                headers={"X-Requested-With": "fetch"},
             )
             assert r.status_code == 200
         assert len(calls) == 2
@@ -226,12 +245,15 @@ class TestCapSemantics:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         captured = {}
+
         def fetch(**kw):
             captured.update(kw)
             return {
                 "items": [],
-                "stopped_by": "items_cap", "window_to": "2026-04-30",
+                "stopped_by": "items_cap",
+                "window_to": "2026-04-30",
             }
+
         payload = _payload([{"name": "A", "wip": True, "matches": [{"stage": "A"}]}])
         payload["items_cap"] = 50
         with TestClient(app) as client:
@@ -243,17 +265,39 @@ class TestCapSemantics:
         contracts, data = workspace
         app = create_app(data_dir=data, contracts_dir=contracts)
         captured = {}
+
         def fetch(**kw):
             captured.update(kw)
             return {
                 "items": [],
-                "stopped_by": "time_window", "window_to": "2026-04-30",
+                "stopped_by": "time_window",
+                "window_to": "2026-04-30",
             }
+
         payload = _payload([{"name": "WIP", "wip": True, "matches": []}], source="jira")
         payload["workflow"]["allowed_issuetypes"] = ["Story", "Bug"]
         with TestClient(app) as client:
             _post(client, payload, mock_fetch=fetch)
         assert captured.get("target", {}).get("allowed_issuetypes") == ["Story", "Bug"]
+
+    def test_dry_run_passes_jira_pat_to_fetcher(self, workspace):
+        contracts, data = workspace
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        captured = {}
+
+        def fetch(**kw):
+            captured.update(kw)
+            return {
+                "items": [],
+                "stopped_by": "time_window",
+                "window_to": "2026-04-30",
+            }
+
+        payload = _payload([{"name": "WIP", "wip": True, "matches": []}], source="jira")
+        payload["workflow"]["jira_pat"] = "test_bearer_token"
+        with TestClient(app) as client:
+            _post(client, payload, mock_fetch=fetch)
+        assert captured.get("target", {}).get("jira_pat") == "test_bearer_token"
 
 
 class TestWizardUIHasDryRunSection:

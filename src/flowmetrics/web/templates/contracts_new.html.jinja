@@ -327,6 +327,27 @@
                  placeholder="Story, Bug"
                  @input="onSourceChanged()" @blur="probeSource()">
         </div>
+        <div class="field">
+          <label class="field-label" for="f-jira-pat">
+            Jira Personal Access Token (PAT)
+            <span class="field-hint">— optional bearer token for On-Prem / private servers</span>
+          </label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input class="field-input" id="f-jira-pat" name="jira_pat" type="password"
+                   x-model="jiraPat"
+                   placeholder="••••••••••••"
+                   :disabled="jiraPatPresent && !updateJiraPat"
+                   @input="onSourceChanged()" @blur="probeSource()">
+            <template x-if="jiraPatPresent">
+              <button type="button" class="btn btn--secondary btn--sm" 
+                      x-text="updateJiraPat ? 'Keep existing' : 'Update token'"
+                      @click="toggleUpdateJiraPat()"></button>
+            </template>
+          </div>
+          <template x-if="jiraPatPresent && !updateJiraPat">
+            <span style="font-size: 0.8125rem; color: var(--fg-muted);">✓ Existing token loaded securely.</span>
+          </template>
+        </div>
       </div>
 
       <div class="probe-status" id="probe-status"
@@ -578,6 +599,7 @@
       // form state
       name: '', label: '', source: 'github',
       repo: '', jiraUrl: '', jiraProject: '', allowedIssuetypes: '',
+      jiraPat: '', jiraPatPresent: false, updateJiraPat: false,
       steps: [],                 // [{name, wip, matches: []}]
       saved: false, savedName: '',   // post-save "fetch data" panel
       activeIdx: null,
@@ -754,14 +776,24 @@
       },
 
       // ---- save / dry-run / archive ----
+      toggleUpdateJiraPat() {
+        this.updateJiraPat = !this.updateJiraPat;
+        if (!this.updateJiraPat) {
+          this.jiraPat = '';
+        }
+      },
       _target() {
         const types = this.allowedIssuetypes
           ? this.allowedIssuetypes.split(',').map(s => s.trim()).filter(Boolean)
           : [];
+        const pat = this.editId
+          ? (this.updateJiraPat ? this.jiraPat : null)
+          : this.jiraPat;
         return {
           source: this.source, repo: this.repo || null,
           jira_url: this.jiraUrl || null, jira_project: this.jiraProject || null,
           allowed_issuetypes: types,
+          jira_pat: pat || null,
         };
       },
       _contractBody() {
@@ -783,6 +815,15 @@
             lines.push('  allowed_issuetypes:');
             for (const t of types) {
               lines.push(`    - ${t}`);
+            }
+          }
+          if (this.editId) {
+            if (this.updateJiraPat) {
+              lines.push(`  jira_pat: ${q(this.jiraPat)}`);
+            }
+          } else {
+            if (this.jiraPat) {
+              lines.push(`  jira_pat: ${q(this.jiraPat)}`);
             }
           }
         }
@@ -857,6 +898,9 @@
         this.jiraUrl = p.jira_url || '';
         this.jiraProject = p.jira_project || '';
         this.allowedIssuetypes = (p.allowed_issuetypes || []).join(', ');
+        this.jiraPatPresent = !!p.jira_pat_present;
+        this.updateJiraPat = false;
+        this.jiraPat = '';
         if (Array.isArray(p.steps) && p.steps.length) {
           this.steps = p.steps.map((s) => ({
             name: s.name, wip: !!s.wip,

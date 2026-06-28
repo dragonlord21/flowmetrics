@@ -209,6 +209,7 @@ def _build_source_from_workflow(
         include_issues=include_issues,
         wip_labels=wip_labels,
         allowed_issuetypes=wf.allowed_issuetypes if wf.source == "jira" else None,
+        token=wf.jira_pat if wf.source == "jira" else None,
     )
 
 
@@ -230,6 +231,7 @@ def _build_source(
     wip_labels: WipLabels | None = None,
     include_issues: bool = False,
     allowed_issuetypes: list[str] | None = None,
+    token: str | None = None,
 ) -> Source:
     """Pick the source backend from whichever flag set the user provided.
 
@@ -269,7 +271,7 @@ def _build_source(
             )
         return make_jira_source(
             jira_url, jira_project, cache_dir=cache_dir, read_only=offline,
-            allowed_issuetypes=allowed_issuetypes,
+            allowed_issuetypes=allowed_issuetypes, token=token,
         )
     raise click.UsageError(
         "No source specified. Pass --repo OWNER/NAME (GitHub) "

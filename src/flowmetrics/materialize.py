@@ -240,6 +240,7 @@ def materialize(
             cache_dir=cache_dir,
             read_only=offline,
             allowed_issuetypes=workflow.allowed_issuetypes,
+            token=workflow.jira_pat,
         )
 
     # The workflow window is optional; fall back to a rolling default

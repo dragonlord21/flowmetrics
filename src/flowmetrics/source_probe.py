@@ -69,13 +69,14 @@ def github_headers() -> dict[str, str]:
     return headers
 
 
-def jira_headers() -> dict[str, str]:
+def jira_headers(token: str | None = None) -> dict:
     """Auth headers for Jira REST calls. Reads $JIRA_PAT and sends it
     as a Bearer token. Degrades to anonymous when no token is configured."""
     headers = {"Accept": "application/json"}
     import os
 
-    token = os.environ.get("JIRA_PAT")
+    if not token:
+        token = os.environ.get("JIRA_PAT")
     if token:
         headers["Authorization"] = f"Bearer {token.strip()}"
     return headers
@@ -113,8 +114,9 @@ def probe_source_exists(source: str, target: dict) -> dict:
             }
         # API v2 — Apache's public Jira is Jira Server.
         url = f"{base.rstrip('/')}/rest/api/2/project/{project}"
+        token = (target or {}).get("jira_pat")
         try:
-            r = httpx.get(url, timeout=10.0, headers=jira_headers())
+            r = httpx.get(url, timeout=10.0, headers=jira_headers(token))
         except httpx.HTTPError as exc:
             return {"ok": False, "error": str(exc)}
         if r.status_code == 404:
@@ -164,10 +166,11 @@ def probe_source_vocab(source: str, target: dict) -> dict:
         lifecycle = list(JIRA_LIFECYCLE_EVENTS)
         base = (target or {}).get("jira_url") or ""
         project = (target or {}).get("jira_project") or ""
+        token = (target or {}).get("jira_pat")
         if base and project:
             url = f"{base.rstrip('/')}/rest/api/2/project/{project}/statuses"
             try:
-                r = httpx.get(url, timeout=10.0, headers=jira_headers())
+                r = httpx.get(url, timeout=10.0, headers=jira_headers(token))
                 if r.status_code == 200:
                     seen: set[str] = set()
                     for issue_type in r.json():
