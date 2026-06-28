@@ -55,7 +55,8 @@ def open_warehouse(data_dir: Path) -> duckdb.DuckDBPyConnection:
             f"    PARTITION BY contract_id, source, item_id "
             f"    ORDER BY materialized_at DESC, run_id DESC"
             f"  ) AS _dedup_rn "
-            f"  FROM read_parquet('{work_items_glob}', hive_partitioning = true)"
+            f"  FROM read_parquet('{work_items_glob}', "
+            f"    hive_partitioning = true, union_by_name = true)"
             f") WHERE _dedup_rn = 1"
         )
     except duckdb.IOException:
@@ -80,7 +81,8 @@ def open_warehouse(data_dir: Path) -> duckdb.DuckDBPyConnection:
             "NULL::DOUBLE   AS cycle_time_days, "
             "NULL::VARCHAR  AS contract_id, "
             "NULL::TIMESTAMP AS materialized_at, "
-            "NULL::VARCHAR  AS run_id "
+            "NULL::VARCHAR  AS run_id, "
+            "NULL::VARCHAR  AS issuetype "
             "WHERE FALSE"
         )
 

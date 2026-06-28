@@ -374,7 +374,8 @@ CREATE TEMPORARY TABLE work_items (
     cycle_time_days     DOUBLE,
     contract_id         VARCHAR,
     materialized_at     TIMESTAMP,
-    run_id              VARCHAR
+    run_id              VARCHAR,
+    issuetype           VARCHAR
 )
 """
 
@@ -442,6 +443,7 @@ def _work_item_row(item, workflow: Workflow, run_id: str, materialized_at: datet
         workflow.name,
         materialized_at,
         run_id,
+        getattr(item, "issuetype", None),
     )
 
 
@@ -472,7 +474,7 @@ def _write_work_items_parquet(
         if rows:
             con.executemany(
                 "INSERT INTO work_items VALUES "
-                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rows,
             )
         # Use parameterised path? DuckDB COPY TO needs a literal — escape
