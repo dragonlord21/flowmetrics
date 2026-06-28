@@ -77,6 +77,22 @@
     </label>
   </details>
   {% endif %}
+  
+  {% if workflow.observed_issuetypes %}
+  <details class="filter-advanced" {% if workflow.selected_issuetypes %}open{% endif %}>
+    <summary title="Filter by issue types">Issue types</summary>
+    <div style="display: inline-flex; gap: 0.6rem; align-items: center; background: var(--bg-shade); padding: 0.15rem 0.5rem; border-radius: 0.25rem; border: 0.0625rem solid var(--border);">
+      {% for type in workflow.observed_issuetypes %}
+        <label style="display: inline-flex; align-items: center; gap: 0.25rem; cursor: pointer; font-size: 0.8125rem; color: var(--fg); font-weight: normal; margin-bottom: 0;">
+          <input type="checkbox" name="issuetype" value="{{ type }}"
+                 {% if type in workflow.selected_issuetypes %}checked{% endif %}
+                 onchange="flowmetricsSubmitFilters(this.form)">
+          {{ type }}
+        </label>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
 </form>
 <script>
   // Submit the filter form, emitting only the params the

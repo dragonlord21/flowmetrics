@@ -53,6 +53,7 @@ def render(
     *,
     states: WorkflowStates | None = None,
     view: Window | None = None,
+    issuetypes: list[str] | None = None,
 ) -> CfdModel:
     """Resolve stages (YAML if provided, otherwise infer by
     pairwise precedence), fetch first-stage entries, and build the
@@ -63,12 +64,13 @@ def render(
         stages = states.cfd_bands()
     else:
         stages = infer_stage_order(
-            pairwise_stage_precedence(con, contract_name),
-            observed_stages(con, contract_name),
+            pairwise_stage_precedence(con, contract_name, issuetypes=issuetypes),
+            observed_stages(con, contract_name, issuetypes=issuetypes),
         )
     entries = first_stage_entries(
         con, contract_name,
         only_stages=stages if states is not None else None,
+        issuetypes=issuetypes,
     )
     return build_cfd_model(entries, stages, view=view)
 

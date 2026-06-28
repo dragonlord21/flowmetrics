@@ -50,6 +50,7 @@ def render(
     ptile_max: int = 100,
     ptile_ranges: list[tuple[int, int]] | None = None,
     metric_thresholds: tuple[float, float, float] | None = None,
+    issuetypes: list[str] | None = None,
 ) -> CycleTimeModel:
     """Query completed items and resolve the cycle-time model.
 
@@ -64,7 +65,7 @@ def render(
     don't shift while the user drags.
     """
     model = build_cycle_time_model(
-        completed_items(con, contract_name), view=view
+        completed_items(con, contract_name, issuetypes=issuetypes), view=view
     )
     # No-op filter shortcut: bounds default to all-items AND no
     # explicit ranges supplied.

@@ -45,6 +45,7 @@ def render(
     ptile_max: int = 100,
     ptile_ranges: list[tuple[int, int]] | None = None,
     metric_thresholds: tuple[float, float, float] | None = None,
+    issuetypes: list[str] | None = None,
 ) -> AgingModel:
     """Query the in-flight snapshot + completed items and resolve
     the aging-WIP model.
@@ -62,10 +63,10 @@ def render(
     bands don't shift while the user drags.
     """
     model = build_aging_model(
-        in_flight_snapshot(con, contract_name, asof),
-        completed_items(con, contract_name),
+        in_flight_snapshot(con, contract_name, asof, issuetypes=issuetypes),
+        completed_items(con, contract_name, issuetypes=issuetypes),
         asof=asof,
-        open_item_count=count_open_items(con, contract_name),
+        open_item_count=count_open_items(con, contract_name, issuetypes=issuetypes),
         reference=reference,
         wip_states=frozenset(states.wip) if states is not None else None,
     )

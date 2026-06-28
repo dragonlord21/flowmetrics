@@ -40,10 +40,11 @@ def render_when_done(
     runs: int = DEFAULT_RUNS,
     seed: int = 0,
     reference: Window | None = None,
+    issuetypes: list[str] | None = None,
 ) -> WhenDoneModel:
     """Query completed items and resolve a "when done" model."""
     return build_when_done_model(
-        completed_items(con, contract_name),
+        completed_items(con, contract_name, issuetypes=issuetypes),
         backlog=items,
         start_date=start_date,
         runs=runs,
@@ -61,10 +62,11 @@ def render_how_many(
     runs: int = DEFAULT_RUNS,
     seed: int = 0,
     reference: Window | None = None,
+    issuetypes: list[str] | None = None,
 ) -> HowManyModel:
     """Query completed items and resolve a "how many" model."""
     return build_how_many_model(
-        completed_items(con, contract_name),
+        completed_items(con, contract_name, issuetypes=issuetypes),
         start_date=start_date,
         end_date=end_date,
         runs=runs,

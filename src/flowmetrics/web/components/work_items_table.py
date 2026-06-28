@@ -246,6 +246,7 @@ def render(
     # line on the chart. Custom ranges still fall back to
     # PERCENT_RANK.
     metric_thresholds: tuple[float, float, float] | None = None,
+    issuetypes: list[str] | None = None,
 ) -> WorkItemsTableData:
     """Read a page of rows for the workflow.
 
@@ -344,6 +345,16 @@ def render(
         )
         view_params = [view.from_, view.to]
 
+    issuetype_clause = ""
+    issuetype_params: list = []
+    if issuetypes is not None:
+        if not issuetypes:
+            issuetype_clause = " AND FALSE "
+        else:
+            placeholders = ",".join("?" for _ in issuetypes)
+            issuetype_clause = f" AND issuetype IN ({placeholders}) "
+            issuetype_params = list(issuetypes)
+
     # Build the WHERE clause + params once, used by both the
     # total-count query and the data query.
     where_clause = (
@@ -355,6 +366,7 @@ def render(
         f"  {in_flight_filter} "
         f"  {wip_clause}"
         f"  {view_clause}"
+        f"  {issuetype_clause}"
     )
     pattern = f"%{(q or '').lower()}%"
     completed_on_arg = completed_on or ""
@@ -366,6 +378,7 @@ def render(
     if in_flight_at and wip_states:
         where_params.extend(list(wip_states))
     where_params.extend(view_params)
+    where_params.extend(issuetype_params)
 
     # Ranking metric: cycle time when scope is completed items,
     # age (asof - created_at) when scope is in-flight. The

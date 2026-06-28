@@ -345,12 +345,26 @@ def creations_by_day(
 
 
 def count_open_items(
-    con: duckdb.DuckDBPyConnection, contract_name: str
+    con: duckdb.DuckDBPyConnection,
+    contract_name: str,
+    issuetypes: list[str] | tuple[str, ...] | None = None,
 ) -> int:
     """How many work items have no completion recorded — i.e.
     whether the warehouse has ever captured open work at all
     (distinguishes a never-captured snapshot from a genuinely
     empty one)."""
+    if issuetypes is not None:
+        if not issuetypes:
+            return 0
+        placeholders = ",".join("?" for _ in issuetypes)
+        return int(
+            con.execute(
+                "SELECT count(*) FROM work_items "
+                "WHERE contract_id = ? AND completed_at IS NULL "
+                f"  AND issuetype IN ({placeholders})",
+                [contract_name, *issuetypes],
+            ).fetchone()[0]
+        )
     return int(
         con.execute(
             "SELECT count(*) FROM work_items "
