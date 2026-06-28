@@ -23,7 +23,9 @@ from flowmetrics.warehouse.queries import (
     in_flight_snapshot,
     latest_materialized_at,
     observed_stages,
+    observed_issuetypes,
     pairwise_stage_precedence,
+    creations_by_day,
 )
 
 
@@ -34,27 +36,27 @@ def _warehouse() -> duckdb.DuckDBPyConnection:
             contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
             title VARCHAR, url VARCHAR,
             created_at TIMESTAMP, completed_at TIMESTAMP,
-            cycle_time_days DOUBLE
+            cycle_time_days DOUBLE, issuetype VARCHAR
         )"""
     )
     rows = [
         # workflow "c" — three completed, completion-ascending
         ("c", "github", "#1", "first", "http://x/1",
-         datetime(2026, 1, 1), datetime(2026, 1, 4), 3.0),
+         datetime(2026, 1, 1), datetime(2026, 1, 4), 3.0, "Story"),
         ("c", "github", "#2", "second", None,
-         datetime(2026, 1, 2), datetime(2026, 1, 9), 7.0),
+         datetime(2026, 1, 2), datetime(2026, 1, 9), 7.0, "Bug"),
         ("c", "github", "#3", "third", "http://x/3",
-         datetime(2026, 1, 1), datetime(2026, 2, 1), 31.0),
+         datetime(2026, 1, 1), datetime(2026, 2, 1), 31.0, "Story"),
         # workflow "c" — two in flight (completed_at NULL)
         ("c", "github", "#4", "open", None,
-         datetime(2026, 1, 5), None, None),
+         datetime(2026, 1, 5), None, None, "Bug"),
         ("c", "github", "#5", "open2", None,
-         datetime(2026, 1, 6), None, None),
+         datetime(2026, 1, 6), None, None, "Task"),
         # a different workflow — must be excluded
         ("other", "github", "#9", "elsewhere", None,
-         datetime(2026, 1, 1), datetime(2026, 1, 2), 1.0),
+         datetime(2026, 1, 1), datetime(2026, 1, 2), 1.0, "Story"),
     ]
-    con.executemany("INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?)", rows)
+    con.executemany("INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?,?)", rows)
     return con
 
 
@@ -92,6 +94,19 @@ class TestCompletedItems:
     def test_unknown_contract_returns_empty(self):
         assert completed_items(_warehouse(), "nope") == []
 
+    def test_filters_by_issuetypes(self):
+        items = completed_items(_warehouse(), "c", issuetypes=["Story"])
+        assert {i.item_id for i in items} == {"#1", "#3"}
+
+        items_bug = completed_items(_warehouse(), "c", issuetypes=["Bug"])
+        assert {i.item_id for i in items_bug} == {"#2"}
+
+        items_both = completed_items(_warehouse(), "c", issuetypes=["Story", "Bug"])
+        assert {i.item_id for i in items_both} == {"#1", "#2", "#3"}
+
+    def test_empty_issuetypes_returns_empty(self):
+        assert completed_items(_warehouse(), "c", issuetypes=[]) == []
+
 
 def _warehouse_with_transitions() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(":memory:")
@@ -100,7 +115,7 @@ def _warehouse_with_transitions() -> duckdb.DuckDBPyConnection:
             contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
             title VARCHAR, url VARCHAR,
             created_at TIMESTAMP, completed_at TIMESTAMP,
-            cycle_time_days DOUBLE)"""
+            cycle_time_days DOUBLE, issuetype VARCHAR)"""
     )
     con.execute(
         """CREATE TABLE transitions (
@@ -108,23 +123,23 @@ def _warehouse_with_transitions() -> duckdb.DuckDBPyConnection:
             entered_at TIMESTAMP, stage VARCHAR, signal VARCHAR)"""
     )
     con.executemany(
-        "INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO work_items VALUES (?,?,?,?,?,?,?,?,?)",
         [
             # open at 2026-02-01: created before, not completed
             ("c", "github", "#1", "one", None,
-             datetime(2026, 1, 1), None, None),
+             datetime(2026, 1, 1), None, None, "Story"),
             # open: created before, completed AFTER the snapshot
             ("c", "github", "#2", "two", None,
-             datetime(2026, 1, 5), datetime(2026, 3, 1), None),
+             datetime(2026, 1, 5), datetime(2026, 3, 1), None, "Bug"),
             # closed: completed before the snapshot
             ("c", "github", "#3", "three", None,
-             datetime(2026, 1, 2), datetime(2026, 1, 20), 18.0),
+             datetime(2026, 1, 2), datetime(2026, 1, 20), 18.0, "Story"),
             # not yet created at the snapshot
             ("c", "github", "#4", "four", None,
-             datetime(2026, 2, 15), None, None),
+             datetime(2026, 2, 15), None, None, "Bug"),
             # open, never transitioned
             ("c", "github", "#5", "five", None,
-             datetime(2026, 1, 10), None, None),
+             datetime(2026, 1, 10), None, None, "Task"),
         ],
     )
     con.executemany(
@@ -179,6 +194,16 @@ class TestInFlightSnapshot:
         items = in_flight_snapshot(_warehouse_with_transitions(), "c", self.ASOF)
         assert [i.item_id for i in items] == ["#1", "#2", "#5"]
 
+    def test_filters_by_issuetypes(self):
+        items = in_flight_snapshot(_warehouse_with_transitions(), "c", self.ASOF, issuetypes=["Story"])
+        assert {i.item_id for i in items} == {"#1"}
+
+        items_bug = in_flight_snapshot(_warehouse_with_transitions(), "c", self.ASOF, issuetypes=["Bug"])
+        assert {i.item_id for i in items_bug} == {"#2"}
+
+        items_empty = in_flight_snapshot(_warehouse_with_transitions(), "c", self.ASOF, issuetypes=[])
+        assert items_empty == []
+
 
 class TestCountOpenItems:
     def test_counts_items_with_no_completion(self):
@@ -213,6 +238,24 @@ class TestFirstStageEntries:
             _warehouse_with_transitions(), "c", only_stages=(),
         ) == []
 
+    def test_filters_by_issuetypes(self):
+        entries = first_stage_entries(_warehouse_with_transitions(), "c", issuetypes=["Story"])
+        keys = {(e.item_id, e.stage, e.entered_date) for e in entries}
+        assert keys == {
+            ("#1", "Draft", date(2026, 1, 2)),
+            ("#1", "Review", date(2026, 1, 10)),
+            ("#1", "Merged", date(2026, 3, 5)),
+        }
+
+        entries_bug = first_stage_entries(_warehouse_with_transitions(), "c", issuetypes=["Bug"])
+        keys_bug = {(e.item_id, e.stage, e.entered_date) for e in entries_bug}
+        assert keys_bug == {
+            ("#2", "Draft", date(2026, 1, 6)),
+        }
+
+    def test_empty_issuetypes_returns_empty(self):
+        assert first_stage_entries(_warehouse_with_transitions(), "c", issuetypes=[]) == []
+
 
 class TestObservedStages:
     def test_returns_distinct_stages_alphabetically(self):
@@ -222,6 +265,17 @@ class TestObservedStages:
 
     def test_unknown_contract_is_empty(self):
         assert observed_stages(_warehouse_with_transitions(), "nope") == []
+
+    def test_filters_by_issuetypes(self):
+        assert observed_stages(_warehouse_with_transitions(), "c", issuetypes=["Story"]) == [
+            "Draft", "Merged", "Review",
+        ]
+        assert observed_stages(_warehouse_with_transitions(), "c", issuetypes=["Bug"]) == [
+            "Draft"
+        ]
+
+    def test_empty_issuetypes_returns_empty(self):
+        assert observed_stages(_warehouse_with_transitions(), "c", issuetypes=[]) == []
 
 
 class TestPairwiseStagePrecedence:
@@ -234,6 +288,20 @@ class TestPairwiseStagePrecedence:
             ("Draft", "Merged"): 1,
             ("Review", "Merged"): 1,
         }
+
+    def test_filters_by_issuetypes(self):
+        pairs = pairwise_stage_precedence(_warehouse_with_transitions(), "c", issuetypes=["Story"])
+        as_dict = {(a, b): c for a, b, c in pairs}
+        assert as_dict == {
+            ("Draft", "Review"): 1,
+            ("Draft", "Merged"): 1,
+            ("Review", "Merged"): 1,
+        }
+
+        assert pairwise_stage_precedence(_warehouse_with_transitions(), "c", issuetypes=["Bug"]) == []
+
+    def test_empty_issuetypes_returns_empty(self):
+        assert pairwise_stage_precedence(_warehouse_with_transitions(), "c", issuetypes=[]) == []
 
 
 def _warehouse_with_materialized() -> duckdb.DuckDBPyConnection:
@@ -297,3 +365,54 @@ class TestLatestMaterializedAt:
 
     def test_unknown_contract_is_none(self):
         assert latest_materialized_at(_warehouse_with_materialized(), "nope") is None
+
+
+class TestObservedIssuetypes:
+    def test_returns_distinct_sorted_issuetypes(self):
+        # _warehouse has "Story", "Bug", "Task" for contract "c"
+        types = observed_issuetypes(_warehouse(), "c")
+        assert types == ["Bug", "Story", "Task"]
+
+    def test_excludes_null_issuetypes(self):
+        con = duckdb.connect(":memory:")
+        con.execute(
+            """CREATE TABLE work_items (
+                contract_id VARCHAR, source VARCHAR, item_id VARCHAR,
+                title VARCHAR, url VARCHAR,
+                created_at TIMESTAMP, completed_at TIMESTAMP,
+                cycle_time_days DOUBLE, issuetype VARCHAR
+            )"""
+        )
+        con.execute(
+            "INSERT INTO work_items VALUES ('c', 'github', '#1', 'a', NULL, NULL, NULL, NULL, 'Story')"
+        )
+        con.execute(
+            "INSERT INTO work_items VALUES ('c', 'github', '#2', 'b', NULL, NULL, NULL, NULL, NULL)"
+        )
+        assert observed_issuetypes(con, "c") == ["Story"]
+
+    def test_unknown_contract_is_empty(self):
+        assert observed_issuetypes(_warehouse(), "nope") == []
+
+
+class TestCreationsByDay:
+    def test_returns_creations_by_day_for_contract(self):
+        res = creations_by_day(_warehouse(), "c")
+        assert res == [
+            (date(2026, 1, 1), 2),
+            (date(2026, 1, 2), 1),
+            (date(2026, 1, 5), 1),
+            (date(2026, 1, 6), 1),
+        ]
+
+    def test_filters_by_issuetypes(self):
+        assert creations_by_day(_warehouse(), "c", issuetypes=["Story"]) == [
+            (date(2026, 1, 1), 2),
+        ]
+        assert creations_by_day(_warehouse(), "c", issuetypes=["Bug"]) == [
+            (date(2026, 1, 2), 1),
+            (date(2026, 1, 5), 1),
+        ]
+
+    def test_empty_issuetypes_returns_empty(self):
+        assert creations_by_day(_warehouse(), "c", issuetypes=[]) == []
