@@ -60,6 +60,7 @@ def github_headers() -> dict[str, str]:
     headers = {"Accept": "application/vnd.github+json"}
     try:
         from .sources.github import resolve_token
+
         token = resolve_token()
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -73,6 +74,7 @@ def jira_headers() -> dict[str, str]:
     as a Bearer token. Degrades to anonymous when no token is configured."""
     headers = {"Accept": "application/json"}
     import os
+
     token = os.environ.get("JIRA_PAT")
     if token:
         headers["Authorization"] = f"Bearer {token.strip()}"
@@ -119,9 +121,7 @@ def probe_source_exists(source: str, target: dict) -> dict:
             return {"ok": False, "error": f"project {project!r} not found"}
         if r.status_code >= 400:
             return {"ok": False, "error": f"{url} returned {r.status_code}"}
-        body = r.json() if r.headers.get("content-type", "").startswith(
-            "application/json"
-        ) else {}
+        body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
         return {"ok": True, "label": body.get("name", project)}
     return {"ok": False, "error": f"unknown source {source!r}"}
 
@@ -211,7 +211,10 @@ def _github_pr_signal(it: dict) -> str | None:
 
 
 def _github_dry_run_items(
-    repo: str, since_date: date, until_date: date, items_cap: int,
+    repo: str,
+    since_date: date,
+    until_date: date,
+    items_cap: int,
 ) -> list[dict]:
     url = (
         f"https://api.github.com/search/issues?q=repo:{repo}"
@@ -237,13 +240,21 @@ def _github_dry_run_items(
 
 
 def _jira_dry_run_items(
-    base: str, project: str, since_date: date, until_date: date, items_cap: int,
+    base: str,
+    project: str,
+    since_date: date,
+    until_date: date,
+    items_cap: int,
+    allowed_issuetypes: list[str] | None = None,
 ) -> list[dict]:
     jql = (
         f"project = {project} AND updated >= "
-        f"\"{since_date.isoformat()}\" AND updated <= "
-        f"\"{until_date.isoformat()}\""
+        f'"{since_date.isoformat()}" AND updated <= '
+        f'"{until_date.isoformat()}"'
     )
+    if allowed_issuetypes:
+        types_str = ", ".join(f'"{t}"' for t in allowed_issuetypes)
+        jql += f" AND issuetype IN ({types_str})"
     url = (
         f"{base.rstrip('/')}/rest/api/2/search?jql="
         f"{httpx.QueryParams({'jql': jql})['jql']}"
@@ -258,20 +269,26 @@ def _jira_dry_run_items(
     out: list[dict] = []
     for it in r.json().get("issues", [])[:items_cap]:
         fields = it.get("fields") or {}
-        out.append({
-            "id": it.get("key") or "",
-            "title": fields.get("summary") or "",
-            "url": f"{base.rstrip('/')}/browse/{it.get('key')}",
-            "current_stage": (fields.get("status") or {}).get("name") or "",
-            # The snapshot shows current status; represent it as a
-            # status-change so `event: status-changed` matchers preview.
-            "signal": signals.SIGNAL_JIRA_STATUS_CHANGED,
-        })
+        out.append(
+            {
+                "id": it.get("key") or "",
+                "title": fields.get("summary") or "",
+                "url": f"{base.rstrip('/')}/browse/{it.get('key')}",
+                "current_stage": (fields.get("status") or {}).get("name") or "",
+                # The snapshot shows current status; represent it as a
+                # status-change so `event: status-changed` matchers preview.
+                "signal": signals.SIGNAL_JIRA_STATUS_CHANGED,
+            }
+        )
     return out
 
 
 def dry_run_fetch(
-    *, source: str, target: dict, since: str, items_cap: int,
+    *,
+    source: str,
+    target: dict,
+    since: str,
+    items_cap: int,
 ) -> dict:
     """Bounded fetch of real items for the dry-run preview.
 
@@ -298,9 +315,12 @@ def dry_run_fetch(
     elif source == "jira":
         base = target.get("jira_url") or ""
         project = target.get("jira_project") or ""
+        allowed_issuetypes = target.get("allowed_issuetypes")
         if not (base and project):
             return err
-        items = _jira_dry_run_items(base, project, since_date, until_date, items_cap)
+        items = _jira_dry_run_items(
+            base, project, since_date, until_date, items_cap, allowed_issuetypes=allowed_issuetypes
+        )
     else:
         items = []
 
@@ -309,7 +329,10 @@ def dry_run_fetch(
 
 
 def bucket_items_by_step(
-    items: list[dict], steps: list[dict], *, source: str = "github",
+    items: list[dict],
+    steps: list[dict],
+    *,
+    source: str = "github",
 ) -> list[dict]:
     """Bucket fetched items per the user's steps.
 
@@ -325,19 +348,18 @@ def bucket_items_by_step(
     parsed: list[Step] = []
     for s in steps:
         try:
-            parsed.append(Step(
-                name=s.get("name") or "",
-                wip=bool(s.get("wip")),
-                matches=s.get("matches") or [],
-            ))
+            parsed.append(
+                Step(
+                    name=s.get("name") or "",
+                    wip=bool(s.get("wip")),
+                    matches=s.get("matches") or [],
+                )
+            )
         except Exception:
             # A malformed step shouldn't crash the preview; skip it.
             continue
 
-    spec = [
-        {"step_name": st.name, "wip": st.wip, "items": []}
-        for st in parsed
-    ]
+    spec = [{"step_name": st.name, "wip": st.wip, "items": []} for st in parsed]
     unmatched: list[dict] = []
     for item in items:
         stage = item.get("current_stage") or ""
@@ -355,8 +377,12 @@ def bucket_items_by_step(
     for bucket in spec:
         bucket["count"] = len(bucket["items"])
         out.append(bucket)
-    out.append({
-        "step_name": "_unmatched", "wip": False,
-        "count": len(unmatched), "items": unmatched,
-    })
+    out.append(
+        {
+            "step_name": "_unmatched",
+            "wip": False,
+            "count": len(unmatched),
+            "items": unmatched,
+        }
+    )
     return out

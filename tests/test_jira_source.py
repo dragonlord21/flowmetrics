@@ -388,7 +388,7 @@ class TestJiraAuthentication:
     def test_bearer_token_in_headers_from_param(self, tmp_path):
         cache = FileCache(tmp_path)
         base_url = "https://issues.example.com/jira"
-        
+
         requests_seen = []
         def handler(request: httpx.Request) -> httpx.Response:
             requests_seen.append(request)
@@ -403,7 +403,7 @@ class TestJiraAuthentication:
             http_client=client,
         )
         source.fetch_completed_in_window(date(2026, 5, 4), date(2026, 5, 10))
-        
+
         assert len(requests_seen) == 1
         assert requests_seen[0].headers["authorization"] == "Bearer secret_pat_123"
 
@@ -411,7 +411,7 @@ class TestJiraAuthentication:
         monkeypatch.setenv("JIRA_PAT", "env_pat_456")
         cache = FileCache(tmp_path)
         base_url = "https://issues.example.com/jira"
-        
+
         requests_seen = []
         def handler(request: httpx.Request) -> httpx.Response:
             requests_seen.append(request)
@@ -425,14 +425,14 @@ class TestJiraAuthentication:
             http_client=client,
         )
         source.fetch_completed_in_window(date(2026, 5, 4), date(2026, 5, 10))
-        
+
         assert len(requests_seen) == 1
         assert requests_seen[0].headers["authorization"] == "Bearer env_pat_456"
 
     def test_unauthorized_error_propagates(self, tmp_path):
         cache = FileCache(tmp_path)
         base_url = "https://issues.example.com/jira"
-        
+
         def handler(request: httpx.Request) -> httpx.Response:
             return httpx.Response(401, text="Unauthorized")
 
@@ -446,7 +446,7 @@ class TestJiraAuthentication:
         )
         with pytest.raises(httpx.HTTPStatusError) as exc_info:
             source.fetch_completed_in_window(date(2026, 5, 4), date(2026, 5, 10))
-        
+
         assert exc_info.value.response.status_code == 401
 
 
@@ -455,7 +455,7 @@ class TestJiraSourceFiltering:
         cache = FileCache(tmp_path)
         base_url = "https://issues.apache.org/jira"
         start, stop = date(2026, 5, 4), date(2026, 5, 10)
-        
+
         requests_seen = []
         def handler(request: httpx.Request) -> httpx.Response:
             requests_seen.append(request)
@@ -483,7 +483,7 @@ class TestJiraSourceFiltering:
         cache = FileCache(tmp_path)
         base_url = "https://issues.apache.org/jira"
         start, stop = date(2026, 5, 4), date(2026, 5, 10)
-        
+
         # We return two issues, one is 'Story' (allowed), one is 'Epic' (not allowed)
         issue_story = {
             "key": "BIGTOP-1",

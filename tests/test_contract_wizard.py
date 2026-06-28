@@ -43,6 +43,7 @@ class TestWizardPage:
         assert 'name="repo"' in html
         assert 'name="jira_url"' in html
         assert 'name="jira_project"' in html
+        assert 'name="allowed_issuetypes"' in html
 
     def test_links_to_wizard_from_home(self, workspace):
         contracts, data = workspace

@@ -77,8 +77,10 @@ The wizard walks you through:
    and a friendlier label (`Astral uv`).
 2. **Source** — pick GitHub or Jira.
 3. **Repo / project** — `astral-sh/uv` for GitHub; `<jira_url>` +
-   project key for Jira. The wizard probes the source to discover
-   labels and stages so it can offer the right options at the next
+   project key for Jira. For Jira sources, you can also optionally enter
+   a comma-separated list of **Allowed issue types** (e.g. `Story, Bug`)
+   to filter which tickets are fetched. The wizard probes the source to
+   discover labels and stages so it can offer the right options at the next
    step.
 4. **Stages** — for GitHub, choose between the default review cycle
    (Draft → Awaiting Review → Changes Requested → Approved) and

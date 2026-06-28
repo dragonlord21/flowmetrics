@@ -19,13 +19,13 @@ from flowmetrics.warehouse.queries import (
     completed_items,
     completion_date_range,
     count_open_items,
+    creations_by_day,
     first_stage_entries,
     in_flight_snapshot,
     latest_materialized_at,
-    observed_stages,
     observed_issuetypes,
+    observed_stages,
     pairwise_stage_precedence,
-    creations_by_day,
 )
 
 

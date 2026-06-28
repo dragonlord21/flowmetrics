@@ -24,13 +24,16 @@ import sys
 from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode
 
 import duckdb
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from jinja2 import pass_context
 
 try:
     import dotenv
+
     dotenv.load_dotenv()
 except ImportError:
     pass
@@ -145,6 +148,7 @@ def _detached_popen_kwargs(os_name: str | None = None) -> dict[str, object]:
         return {"creationflags": _WIN_CREATE_NEW_PROCESS_GROUP}
     return {}
 
+
 # Source `kind` → human label for the snapshot-section aside on
 # the dashboard ("most recent GitHub import"). New backends added
 # here; `.title()` is a safe fallback.
@@ -192,6 +196,7 @@ class WorkflowView:
             meta = contracts_db.get_meta(workflow_id)
             if meta is None or meta.archived_at is not None:
                 from .workflow import WorkflowError
+
                 raise WorkflowError(
                     f"workflow {workflow_id!r} not in the live "
                     f"store at {contracts_dir / 'contracts.db'}"
@@ -204,9 +209,7 @@ class WorkflowView:
         # the reference period; both bound the filter-bar date
         # inputs so the user can't pick a Period Ending with no
         # data behind it.
-        self.data_min_date, self.data_max_date = (
-            self._completion_date_range()
-        )
+        self.data_min_date, self.data_max_date = self._completion_date_range()
         # `parse_windows` is the single place date math happens —
         # the filter bar only emits a `period` choice. It returns
         # the WindowSelection model that every view and the filter
@@ -237,8 +240,7 @@ class WorkflowView:
         # before today (>= 2 days) — typical cron lag is one
         # day, so two-day staleness is the noise floor.
         self.data_is_stale = (
-            self.data_max_date is not None
-            and (today_utc - self.data_max_date).days >= 2
+            self.data_max_date is not None and (today_utc - self.data_max_date).days >= 2
         )
 
     def _completion_date_range(self):
@@ -326,14 +328,8 @@ class WorkflowView:
             # Completion-data coverage. Bounds the Period Ending
             # date input (min/max) and drives the freshness
             # banner. None when the warehouse is empty.
-            "data_min_date": (
-                self.data_min_date.isoformat()
-                if self.data_min_date else None
-            ),
-            "data_max_date": (
-                self.data_max_date.isoformat()
-                if self.data_max_date else None
-            ),
+            "data_min_date": (self.data_min_date.isoformat() if self.data_min_date else None),
+            "data_max_date": (self.data_max_date.isoformat() if self.data_max_date else None),
             "data_is_stale": self.data_is_stale,
             # The aging snapshot's asof — the date the dashboard's
             # Snapshot-section header names. Aging WIP is pinned to
@@ -352,9 +348,7 @@ class WorkflowView:
         asof = self._aging_snapshot_date()
         if asof is None:
             return None
-        return to_utc_display_date(
-            datetime.combine(asof, datetime.min.time(), tzinfo=UTC)
-        )
+        return to_utc_display_date(datetime.combine(asof, datetime.min.time(), tzinfo=UTC))
 
     def _slug(self) -> str:
         c = self.workflow
@@ -372,15 +366,19 @@ class WorkflowView:
         # carry-in at the window's left edge is correct; the
         # y-axis floor slider crops that inert base.
         return render_cfd(
-            con, self.id,
+            con,
+            self.id,
             states=self.workflow.states,
             view=self.view_window,
             issuetypes=self.selected_issuetypes,
         )
 
     def render_aging(
-        self, con, *,
-        ptile_min: int = 0, ptile_max: int = 100,
+        self,
+        con,
+        *,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
         ptile_ranges: list[tuple[int, int]] | None = None,
         metric_thresholds: tuple[float, float, float] | None = None,
     ):
@@ -391,29 +389,36 @@ class WorkflowView:
         # that date.
         asof = latest_materialized_at(con, self.id) or self.today
         return render_aging(
-            con, self.id,
+            con,
+            self.id,
             asof=asof,
             states=self.workflow.states,
             reference=self.selection.reference,
-            ptile_min=ptile_min, ptile_max=ptile_max,
+            ptile_min=ptile_min,
+            ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
             metric_thresholds=metric_thresholds,
             issuetypes=self.selected_issuetypes,
         )
 
     def render_cycle_time(
-        self, con, *,
-        ptile_min: int = 0, ptile_max: int = 100,
+        self,
+        con,
+        *,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
         ptile_ranges: list[tuple[int, int]] | None = None,
         metric_thresholds: tuple[float, float, float] | None = None,
     ):
         return render_cycle_time(
-            con, self.id,
+            con,
+            self.id,
             # Cycle-time's percentile lines summarise the dots on
             # screen — so they sample the view window, not the
             # reference. The reference is for aging + forecasts.
             view=self.selection.view,
-            ptile_min=ptile_min, ptile_max=ptile_max,
+            ptile_min=ptile_min,
+            ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
             metric_thresholds=metric_thresholds,
             issuetypes=self.selected_issuetypes,
@@ -423,14 +428,16 @@ class WorkflowView:
         # The throughput model derives its own coverage from the
         # observed completion span — caller passes only the view.
         return render_throughput(
-            con, self.id,
+            con,
+            self.id,
             view=self.view_window,
             issuetypes=self.selected_issuetypes,
         )
 
     def render_forecast_when_done(self, con, *, items: int, start_date=None):
         return render_forecast_when_done(
-            con, self.id,
+            con,
+            self.id,
             items=items,
             # A forecast runs from "now" by default — `self.today`,
             # the model's clock, not an ad-hoc now() in a route.
@@ -442,7 +449,8 @@ class WorkflowView:
     def render_forecast_how_many(self, con, *, start_date=None, end_date=None):
         start = start_date or self.today
         return render_forecast_how_many(
-            con, self.id,
+            con,
+            self.id,
             start_date=start,
             # Default horizon: 7 inclusive days from the start.
             end_date=end_date or (start + timedelta(days=6)),
@@ -454,25 +462,26 @@ class WorkflowView:
         return render_lifecycle(con, self.id, source, item_id)
 
 
-from urllib.parse import parse_qsl, urlencode
-from jinja2 import pass_context
+_CARRIED_PARAMS = frozenset(
+    {
+        "period",
+        "anchor",
+        "view_days",
+        "ref_days",
+        "ptile_min",
+        "ptile_max",
+        "ptile_ranges",
+        "issuetype",
+    }
+)
 
-_CARRIED_PARAMS = frozenset({
-    "period", "anchor", "view_days", "ref_days",
-    "ptile_min", "ptile_max", "ptile_ranges",
-    "issuetype",
-})
 
 @pass_context
 def _keep_filters(ctx, path: str) -> str:
     request = ctx.get("request")
     if request is None:
         return path
-    carried = [
-        (k, v)
-        for k, v in parse_qsl(request.url.query)
-        if k in _CARRIED_PARAMS
-    ]
+    carried = [(k, v) for k, v in parse_qsl(request.url.query) if k in _CARRIED_PARAMS]
     if not carried:
         return path
     sep = "&" if "?" in path else "?"
@@ -508,6 +517,7 @@ def create_app(
     # workflows dir into the SQLite store, then move them to `migrated/`.
     # Idempotent — subsequent calls with no YAMLs are no-ops.
     from .workflows_db import WorkflowStore
+
     contracts_db = WorkflowStore(contracts_dir)
     contracts_db.ensure_initialized()
 
@@ -551,6 +561,7 @@ def create_app(
         bar; thin wrapper around the charts/ptile_filter helper
         so the route can pass it straight through to render()."""
         from .charts.ptile_filter import parse_ranges
+
         return parse_ranges(s)
 
     def _parse_ptile_thresholds(
@@ -601,9 +612,7 @@ def create_app(
             creds: HTTPBasicCredentials = Depends(_BASIC),  # noqa: B008
         ) -> None:
             user_ok = secrets.compare_digest(creds.username.encode(), b"operator")
-            pass_ok = secrets.compare_digest(
-                creds.password.encode(), _expected_password.encode()
-            )
+            pass_ok = secrets.compare_digest(creds.password.encode(), _expected_password.encode())
             if not (user_ok and pass_ok):
                 raise HTTPException(
                     status_code=401,
@@ -616,7 +625,8 @@ def create_app(
         auth_dep = []
 
     def _open_view(
-        workflow_id: str, request: Request | None = None,
+        workflow_id: str,
+        request: Request | None = None,
     ) -> WorkflowView:
         """Factory: 404 if the workflow YAML is missing, else
         return a WorkflowView. Centralizes the (exists-check +
@@ -729,10 +739,7 @@ def create_app(
         if meta is None or meta.archived_at is not None:
             raise HTTPException(
                 status_code=404,
-                detail=(
-                    f"workflow {name!r} not found in "
-                    f"{contracts_dir / 'contracts.db'}."
-                ),
+                detail=(f"workflow {name!r} not found in {contracts_dir / 'contracts.db'}."),
             )
         return meta.workflow
 
@@ -751,8 +758,7 @@ def create_app(
             label = c.label if c and c.label else name
             workflows.append({"name": name, "label": label})
         archived_count = sum(
-            1 for m in contracts_db.list(include_archived=True)
-            if m.archived_at is not None
+            1 for m in contracts_db.list(include_archived=True) if m.archived_at is not None
         )
         return templates.TemplateResponse(
             request,
@@ -819,7 +825,8 @@ def create_app(
 
     @app.get("/api/internal/workflows/{contract_id}", dependencies=auth_dep)
     def get_contract(
-        contract_id: str, include_archived: bool = False,
+        contract_id: str,
+        include_archived: bool = False,
     ) -> dict:
         """Full detail for one workflow.
 
@@ -837,8 +844,7 @@ def create_app(
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"workflow {contract_id!r} is archived. "
-                    "Pass ?include_archived=true to fetch."
+                    f"workflow {contract_id!r} is archived. Pass ?include_archived=true to fetch."
                 ),
             )
         c = meta.workflow
@@ -848,6 +854,7 @@ def create_app(
             "repo": c.repo,
             "jira_url": c.jira_url,
             "jira_project": c.jira_project,
+            "allowed_issuetypes": c.allowed_issuetypes,
             "start": c.start.isoformat() if c.start else None,
             "stop": c.stop.isoformat() if c.stop else None,
             "label": c.label,
@@ -857,9 +864,7 @@ def create_app(
                 {
                     "name": s.name,
                     "wip": s.wip,
-                    "matches": [
-                        {"kind": m.kind, "value": m.value} for m in s.matches
-                    ],
+                    "matches": [{"kind": m.kind, "value": m.value} for m in s.matches],
                 }
                 for s in c.steps
             ],
@@ -909,7 +914,8 @@ def create_app(
         dependencies=auth_dep,
     )
     def edit_contract_page(
-        request: Request, contract_id: str,
+        request: Request,
+        contract_id: str,
     ) -> HTMLResponse:
         """Edit-existing-workflow page. Reuses the wizard template;
         the JS detects `mode=edit` and hydrates fields from
@@ -932,7 +938,8 @@ def create_app(
         dependencies=auth_dep,
     )
     def export_contract_yaml(
-        contract_id: str, include_archived: bool = False,
+        contract_id: str,
+        include_archived: bool = False,
     ):
         """Return the workflow's canonical YAML as a downloadable
         attachment. 404 on archived rows unless
@@ -949,17 +956,14 @@ def create_app(
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    f"workflow {contract_id!r} is archived. Pass "
-                    "?include_archived=true to export."
+                    f"workflow {contract_id!r} is archived. Pass ?include_archived=true to export."
                 ),
             )
         return Response(
             content=meta.yaml,
             media_type="application/x-yaml",
             headers={
-                "Content-Disposition": (
-                    f'attachment; filename="{contract_id}.yaml"'
-                ),
+                "Content-Disposition": (f'attachment; filename="{contract_id}.yaml"'),
             },
         )
 
@@ -971,10 +975,7 @@ def create_app(
     def archived_contracts_page(request: Request) -> HTMLResponse:
         """List archived contracts with restore / export / hard-
         delete actions."""
-        rows = [
-            m for m in contracts_db.list(include_archived=True)
-            if m.archived_at is not None
-        ]
+        rows = [m for m in contracts_db.list(include_archived=True) if m.archived_at is not None]
         archived = [
             {
                 "id": m.workflow.name,
@@ -1033,18 +1034,27 @@ def create_app(
             "repo": c_payload.get("repo"),
             "jira_url": c_payload.get("jira_url"),
             "jira_project": c_payload.get("jira_project"),
+            "allowed_issuetypes": c_payload.get("allowed_issuetypes") or [],
         }
         import hashlib
         import json as _json
-        steps_sig = hashlib.sha256(
-            _json.dumps(steps, sort_keys=True).encode()
-        ).hexdigest()[:16]
+
+        steps_sig = hashlib.sha256(_json.dumps(steps, sort_keys=True).encode()).hexdigest()[:16]
         cache_key = (
-            "dry-run", source, target.get("repo"), target.get("jira_url"),
-            target.get("jira_project"), since, items_cap, steps_sig,
+            "dry-run",
+            source,
+            target.get("repo"),
+            target.get("jira_url"),
+            target.get("jira_project"),
+            tuple(target.get("allowed_issuetypes") or []),
+            since,
+            items_cap,
+            steps_sig,
         )
         force = (request.query_params.get("force") or "").lower() in (
-            "true", "1", "yes",
+            "true",
+            "1",
+            "yes",
         )
         cache: dict = getattr(app.state, "_dry_run_cache", {})
         if not hasattr(app.state, "_dry_run_cache"):
@@ -1057,12 +1067,16 @@ def create_app(
 
         # Fetch (or stub via the injection slot for tests).
         fetcher = getattr(
-            app.state, "dry_run_fetch", _default_dry_run_fetch,
+            app.state,
+            "dry_run_fetch",
+            _default_dry_run_fetch,
         )
         try:
             fetched = fetcher(
-                source=source, target=target,
-                since=since, items_cap=items_cap,
+                source=source,
+                target=target,
+                since=since,
+                items_cap=items_cap,
             )
         except Exception as exc:
             return {
@@ -1110,10 +1124,17 @@ def create_app(
             "jira_url": payload.get("jira_url"),
             "jira_project": payload.get("jira_project"),
         }
-        key = ("vocab", source, target.get("repo"),
-               target.get("jira_url"), target.get("jira_project"))
+        key = (
+            "vocab",
+            source,
+            target.get("repo"),
+            target.get("jira_url"),
+            target.get("jira_project"),
+        )
         force = (request.query_params.get("force") or "").lower() in (
-            "true", "1", "yes",
+            "true",
+            "1",
+            "yes",
         )
         cache: dict = getattr(app.state, "_probe_vocab_cache", {})
         if not hasattr(app.state, "_probe_vocab_cache"):
@@ -1125,7 +1146,9 @@ def create_app(
                 return cached[1]
 
         probe = getattr(
-            app.state, "probe_source_vocab", _default_probe_source_vocab,
+            app.state,
+            "probe_source_vocab",
+            _default_probe_source_vocab,
         )
         try:
             result = probe(source, target)
@@ -1133,7 +1156,8 @@ def create_app(
             return {
                 "labels": [],
                 "lifecycle_events": (
-                    list(_GITHUB_LIFECYCLE_EVENTS) if source == "github"
+                    list(_GITHUB_LIFECYCLE_EVENTS)
+                    if source == "github"
                     else list(_JIRA_LIFECYCLE_EVENTS)
                 ),
                 "warehouse_stages": [],
@@ -1143,7 +1167,8 @@ def create_app(
         return result
 
     @app.post(
-        "/api/internal/workflows/_probe-stages", dependencies=write_dep,
+        "/api/internal/workflows/_probe-stages",
+        dependencies=write_dep,
     )
     def probe_stages(payload: dict, request: Request) -> dict:
         """Discover the workflow stages from the source. Runs a
@@ -1170,10 +1195,11 @@ def create_app(
         # Cache key: deterministic tuple of just the identifying
         # bits so a probe of repo "a/b" hits regardless of incidental
         # payload fields.
-        key = (source, target.get("repo"),
-               target.get("jira_url"), target.get("jira_project"))
+        key = (source, target.get("repo"), target.get("jira_url"), target.get("jira_project"))
         force = (request.query_params.get("force") or "").lower() in (
-            "true", "1", "yes",
+            "true",
+            "1",
+            "yes",
         )
         cache: dict = getattr(app.state, "_probe_stages_cache", {})
         if not hasattr(app.state, "_probe_stages_cache"):
@@ -1193,7 +1219,8 @@ def create_app(
         return result
 
     @app.post(
-        "/api/internal/workflows/_probe-source", dependencies=write_dep,
+        "/api/internal/workflows/_probe-source",
+        dependencies=write_dep,
     )
     def probe_source(payload: dict) -> dict:
         """Check whether the named source target (GitHub repo or
@@ -1219,7 +1246,8 @@ def create_app(
             return {"ok": False, "error": f"probe failed: {exc}"}
 
     @app.post(
-        "/api/internal/workflows/_validate", dependencies=write_dep,
+        "/api/internal/workflows/_validate",
+        dependencies=write_dep,
     )
     def validate_contract(payload: dict) -> dict:
         """Validate a YAML body without touching disk. Always returns
@@ -1230,7 +1258,8 @@ def create_app(
         return {"valid": not errors, "errors": errors}
 
     @app.put(
-        "/api/internal/workflows/{contract_id}", dependencies=write_dep,
+        "/api/internal/workflows/{contract_id}",
+        dependencies=write_dep,
     )
     def put_contract(contract_id: str, payload: dict) -> dict:
         """Create or overwrite a workflow. Body must carry a `yaml`
@@ -1253,7 +1282,8 @@ def create_app(
         except WorkflowsDBError as exc:
             # e.g. id collides with an archived row.
             raise HTTPException(
-                status_code=409, detail=str(exc),
+                status_code=409,
+                detail=str(exc),
             ) from exc
         return get_contract(contract_id)
 
@@ -1301,10 +1331,12 @@ def create_app(
         return {"id": contract_id, "archived": False}
 
     @app.delete(
-        "/api/internal/workflows/{contract_id}", dependencies=write_dep,
+        "/api/internal/workflows/{contract_id}",
+        dependencies=write_dep,
     )
     async def delete_contract(
-        contract_id: str, request: Request,
+        contract_id: str,
+        request: Request,
     ) -> dict:
         """**Hard delete.** Refuses unless the workflow is already
         archived (the two-step delete invariant — POST to /archive
@@ -1330,13 +1362,16 @@ def create_app(
 
         # Read purge_data from either the query string OR a JSON body.
         purge = (request.query_params.get("purge_data") or "").lower() in (
-            "true", "1", "yes",
+            "true",
+            "1",
+            "yes",
         )
         if not purge:
             try:
                 raw = await request.body()
                 if raw:
                     import json as _json
+
                     purge = bool(_json.loads(raw).get("purge_data"))
             except (ValueError, TypeError):
                 purge = False
@@ -1408,7 +1443,8 @@ def create_app(
         dependencies=auth_dep,
     )
     def data_source_detail(
-        request: Request, workflow_id: str,
+        request: Request,
+        workflow_id: str,
     ) -> HTMLResponse:
         """Per-workflow Data Source page: a completion-coverage
         timeline plus a browser-driven backfill the operator runs
@@ -1475,25 +1511,47 @@ def create_app(
             date.fromisoformat(since)
             date.fromisoformat(until)
         except ValueError:
-            return _fragment({
-                "workflow": workflow, "since": since, "until": until,
-                "status": "failed", "message": "Invalid date range.",
-            })
+            return _fragment(
+                {
+                    "workflow": workflow,
+                    "since": since,
+                    "until": until,
+                    "status": "failed",
+                    "message": "Invalid date range.",
+                }
+            )
         # Mark running now — closes the race where the page polls
         # before the subprocess writes its own first record.
-        write_status(spath, {
-            "workflow": workflow, "since": since, "until": until,
-            "status": "running",
-            "started_at": datetime.now(UTC).isoformat(),
-            "finished_at": None, "message": "",
-        })
+        write_status(
+            spath,
+            {
+                "workflow": workflow,
+                "since": since,
+                "until": until,
+                "status": "running",
+                "started_at": datetime.now(UTC).isoformat(),
+                "finished_at": None,
+                "message": "",
+            },
+        )
         cmd = [
-            sys.executable, "-m", "flowmetrics", "materialize", workflow,
-            "--data-dir", str(data_dir),
-            "--workflows-dir", str(contracts_dir),
-            "--cache-dir", str(cache_dir),
-            "--since", since, "--until", until,
-            "--status-file", str(spath),
+            sys.executable,
+            "-m",
+            "flowmetrics",
+            "materialize",
+            workflow,
+            "--data-dir",
+            str(data_dir),
+            "--workflows-dir",
+            str(contracts_dir),
+            "--cache-dir",
+            str(cache_dir),
+            "--since",
+            since,
+            "--until",
+            until,
+            "--status-file",
+            str(spath),
         ]
         if offline:
             cmd.append("--offline")
@@ -1515,7 +1573,8 @@ def create_app(
         dependencies=auth_dep,
     )
     def backfill_status(
-        request: Request, workflow: str,
+        request: Request,
+        workflow: str,
     ) -> HTMLResponse:
         """Polled by the progress fragment while a backfill runs."""
         return templates.TemplateResponse(
@@ -1559,7 +1618,9 @@ def create_app(
         dependencies=auth_dep,
     )
     def dashboard_tile(
-        request: Request, metric: str, workflow: str,
+        request: Request,
+        metric: str,
+        workflow: str,
     ) -> HTMLResponse:
         """HTMX-served per-metric tile (headline + chart). The
         dashboard renders only stubs; each tile fetches itself.
@@ -1585,7 +1646,8 @@ def create_app(
                 # 20-item / 7-day preview; the forecast clock
                 # (`start_date`) defaults to the model's today.
                 ctx["forecast_when_done"] = view.render_forecast_when_done(
-                    con, items=20,
+                    con,
+                    items=20,
                 )
                 ctx["forecast_how_many"] = view.render_forecast_how_many(con)
                 tpl = "_partials/dashboard_tile_forecast.html.jinja"
@@ -1613,9 +1675,7 @@ def create_app(
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def dashboard_with_slug(
-        request: Request, workflow_id: str, slug: str
-    ) -> HTMLResponse:
+    def dashboard_with_slug(request: Request, workflow_id: str, slug: str) -> HTMLResponse:
         return _dashboard(request, workflow_id)
 
     @app.get(
@@ -1624,8 +1684,10 @@ def create_app(
         dependencies=auth_dep,
     )
     def cycle_time_detail(
-        request: Request, workflow_id: str,
-        ptile_min: int = 0, ptile_max: int = 100,
+        request: Request,
+        workflow_id: str,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
         ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
@@ -1633,13 +1695,18 @@ def create_app(
         pranges = _parse_ptile_ranges(ptile_ranges)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
-                con, ptile_min=pmin, ptile_max=pmax,
+                con,
+                ptile_min=pmin,
+                ptile_max=pmax,
                 ptile_ranges=pranges,
             )
             pct = cycle_time.percentiles
             work_items = render_work_items_table(
-                con, workflow_id, view=view.view_window,
-                ptile_min=pmin, ptile_max=pmax,
+                con,
+                workflow_id,
+                view=view.view_window,
+                ptile_min=pmin,
+                ptile_max=pmax,
                 ptile_ranges=pranges,
                 metric_thresholds=(pct.p50, pct.p85, pct.p95),
                 issuetypes=view.selected_issuetypes,
@@ -1671,8 +1738,10 @@ def create_app(
         dependencies=auth_dep,
     )
     def cycle_time_fragment(
-        request: Request, workflow: str,
-        ptile_min: int = 0, ptile_max: int = 100,
+        request: Request,
+        workflow: str,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
         ptile_ranges: str | None = None,
         ptile_thresholds: str | None = None,
     ) -> HTMLResponse:
@@ -1682,7 +1751,9 @@ def create_app(
         pthr = _parse_ptile_thresholds(ptile_thresholds)
         with view.warehouse() as con:
             cycle_time = view.render_cycle_time(
-                con, ptile_min=pmin, ptile_max=pmax,
+                con,
+                ptile_min=pmin,
+                ptile_max=pmax,
                 ptile_ranges=pranges,
                 metric_thresholds=pthr,
             )
@@ -1708,7 +1779,9 @@ def create_app(
         with view.warehouse() as con:
             throughput = view.render_throughput(con)
             work_items = render_work_items_table(
-                con, workflow_id, view=view.view_window,
+                con,
+                workflow_id,
+                view=view.view_window,
                 issuetypes=view.selected_issuetypes,
             )
         return templates.TemplateResponse(
@@ -1730,9 +1803,7 @@ def create_app(
         response_class=HTMLResponse,
         dependencies=auth_dep,
     )
-    def throughput_fragment(
-        request: Request, workflow: str
-    ) -> HTMLResponse:
+    def throughput_fragment(request: Request, workflow: str) -> HTMLResponse:
         view = _open_view(workflow, request)
         with view.warehouse() as con:
             throughput = view.render_throughput(con)
@@ -1754,7 +1825,8 @@ def create_app(
     def aging_detail(
         request: Request,
         workflow_id: str,
-        ptile_min: int = 0, ptile_max: int = 100,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
         ptile_ranges: str | None = None,
     ) -> HTMLResponse:
         view = _open_view(workflow_id, request)
@@ -1762,7 +1834,9 @@ def create_app(
         pranges = _parse_ptile_ranges(ptile_ranges)
         with view.warehouse() as con:
             aging = view.render_aging(
-                con, ptile_min=pmin, ptile_max=pmax,
+                con,
+                ptile_min=pmin,
+                ptile_max=pmax,
                 ptile_ranges=pranges,
             )
             # Table scope mirrors the chart: in-flight items only,
@@ -1777,11 +1851,9 @@ def create_app(
                 in_flight_at=aging.asof_iso,
                 sort="created_at",
                 direction="asc",
-                wip_states=(
-                    view.workflow.states.wip
-                    if view.workflow.states else None
-                ),
-                ptile_min=pmin, ptile_max=pmax,
+                wip_states=(view.workflow.states.wip if view.workflow.states else None),
+                ptile_min=pmin,
+                ptile_max=pmax,
                 ptile_ranges=pranges,
                 # Aging's reference percentiles come from
                 # completed cycle times — a different population
@@ -1831,9 +1903,7 @@ def create_app(
             # window (which follows the Period) reaches the MCS
             # sample — not the bare component, which would forecast
             # off the full history regardless of the Period.
-            when_done = view.render_forecast_when_done(
-                con, items=max(1, items), start_date=today
-            )
+            when_done = view.render_forecast_when_done(con, items=max(1, items), start_date=today)
             # Slider semantics: "N days" → N-day inclusive window.
             # end_date = start + (N - 1) gives a window of size N.
             how_many = view.render_forecast_how_many(
@@ -1876,9 +1946,7 @@ def create_app(
         except (TypeError, ValueError):
             items_int = 20
         with view.warehouse() as con:
-            data = view.render_forecast_when_done(
-                con, items=items_int, start_date=start_date
-            )
+            data = view.render_forecast_when_done(con, items=items_int, start_date=start_date)
         return templates.TemplateResponse(
             request,
             "_partials/forecast_when_done_chart_fragment.html.jinja",
@@ -1929,8 +1997,10 @@ def create_app(
         dependencies=auth_dep,
     )
     def aging_fragment(
-        request: Request, workflow: str,
-        ptile_min: int = 0, ptile_max: int = 100,
+        request: Request,
+        workflow: str,
+        ptile_min: int = 0,
+        ptile_max: int = 100,
         ptile_ranges: str | None = None,
         ptile_thresholds: str | None = None,
     ) -> HTMLResponse:
@@ -1940,7 +2010,9 @@ def create_app(
         pthr = _parse_ptile_thresholds(ptile_thresholds)
         with view.warehouse() as con:
             aging = view.render_aging(
-                con, ptile_min=pmin, ptile_max=pmax,
+                con,
+                ptile_min=pmin,
+                ptile_max=pmax,
                 ptile_ranges=pranges,
                 metric_thresholds=pthr,
             )
@@ -2044,15 +2116,22 @@ def create_app(
         view = _open_view(workflow, request)
         # Normalise sort/direction via the component's whitelist —
         # invalid values fall back to defaults inside render().
-        sort_key: SortKey = sort if sort in (
-            "item_id", "title", "created_at",
-            "completed_at", "cycle_time_days", "age_days",
-            "percentile_rank",
-        ) else "completed_at"
+        sort_key: SortKey = (
+            sort
+            if sort
+            in (
+                "item_id",
+                "title",
+                "created_at",
+                "completed_at",
+                "cycle_time_days",
+                "age_days",
+                "percentile_rank",
+            )
+            else "completed_at"
+        )
         pmin, pmax = _clamp_ptile(ptile_min, ptile_max)
-        direction_key: SortDir = direction if direction in (
-            "asc", "desc"
-        ) else "desc"
+        direction_key: SortDir = direction if direction in ("asc", "desc") else "desc"
         try:
             page_int = max(1, int(page))
         except (TypeError, ValueError):
@@ -2074,10 +2153,7 @@ def create_app(
                 sort=sort_key,
                 direction=direction_key,
                 page=page_int,
-                wip_states=(
-                    view.workflow.states.wip
-                    if view.workflow.states else None
-                ),
+                wip_states=(view.workflow.states.wip if view.workflow.states else None),
                 # View window applies in completed-items mode
                 # (cycle-time / throughput pages); the component
                 # auto-skips it when in_flight_at is set (aging).
@@ -2114,9 +2190,7 @@ def create_app(
             # `After-Settle` (not After-Swap): the swap mutation
             # is queued asynchronously, so the meta element only
             # carries the new bounds after the settle phase runs.
-            response.headers["HX-Trigger-After-Settle"] = (
-                "flowmetrics:ptile-changed"
-            )
+            response.headers["HX-Trigger-After-Settle"] = "flowmetrics:ptile-changed"
         return response
 
     @app.get("/healthz")

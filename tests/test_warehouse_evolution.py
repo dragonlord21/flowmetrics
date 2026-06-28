@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
+
 import duckdb
-import pytest
 
 from flowmetrics.compute import WorkItem
-from flowmetrics.workflow import Workflow
 from flowmetrics.materialize import _write_work_items_parquet
 from flowmetrics.warehouse.connection import open_warehouse
+from flowmetrics.workflow import Workflow
 
 
 def test_materialize_writes_issuetype_column(tmp_path: Path):
@@ -50,7 +50,7 @@ def test_materialize_writes_issuetype_column(tmp_path: Path):
 def test_warehouse_schema_evolution_union_by_name(tmp_path: Path):
     workflow = "test_evolution"
     base = tmp_path / "work_items" / f"contract_id={workflow}"
-    
+
     # 1. Older style parquet file without the issuetype column (May 2026 schema)
     snap1 = base / "year=2026" / "month=06" / "day=28" / "items-old.parquet"
     snap1.parent.mkdir(parents=True, exist_ok=True)
@@ -115,7 +115,7 @@ def test_warehouse_schema_evolution_union_by_name(tmp_path: Path):
     con.execute(f"COPY wi_new TO '{p2}' (FORMAT PARQUET)")
     con.close()
 
-    # 3. Read both back via the warehouse view. It must union them cleanly, 
+    # 3. Read both back via the warehouse view. It must union them cleanly,
     # filling NULL for the older file's issuetype column.
     db_con = open_warehouse(tmp_path)
     res = db_con.execute(

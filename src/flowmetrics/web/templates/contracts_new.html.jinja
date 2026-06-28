@@ -317,6 +317,16 @@
                  placeholder="CASSANDRA"
                  @input="onSourceChanged()" @blur="probeSource()">
         </div>
+        <div class="field">
+          <label class="field-label" for="f-allowed-issuetypes">
+            Allowed issue types
+            <span class="field-hint">— optional comma-separated list, e.g. "Story, Bug" (leave blank to fetch all types)</span>
+          </label>
+          <input class="field-input" id="f-allowed-issuetypes" name="allowed_issuetypes" type="text"
+                 x-model="allowedIssuetypes"
+                 placeholder="Story, Bug"
+                 @input="onSourceChanged()" @blur="probeSource()">
+        </div>
       </div>
 
       <div class="probe-status" id="probe-status"
@@ -567,7 +577,7 @@
       editId: cfg.editId,
       // form state
       name: '', label: '', source: 'github',
-      repo: '', jiraUrl: '', jiraProject: '',
+      repo: '', jiraUrl: '', jiraProject: '', allowedIssuetypes: '',
       steps: [],                 // [{name, wip, matches: []}]
       saved: false, savedName: '',   // post-save "fetch data" panel
       activeIdx: null,
@@ -745,9 +755,13 @@
 
       // ---- save / dry-run / archive ----
       _target() {
+        const types = this.allowedIssuetypes
+          ? this.allowedIssuetypes.split(',').map(s => s.trim()).filter(Boolean)
+          : [];
         return {
           source: this.source, repo: this.repo || null,
           jira_url: this.jiraUrl || null, jira_project: this.jiraProject || null,
+          allowed_issuetypes: types,
         };
       },
       _contractBody() {
@@ -762,6 +776,15 @@
         if (this.source === 'jira') {
           if (this.jiraUrl) lines.push(`  jira_url: ${this.jiraUrl}`);
           if (this.jiraProject) lines.push(`  jira_project: ${this.jiraProject}`);
+          const types = this.allowedIssuetypes
+            ? this.allowedIssuetypes.split(',').map(s => s.trim()).filter(Boolean)
+            : [];
+          if (types.length) {
+            lines.push('  allowed_issuetypes:');
+            for (const t of types) {
+              lines.push(`    - ${t}`);
+            }
+          }
         }
         if (this.steps.length) {
           lines.push('  steps:');
@@ -833,6 +856,7 @@
         this.repo = p.repo || '';
         this.jiraUrl = p.jira_url || '';
         this.jiraProject = p.jira_project || '';
+        this.allowedIssuetypes = (p.allowed_issuetypes || []).join(', ');
         if (Array.isArray(p.steps) && p.steps.length) {
           this.steps = p.steps.map((s) => ({
             name: s.name, wip: !!s.wip,

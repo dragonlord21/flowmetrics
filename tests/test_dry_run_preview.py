@@ -239,6 +239,22 @@ class TestCapSemantics:
         assert captured.get("items_cap") == 50
         assert captured.get("since") == "2026-04-01"
 
+    def test_dry_run_passes_allowed_issuetypes_to_fetcher(self, workspace):
+        contracts, data = workspace
+        app = create_app(data_dir=data, contracts_dir=contracts)
+        captured = {}
+        def fetch(**kw):
+            captured.update(kw)
+            return {
+                "items": [],
+                "stopped_by": "time_window", "window_to": "2026-04-30",
+            }
+        payload = _payload([{"name": "WIP", "wip": True, "matches": []}], source="jira")
+        payload["workflow"]["allowed_issuetypes"] = ["Story", "Bug"]
+        with TestClient(app) as client:
+            _post(client, payload, mock_fetch=fetch)
+        assert captured.get("target", {}).get("allowed_issuetypes") == ["Story", "Bug"]
+
 
 class TestWizardUIHasDryRunSection:
     """The wizard renders the Dry-run disclosure panel under the

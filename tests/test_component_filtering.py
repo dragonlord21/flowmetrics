@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+
 import duckdb
 
 from flowmetrics.web.components import (
-    cycle_time,
-    throughput,
     aging,
+    cycle_time,
     forecast,
+    throughput,
     work_items_table,
 )
 
