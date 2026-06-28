@@ -302,6 +302,7 @@ def _issue_to_work_item(
 
     reporter = fields.get("reporter") or {}
     author_login = reporter.get("name") or reporter.get("accountId")
+    issue_type = (fields.get("issuetype") or {}).get("name")
 
     # Canonical Jira browse URL — same convention every Jira instance
     # uses (`<base>/browse/PROJECT-N`). Recorded on the WorkItem so
@@ -319,6 +320,7 @@ def _issue_to_work_item(
         author_login=author_login,
         status_intervals=intervals,
         url=url,
+        issuetype=issue_type,
     )
 
 

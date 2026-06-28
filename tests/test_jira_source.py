@@ -21,7 +21,7 @@ import httpx
 import pytest
 
 from flowmetrics.cache import CacheMiss, FileCache
-from flowmetrics.sources.jira import JIRA_SEARCH_QUERY, JiraSource
+from flowmetrics.sources.jira import JIRA_SEARCH_QUERY, JiraSource, _issue_to_work_item
 
 
 def _no_network_client() -> httpx.Client:
@@ -532,4 +532,21 @@ class TestJiraSourceFiltering:
         assert len(items) == 1
         assert items[0].item_id == "BIGTOP-1"
         assert items[0].title == "Allowed Story"
+
+    def test_jira_work_item_contains_issuetype(self):
+        issue_payload = {
+            "key": "TEST-100",
+            "fields": {
+                "summary": "Sample task",
+                "created": "2026-05-01T09:00:00.000+0000",
+                "resolutiondate": "2026-05-05T15:00:00.000+0000",
+                "status": {"name": "Resolved", "statusCategory": {"key": "done"}},
+                "reporter": {"displayName": "Alice", "accountId": "u-1"},
+                "issuetype": {"name": "Bug"},
+            },
+            "changelog": {"histories": []},
+        }
+        item = _issue_to_work_item(issue_payload)
+        assert item is not None
+        assert item.issuetype == "Bug"
 

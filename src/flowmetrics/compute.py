@@ -46,6 +46,7 @@ class WorkItem:
     # own URL convention). Renderers should consume `url` directly
     # rather than pattern-matching `item_id` to guess the source type.
     url: str | None = None
+    issuetype: str | None = None
 
 
 @dataclass(frozen=True)
