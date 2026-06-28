@@ -46,7 +46,11 @@ from .backfill import (
 )
 from .utc_dates import to_utc_display_date
 from .warehouse.connection import open_warehouse
-from .warehouse.queries import completion_date_range, latest_materialized_at
+from .warehouse.queries import (
+    completion_date_range,
+    latest_materialized_at,
+    observed_issuetypes,
+)
 from .web.components.aging import render as render_aging
 from .web.components.cfd import render as render_cfd
 from .web.components.cycle_time import render as render_cycle_time
@@ -177,6 +181,7 @@ class WorkflowView:
         data_dir: Path,
         query: dict | None = None,
         contracts_db=None,
+        request: Request | None = None,
     ) -> None:
         self.id = workflow_id
         self._data_dir = data_dir
@@ -217,6 +222,16 @@ class WorkflowView:
             data_max=self.data_max_date,
             data_min=self.data_min_date,
         )
+        if request is not None:
+            self.selected_issuetypes = request.query_params.getlist("issuetype")
+        elif query is not None and "issuetype" in query:
+            val = query["issuetype"]
+            if isinstance(val, list):
+                self.selected_issuetypes = list(val)
+            else:
+                self.selected_issuetypes = [val]
+        else:
+            self.selected_issuetypes = []
         # "Data is stale" diagnostic for the template. True when
         # the warehouse's latest completion is meaningfully
         # before today (>= 2 days) — typical cron lag is one
@@ -277,6 +292,14 @@ class WorkflowView:
         finally:
             con.close()
 
+    @property
+    def _observed_issuetypes(self) -> list[str]:
+        try:
+            with self.warehouse() as con:
+                return observed_issuetypes(con, self.id)
+        except Exception:
+            return []
+
     def template_context(self) -> dict:
         """Context for the filter bar + breadcrumb.
 
@@ -321,6 +344,8 @@ class WorkflowView:
             "source_display": _SOURCE_DISPLAY.get(
                 self.workflow.source, self.workflow.source.title()
             ),
+            "observed_issuetypes": self._observed_issuetypes,
+            "selected_issuetypes": self.selected_issuetypes,
         }
 
     def _aging_asof_display(self) -> str | None:
@@ -350,6 +375,7 @@ class WorkflowView:
             con, self.id,
             states=self.workflow.states,
             view=self.view_window,
+            issuetypes=self.selected_issuetypes,
         )
 
     def render_aging(
@@ -372,6 +398,7 @@ class WorkflowView:
             ptile_min=ptile_min, ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
             metric_thresholds=metric_thresholds,
+            issuetypes=self.selected_issuetypes,
         )
 
     def render_cycle_time(
@@ -389,12 +416,17 @@ class WorkflowView:
             ptile_min=ptile_min, ptile_max=ptile_max,
             ptile_ranges=ptile_ranges,
             metric_thresholds=metric_thresholds,
+            issuetypes=self.selected_issuetypes,
         )
 
     def render_throughput(self, con):
         # The throughput model derives its own coverage from the
         # observed completion span — caller passes only the view.
-        return render_throughput(con, self.id, view=self.view_window)
+        return render_throughput(
+            con, self.id,
+            view=self.view_window,
+            issuetypes=self.selected_issuetypes,
+        )
 
     def render_forecast_when_done(self, con, *, items: int, start_date=None):
         return render_forecast_when_done(
@@ -404,6 +436,7 @@ class WorkflowView:
             # the model's clock, not an ad-hoc now() in a route.
             start_date=start_date or self.today,
             reference=self.selection.reference,
+            issuetypes=self.selected_issuetypes,
         )
 
     def render_forecast_how_many(self, con, *, start_date=None, end_date=None):
@@ -414,10 +447,36 @@ class WorkflowView:
             # Default horizon: 7 inclusive days from the start.
             end_date=end_date or (start + timedelta(days=6)),
             reference=self.selection.reference,
+            issuetypes=self.selected_issuetypes,
         )
 
     def render_lifecycle(self, con, *, source: str, item_id: str):
         return render_lifecycle(con, self.id, source, item_id)
+
+
+from urllib.parse import parse_qsl, urlencode
+from jinja2 import pass_context
+
+_CARRIED_PARAMS = frozenset({
+    "period", "anchor", "view_days", "ref_days",
+    "ptile_min", "ptile_max", "ptile_ranges",
+    "issuetype",
+})
+
+@pass_context
+def _keep_filters(ctx, path: str) -> str:
+    request = ctx.get("request")
+    if request is None:
+        return path
+    carried = [
+        (k, v)
+        for k, v in parse_qsl(request.url.query)
+        if k in _CARRIED_PARAMS
+    ]
+    if not carried:
+        return path
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{urlencode(carried)}"
 
 
 def create_app(
@@ -470,30 +529,6 @@ def create_app(
     # query keys. Without the whitelist, internal-endpoint
     # params (`workflow=` on the dashboard-tile route) would
     # leak into every navigation URL.
-    from urllib.parse import parse_qsl, urlencode
-
-    from jinja2 import pass_context
-
-    _CARRIED_PARAMS = frozenset({
-        "period", "anchor", "view_days", "ref_days",
-        "ptile_min", "ptile_max", "ptile_ranges",
-    })
-
-    @pass_context
-    def _keep_filters(ctx, path: str) -> str:
-        request = ctx.get("request")
-        if request is None:
-            return path
-        carried = [
-            (k, v)
-            for k, v in parse_qsl(request.url.query)
-            if k in _CARRIED_PARAMS
-        ]
-        if not carried:
-            return path
-        sep = "&" if "?" in path else "?"
-        return f"{path}{sep}{urlencode(carried)}"
-
     templates.env.filters["keep_filters"] = _keep_filters
 
     def _clamp_ptile(pmin, pmax) -> tuple[int, int]:
@@ -598,6 +633,7 @@ def create_app(
             data_dir=data_dir,
             query=query,
             contracts_db=contracts_db,
+            request=request,
         )
 
     def _parse_iso_date(value: str | None):
@@ -1606,6 +1642,7 @@ def create_app(
                 ptile_min=pmin, ptile_max=pmax,
                 ptile_ranges=pranges,
                 metric_thresholds=(pct.p50, pct.p85, pct.p95),
+                issuetypes=view.selected_issuetypes,
             )
         return templates.TemplateResponse(
             request,
@@ -1672,6 +1709,7 @@ def create_app(
             throughput = view.render_throughput(con)
             work_items = render_work_items_table(
                 con, workflow_id, view=view.view_window,
+                issuetypes=view.selected_issuetypes,
             )
         return templates.TemplateResponse(
             request,
@@ -1754,6 +1792,7 @@ def create_app(
                 # showed zero rows while the chart showed dots
                 # above the P95 line).
                 metric_thresholds=(pct.p50, pct.p85, pct.p95),
+                issuetypes=view.selected_issuetypes,
             )
         return templates.TemplateResponse(
             request,
@@ -2047,6 +2086,7 @@ def create_app(
                 ptile_max=pmax,
                 ptile_ranges=_parse_ptile_ranges(ptile_ranges),
                 metric_thresholds=_parse_ptile_thresholds(ptile_thresholds),
+                issuetypes=view.selected_issuetypes,
             )
         response = templates.TemplateResponse(
             request,
