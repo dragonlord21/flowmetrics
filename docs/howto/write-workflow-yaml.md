@@ -60,6 +60,25 @@ workflow:
   stop:  2026-05-11
 ```
 
+### Jira Ticket Type Filtering
+
+You can restrict which issue types are fetched from Jira by providing the optional `allowed_issuetypes` list. If specified, only issues matching those types (e.g., `Story`, `Bug`) will be requested from the Jira API via JQL and verified during import.
+
+```yaml
+workflow:
+  name: cassandra-month-filtered
+  source: jira
+  jira_url:     https://issues.apache.org/jira
+  jira_project: CASSANDRA
+  start: 2026-04-12
+  stop:  2026-05-11
+  allowed_issuetypes:
+    - Story
+    - Bug
+```
+
+When a workflow contains observed issue types, the Web UI automatically displays an **Issue types** checkbox group in the filter bar. Selecting these options dynamically filters the metrics, charts (CFD, Aging, Cycle Time, Throughput, Forecast), and the work items table in real-time via HTMX, preserving the selections in the URL query string (e.g. `?issuetype=Story&issuetype=Bug`).
+
 ## Reference + starters
 
 - Field reference + all valid combinations:

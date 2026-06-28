@@ -223,6 +223,7 @@ workflow:
   # Jira
   jira_url: https://…        # required when source: jira
   jira_project: KEY          # required when source: jira
+  allowed_issuetypes: [a, b] # optional — ticket types to fetch (e.g. [Story, Bug])
 ```
 
 > **Legacy.** The top-level key was `contract:` in older versions and
@@ -238,6 +239,11 @@ workflow:
   progress. First-match wins. See
   [GitHub label-driven CFD and Aging](explain/github-labels.md) for
   the resolution rules.
+
+### Jira Ticket Type Filtering
+
+- `allowed_issuetypes`: Optional list of issue type names (e.g., `Story`, `Bug`, `Task`) to restrict which tickets are processed. When set, only these types are queried from the Jira API via JQL and accepted during import.
+- **Dynamic Dashboard Filters**: When a workflow has observed issue types, the Web UI renders an **Issue types** checkbox group in the filter bar. Checking and unchecking filters the entire dashboard (CFD, Aging, Cycle Time, Throughput, Forecast, and tables) in real-time using HTMX. The filter selections are preserved directly in the URL query parameters (e.g., `?issuetype=Story&issuetype=Bug`).
 
 Worked starters: [`samples/`](../samples/).
 
