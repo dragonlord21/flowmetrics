@@ -27,6 +27,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import httpx
+import ssl
+import truststore
 
 from . import signals
 
@@ -115,8 +117,9 @@ def probe_source_exists(source: str, target: dict) -> dict:
         # API v2 — Apache's public Jira is Jira Server.
         url = f"{base.rstrip('/')}/rest/api/2/project/{project}"
         token = (target or {}).get("jira_pat")
+        ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         try:
-            r = httpx.get(url, timeout=10.0, headers=jira_headers(token))
+            r = httpx.get(url, timeout=10.0, headers=jira_headers(token), verify=ctx)
         except httpx.HTTPError as exc:
             return {"ok": False, "error": str(exc)}
         if r.status_code == 404:

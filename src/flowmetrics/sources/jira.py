@@ -24,6 +24,8 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 import httpx
+import ssl
+import truststore
 from dateutil.parser import isoparse
 
 from ..cache import CacheMiss, FileCache
@@ -74,6 +76,8 @@ class JiraSource:
             token = os.environ.get("JIRA_PAT")
             if token:
                 self.token = token.strip()
+        
+        self.ctx = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 
     @property
     def label(self) -> str:
@@ -89,7 +93,7 @@ class JiraSource:
     def _client(self) -> httpx.Client:
         if self.http_client is not None:
             return self.http_client
-        self.http_client = httpx.Client(timeout=self.timeout)
+        self.http_client = httpx.Client(timeout=self.timeout, verify=self.ctx)
         self._owns_client = True
         return self.http_client
 

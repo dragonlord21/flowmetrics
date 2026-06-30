@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "pyyaml>=6.0.3",
     "rich>=15.0.0",
+    "truststore>=0.10.4",
     "uvicorn>=0.47.0",
 ]
 
