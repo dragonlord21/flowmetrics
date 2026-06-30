@@ -226,7 +226,11 @@ class WorkflowView:
             data_min=self.data_min_date,
         )
         if request is not None:
-            self.selected_issuetypes = request.query_params.getlist("issuetype")
+            if (request.query_params.getlist("issuetype") is not None and len(request.query_params.getlist("issuetype")) > 0):
+                self.selected_issuetypes = request.query_params.getlist("issuetype")
+            else:
+                self.selected_issuetypes = self._observed_issuetypes.copy()
+            print("request params", request.query_params)
         elif query is not None and "issuetype" in query:
             val = query["issuetype"]
             if isinstance(val, list):
@@ -234,7 +238,9 @@ class WorkflowView:
             else:
                 self.selected_issuetypes = [val]
         else:
-            self.selected_issuetypes = []
+            self.selected_issuetypes = self._observed_issuetypes.copy()
+
+        print(self.selected_issuetypes, self._observed_issuetypes)
         # "Data is stale" diagnostic for the template. True when
         # the warehouse's latest completion is meaningfully
         # before today (>= 2 days) — typical cron lag is one
